@@ -1,0 +1,38 @@
+package com.shop.identity.internal.security;
+
+import com.shop.shared.error.ErrorCode;
+import com.shop.shared.web.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+
+@Component
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+public class JwtAccessDeniedHandler implements AccessDeniedHandler {
+
+    ObjectMapper objectMapper;
+
+    @Override
+    public void handle(
+            HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException)
+            throws IOException {
+        ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
+        response.setStatus(errorCode.getStatusCode().value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+        ApiResponse<Void> apiResponse = ApiResponse.<Void>builder()
+                .code(errorCode.getCode())
+                .message(errorCode.getMessage())
+                .build();
+        objectMapper.writeValue(response.getOutputStream(), apiResponse);
+    }
+}

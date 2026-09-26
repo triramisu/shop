@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:shop;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+
+jwt:
+  signerKey: test-only-hs512-key-with-at-least-sixty-four-bytes-0123456789-abcdefghijk
+  valid-duration: 3600
+  refreshable-duration: 36000
+  cleanup-interval: 3600000
+  cleanup-initial-delay: 3600000
+  issuer: shop-test
+  audience: shop-api-test
+
+app:
+  security:
+    rate-limit:
+      enabled: false
+    captcha:
+      enabled: false

@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: shop
+  datasource:
+    url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_NAME:shop}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:shop}
+    password: ${DB_PASSWORD:shop-local-password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  paths-to-match: /api/**
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  security:
+    rate-limit:
+      enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+      max-buckets: ${AUTH_RATE_LIMIT_MAX_BUCKETS:10000}
+      bucket-idle-time: ${AUTH_RATE_LIMIT_BUCKET_IDLE_TIME:10m}
+      cleanup-interval: ${AUTH_RATE_LIMIT_CLEANUP_INTERVAL:60000}
+      registration:
+        capacity: ${AUTH_RATE_LIMIT_REGISTRATION_CAPACITY:5}
+        refill-period: ${AUTH_RATE_LIMIT_REGISTRATION_REFILL:1m}
+      login:
+        capacity: ${AUTH_RATE_LIMIT_LOGIN_CAPACITY:10}
+        refill-period: ${AUTH_RATE_LIMIT_LOGIN_REFILL:1m}
+      captcha:
+        capacity: ${AUTH_RATE_LIMIT_CAPTCHA_CAPACITY:10}
+        refill-period: ${AUTH_RATE_LIMIT_CAPTCHA_REFILL:1m}
+      introspection:
+        capacity: ${AUTH_RATE_LIMIT_INTROSPECTION_CAPACITY:60}
+        refill-period: ${AUTH_RATE_LIMIT_INTROSPECTION_REFILL:1m}
+      refresh:
+        capacity: ${AUTH_RATE_LIMIT_REFRESH_CAPACITY:30}
+        refill-period: ${AUTH_RATE_LIMIT_REFRESH_REFILL:1m}
+      logout:
+        capacity: ${AUTH_RATE_LIMIT_LOGOUT_CAPACITY:30}
+        refill-period: ${AUTH_RATE_LIMIT_LOGOUT_REFILL:1m}
+    captcha:
+      enabled: ${AUTH_CAPTCHA_ENABLED:true}
+      failure-threshold: ${AUTH_CAPTCHA_FAILURE_THRESHOLD:3}
+      failure-window: ${AUTH_CAPTCHA_FAILURE_WINDOW:15m}
+      challenge-ttl: ${AUTH_CAPTCHA_CHALLENGE_TTL:2m}
+      max-active-challenges: ${AUTH_CAPTCHA_MAX_ACTIVE_CHALLENGES:10000}
+      cleanup-interval: ${AUTH_CAPTCHA_CLEANUP_INTERVAL:60000}
+      cleanup-initial-delay: ${AUTH_CAPTCHA_CLEANUP_INITIAL_DELAY:60000}
+
+logging:
+  pattern:
+    level: "%5p [correlationId:%X{correlationId:-none}]"
+
+jwt:
+  signerKey: "1TjXchw5FloESb63Kc+DFhTARvpWL4jUGCwfGWxuG5SIf/1y/LgJxHnMqaF6A/ij"
+  valid-duration: 3600 # in seconds
+  refreshable-duration: 36000 # in seconds
+  cleanup-interval: 3600000 # in milliseconds
+  cleanup-initial-delay: 3600000 # in milliseconds
+  issuer: ${JWT_ISSUER:shop}
+  audience: ${JWT_AUDIENCE:shop-api}
