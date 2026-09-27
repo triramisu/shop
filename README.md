@@ -276,13 +276,49 @@ Tiêu chí hoàn thành M5:
 - [ ] M6.7 Load test các điểm login, search, checkout và reserve stock.
 - [ ] M6.8 Threat review và dependency/security scan.
 - [ ] M6.9 Audit trail và lịch sử truy cập.
-  - [ ] M6.9A Tách access log kỹ thuật khỏi audit event nghiệp vụ; không ghi mọi request đọc thông thường vào database.
-  - [ ] M6.9B Tạo entity và migration cho bảng append-only `he_thong_lich_su_truy_cap`, dùng UUID và thời gian UTC.
-  - [ ] M6.9C Ghi nhận đăng nhập thành công/thất bại, logout, refresh/revoke token, thay đổi mật khẩu/hồ sơ, thao tác quản trị, thay đổi trạng thái nghiệp vụ quan trọng và tác vụ tự động do hệ thống thực hiện.
-  - [ ] M6.9D Phát audit event tin cậy qua transaction/outbox; sự kiện bảo mật và thanh toán không được mất khi tiến trình bị lỗi.
-  - [ ] M6.9E Cung cấp API quản trị có quyền riêng và data scope theo shop/seller để lọc theo actor, action, module, outcome, IP, correlation ID, resource và khoảng thời gian; hỗ trợ phân trang và timeline theo đối tượng nghiệp vụ; không có API sửa hoặc xóa từng bản ghi audit.
-  - [ ] M6.9F Xuất lịch sử theo giới hạn thời gian/kích thước bằng streaming hoặc job bất đồng bộ; không tải toàn bộ dữ liệu rồi trả file Base64 trong JSON và phải audit chính thao tác xuất.
-  - [ ] M6.9G Thiết lập index, retention/archive, giới hạn kích thước chi tiết, che dữ liệu cá nhân và test chống ghi trùng/lộ bí mật; chi tiết riêng của module dùng snapshot/JSON có schema thay vì quan hệ `OneToOne` cứng với một bảng nghiệp vụ dùng chung.
+
+Trình tự thực hiện M6.9 — chỉ chuyển sang bước sau khi bước hiện tại đạt điều kiện nghiệm thu:
+
+- [ ] M6.9A Chốt phạm vi và danh mục sự kiện.
+  - Thực hiện: tách access log kỹ thuật khỏi audit event; lập ma trận `action_code` gồm điểm phát sinh, actor, resource, outcome, mức nhạy cảm, thời hạn lưu và module sở hữu.
+  - Đầu ra: tài liệu danh mục cho các nhóm authentication, user/permission, product, order, inventory, payment, export và system job; request đọc thông thường không được ghi vào database nếu không truy cập dữ liệu nhạy cảm.
+  - Nghiệm thu: mọi sự kiện đều có mã ổn định và lý do cần audit; không còn trường hợp dùng nhãn hiển thị làm định danh sự kiện.
+- [ ] M6.9B Tạo cấu trúc module và hợp đồng dữ liệu.
+  - Thực hiện: tạo package `audit` tách rõ `controller`, `dto.request`, `dto.response`, `entity`, `repository`, `service`, `event` và `config`; định nghĩa enum actor/outcome cùng DTO/event bất biến.
+  - Đầu ra: hợp đồng dữ liệu bên dưới được version hóa; module nghiệp vụ chỉ phụ thuộc cổng phát sự kiện, không gọi audit repository trực tiếp.
+  - Nghiệm thu: compile thành công, Spring Modulith và ArchUnit không báo vi phạm phụ thuộc module.
+- [ ] M6.9C Tạo schema lưu trữ append-only.
+  - Thực hiện: thêm Flyway migration, entity và repository cho `he_thong_lich_su_truy_cap`; dùng UUID, `Instant` UTC, giới hạn độ dài cột/JSON và các index đã xác định.
+  - Đầu ra: migration chạy được trên schema rỗng và schema hiện có; tầng ứng dụng không cung cấp thao tác update/delete bản ghi audit.
+  - Nghiệm thu: migration test, repository test và kiểm tra unique/idempotency đều đạt; tên bảng/cột được khai báo tường minh.
+- [ ] M6.9D Chuẩn hóa ngữ cảnh request và bảo vệ dữ liệu.
+  - Thực hiện: tạo resolver dùng `Clock`, correlation ID, user-agent và IP; chỉ đọc proxy header từ trusted proxy; tạo allowlist/redactor cho `detail_json`.
+  - Đầu ra: actor snapshot và request metadata được thu thập tại một nơi dùng chung, không sao chép logic trong từng service.
+  - Nghiệm thu: test xác nhận không giả mạo được IP qua `X-Forwarded-For` từ nguồn không tin cậy và password/token/cookie/CAPTCHA answer luôn bị loại bỏ.
+- [ ] M6.9E Xây luồng ghi sự kiện tin cậy.
+  - Thực hiện: tạo cổng phát audit event, writer và cơ chế transaction/outbox; dùng `business_event_id` làm khóa chống ghi trùng khi consumer retry.
+  - Đầu ra: business service phát sự kiện có kiểu thay vì tự dựng entity; quy tắc xử lý lỗi ghi audit được tài liệu hóa riêng cho security event và business event.
+  - Nghiệm thu: integration test chứng minh commit tạo đúng một audit record, rollback không tạo bản ghi sai và retry không tạo bản ghi trùng.
+- [ ] M6.9F Gắn audit vào authentication và quản trị tài khoản.
+  - Thực hiện: phát sự kiện cho login success/failure/denied, logout, refresh/revoke, đổi/reset mật khẩu, cập nhật hồ sơ và thay đổi role/permission; login thất bại cho phép `actor_user_id = null`.
+  - Đầu ra: mỗi luồng có `outcome`, HTTP metadata và lý do thất bại đã chuẩn hóa nhưng không lộ thông tin giúp dò tài khoản.
+  - Nghiệm thu: test API xác nhận từng luồng tạo đúng sự kiện, token đã logout/revoke không được chấp nhận và log không chứa credential/token thô.
+- [ ] M6.9G Gắn audit vào nghiệp vụ và tác vụ hệ thống.
+  - Thực hiện: phát sự kiện cho thay đổi trạng thái quan trọng của Product, Order, Inventory và Payment; scheduled job dùng `actor_type = SYSTEM`.
+  - Đầu ra: mỗi event có `resource_type`, `resource_id` và snapshot/diff tối thiểu có schema/version; không tạo foreign key xuyên module.
+  - Nghiệm thu: test timeline của resource đúng thứ tự và tác vụ hệ thống không cần giả lập người dùng đăng nhập.
+- [ ] M6.9H Xây API tra cứu có phân quyền.
+  - Thực hiện: thêm quyền riêng `AUDIT_READ`; xây API lọc theo actor, action, module, outcome, IP, correlation ID, resource và khoảng thời gian UTC; hỗ trợ timeline resource và cursor/keyset pagination.
+  - Đầu ra: platform admin xem theo phạm vi được cấp, shop/seller chỉ xem dữ liệu thuộc shop của mình; không có API sửa/xóa audit.
+  - Nghiệm thu: test trả `403` khi thiếu quyền, không rò dữ liệu chéo shop/seller, khoảng ngày dùng `[from, to)` và kết quả sắp xếp ổn định theo `occurred_at`, `id`.
+- [ ] M6.9I Xây xuất dữ liệu và chính sách vòng đời.
+  - Thực hiện: thêm quyền `AUDIT_EXPORT`, giới hạn khoảng ngày/số lượng và xuất bằng streaming hoặc job bất đồng bộ; cấu hình retention/archive và cleanup theo batch.
+  - Đầu ra: không tải toàn bộ dữ liệu vào RAM, không trả file Base64 trong JSON; chính thao tác yêu cầu/tải bản xuất cũng được audit.
+  - Nghiệm thu: test giới hạn export, quyền truy cập file, thời hạn file, cleanup/archive và tải lớn không làm cạn heap.
+- [ ] M6.9J Hoàn tất quality gate và tài liệu vận hành.
+  - Thực hiện: chạy Spotless, unit test, integration test, Modulith, ArchUnit, migration test và security test; cập nhật OpenAPI, retention, quyền xem IP/user-agent và runbook điều tra sự cố.
+  - Đầu ra: báo cáo kiểm thử và ví dụ truy vết hoàn chỉnh từ `correlation_id` hoặc resource tới audit record và structured log.
+  - Nghiệm thu: toàn bộ tiêu chí M6.9 bên dưới đạt, không còn lỗi đã biết mức cao/nghiêm trọng; chỉ khi đó mới đánh dấu M6.9 hoàn thành và chuyển nhiệm vụ.
 
 Hợp đồng dữ liệu dự kiến cho M6.9:
 
