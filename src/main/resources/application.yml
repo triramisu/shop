@@ -44,6 +44,12 @@ springdoc:
     tags-sorter: alpha
 
 app:
+  identity:
+    super-admin:
+      bootstrap-enabled: ${SUPER_ADMIN_BOOTSTRAP_ENABLED:false}
+      username: ${SUPER_ADMIN_USERNAME:}
+      email: ${SUPER_ADMIN_EMAIL:}
+      password: ${SUPER_ADMIN_PASSWORD:}
   open-api:
     info:
       title: ${OPENAPI_TITLE:Shop API}

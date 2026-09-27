@@ -77,6 +77,9 @@ public class GlobalExceptionHandler {
         if (fieldError == null || fieldError.getDefaultMessage() == null) {
             return ErrorCode.INVALID_KEY;
         }
+        if (fieldError.isBindingFailure()) {
+            return ErrorCode.MALFORMED_REQUEST;
+        }
         try {
             return ErrorCode.valueOf(fieldError.getDefaultMessage());
         } catch (IllegalArgumentException exception) {

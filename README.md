@@ -12,8 +12,8 @@ Cách làm này giúp phát triển và debug nhanh ở giai đoạn đầu như
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M1 — Identity và RBAC`
-- Nhiệm vụ vừa hoàn thành: `M1.5 — API my-info, cập nhật hồ sơ và đổi mật khẩu`
-- Nhiệm vụ kế tiếp: `M1.6 — Admin quản lý user/role/permission` (**chưa bắt đầu**)
+- Nhiệm vụ vừa hoàn thành: `M1.6 — Phân hệ quản trị hệ thống và RBAC`
+- Nhiệm vụ kế tiếp: `M1.7 — Ownership trước mutation` (**chưa bắt đầu**)
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
 - Kiến trúc đích: Gateway + Identity + Catalog + Inventory + Order + Payment.
@@ -213,10 +213,14 @@ Tiêu chí hoàn thành M0:
 - [x] M1.4G Chuẩn hóa artifact, application name và JWT issuer thành `shop`.
 - [x] M1.4H Gom CAPTCHA thành feature package và soát chất lượng toàn dự án.
 - [x] M1.5 API `my-info`, cập nhật hồ sơ và đổi mật khẩu.
-- [ ] M1.6 Admin quản lý user/role/permission.
-  - Yêu cầu: ADMIN được lọc/phân trang user, khóa/mở khóa tài khoản, gán/bỏ role và quản lý role-permission; bảo vệ role hệ thống và không cho vô hiệu hóa/xóa quản trị viên hoạt động cuối cùng.
-  - Đầu ra: controller, request/response DTO, service, repository query, permission constants, OpenAPI và migration nếu schema cần thay đổi; không trả entity hoặc password hash ra API.
-  - Ví dụ và nghiệm thu: ADMIN gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; thao tác làm mất quản trị viên cuối cùng trả `409`; unit, repository, controller và security integration test đạt.
+- [x] M1.6 Phân hệ quản trị hệ thống: user, role và permission.
+  - Yêu cầu chức năng: lọc/phân trang user; xem chi tiết; khóa/mở khóa; gán/bỏ role; xem danh mục permission; tạo/sửa/xóa role tùy biến và cấu hình role-permission. Permission là capability do code sở hữu, không cho tạo chuỗi permission tùy ý qua API.
+  - Mô hình quyền: `SUPER_ADMIN` là cấp cao nhất và là tài khoản duy nhất được quản lý role; `ADMIN` được quản lý user trong phạm vi quyền mình đang có; `USER` không được truy cập phân hệ. `SUPER_ADMIN`, `ADMIN`, `USER` là role hệ thống, không được sửa/xóa.
+  - Bảo vệ: không gán `SUPER_ADMIN` qua API; không khóa, vô hiệu hóa hoặc đổi role của tài khoản `SUPER_ADMIN`; `ADMIN` không thể sửa tài khoản `ADMIN` khác hay tự nâng quyền; mọi thay đổi status/role/role-permission thu hồi phiên liên quan ngay.
+  - Bootstrap: tạo đúng một tài khoản `SUPER_ADMIN` từ biến môi trường có kiểm tra; không có username/password mặc định và không lưu mật khẩu rõ trong source/database.
+  - Đầu ra: feature package `identity.internal.administration`, request/response DTO, service, repository query, permission constants, OpenAPI, Flyway V6 và test H2/MySQL; không trả entity hoặc password hash ra API.
+  - Ví dụ và nghiệm thu: ADMIN lọc user và gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; role hệ thống/tài khoản cao nhất trả `409`; token mang quyền cũ bị từ chối ngay sau mutation; toàn bộ quality gate đạt.
+  - Ngoài phạm vi: lịch sử truy cập vẫn thuộc M6.9 vì cần kho append-only, event/outbox, retention và quyền xem dữ liệu nhạy cảm. API tra cứu sau này sẽ nằm trong không gian quản trị hệ thống nhưng không được ghi trực tiếp rải rác từ service M1.6.
 - [ ] M1.7 Kiểm tra ownership trước khi ghi dữ liệu; không dùng `@PostAuthorize` cho update.
   - Yêu cầu: mọi lệnh sửa/xóa dữ liệu người dùng kiểm tra actor, ownership và quyền quản trị trước khi mutation; chốt chính sách trả `403` hoặc `404` để không rò sự tồn tại tài nguyên.
   - Đầu ra: ownership policy dùng lại được ở service/repository predicate, error code thống nhất và test chéo tài khoản; không kiểm tra quyền sau khi dữ liệu đã bị ghi.
@@ -229,7 +233,7 @@ Tiêu chí hoàn thành M0:
 Tiêu chí hoàn thành M1:
 
 - USER không thể tự cấp ADMIN hoặc sửa dữ liệu người khác.
-- API role/permission chỉ dành cho ADMIN.
+- API quản trị áp dụng permission tường minh; chỉ `SUPER_ADMIN` quản lý role, còn `ADMIN` không thể cấp quyền cao hơn quyền đang có.
 - Access token và refresh token tách biệt, có rotation/revoke test.
 - Trước production, JWT key local/dev phải được thay bằng environment/secret riêng.
 
@@ -602,11 +606,20 @@ Ngày 2026-09-27:
 - Không sao chép global security requirement; integration test xác nhận register, token và CAPTCHA vẫn là API công khai trên tài liệu, còn `my-info` tiếp tục yêu cầu Bearer JWT.
 - `mvnw.cmd spotless:check clean verify` sau M6.2A.1: thành công với 55 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
 - Đã phân tích 47.588 bản ghi mẫu trong `ht_lich_su_truy_cap.xlsx` và bổ sung backlog M6.9; giữ các trường actor/action/module/time/IP/business reference hữu ích, loại bỏ hai trường rỗng hoàn toàn và bổ sung outcome, correlation ID, user-agent, HTTP/resource metadata, retention cùng quy tắc không lưu secret.
-- M6.9 hiện chỉ là thiết kế tương lai, chưa tạo entity, migration hoặc API và không thay đổi nhiệm vụ kế tiếp M1.6.
-- Đã chuẩn hóa task contract bắt buộc gồm mục tiêu/phạm vi, phụ thuộc, yêu cầu chức năng, bảo mật/phi chức năng, đầu ra, ví dụ, nghiệm thu và rollout/rollback; toàn bộ nhiệm vụ chưa hoàn thành từ M1.6 đến M7.10 đã có yêu cầu, đầu ra và ví dụ nghiệm thu cụ thể.
+- M6.9 hiện chỉ là thiết kế tương lai, chưa tạo entity, migration hoặc API; nhiệm vụ kế tiếp theo thứ tự triển khai là M1.7.
+- Đã chuẩn hóa task contract bắt buộc gồm mục tiêu/phạm vi, phụ thuộc, yêu cầu chức năng, bảo mật/phi chức năng, đầu ra, ví dụ, nghiệm thu và rollout/rollback; toàn bộ nhiệm vụ chưa hoàn thành từ M1.7 đến M7.10 đã có yêu cầu, đầu ra và ví dụ nghiệm thu cụ thể.
 - Hai tài liệu tích hợp SSO do người dùng cung cấp chỉ được dùng làm ví dụ về cách viết yêu cầu, đầu ra và nghiệm thu; VNeID SSO không thuộc phạm vi Shop và không được thêm vào backlog.
+- M1.6 học mô hình user–role–chức năng từ `khcn-sso` và gom toàn bộ use case mới trong feature package `identity.internal.administration`; không sao chép role ID hard-code, mật khẩu mặc định, controller trả `Object` hoặc service quản trị quá lớn.
+- Flyway V6 thêm cờ bảo vệ role hệ thống, seed `SUPER_ADMIN`, sáu capability quản trị và ma trận permission cho `SUPER_ADMIN`/`ADMIN`; migration đã chạy trên H2 2.3 và MySQL 8.0.46.
+- Tài khoản `SUPER_ADMIN` duy nhất được bootstrap bằng bốn biến môi trường, mật khẩu BCrypt và không có credential mặc định; API không thể gán role này, khóa tài khoản này hoặc sửa/xóa ba role hệ thống.
+- Phân hệ công bố API lọc/phân trang user, xem chi tiết, đổi status/role, xem permission và CRUD role tùy biến; request/response dùng DTO, validation chuẩn và không lộ entity/password hash.
+- `ADMIN` chỉ gán được role có tập permission không vượt quyền của chính mình; chỉ `SUPER_ADMIN` quản lý role hoặc tài khoản `ADMIN`. `USER` nhận `403` tại toàn bộ endpoint quản trị.
+- Thay đổi status, tập role hoặc role-permission thu hồi refresh session liên quan trong cùng transaction; regression test xác nhận access token chứa claim cũ lập tức nhận `401`.
+- Test MySQL thật đã phát hiện cú pháp escape chỉ H2 chấp nhận trong bản migration đầu; migration được sửa thành seed tường minh và chạy lại thành công trên cả hai database.
+- `mvnw.cmd spotless:check clean verify` sau M1.6: thành công với 63 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V6, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
+- Lịch sử truy cập chưa được code trong M1.6; backlog M6.9 tiếp tục sở hữu kho audit append-only và sau này cung cấp API đọc trong không gian quản trị hệ thống.
 
-Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
+Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5, M1.6 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.7 chưa bắt đầu.
 
 ## 8. Luồng nghiệp vụ đích
 
@@ -708,7 +721,7 @@ Content-Type: application/json
 
 Mỗi CAPTCHA chỉ dùng một lần và mặc định hết hạn sau hai phút. Login thành công xóa bộ đếm thất bại. Có thể điều chỉnh bằng `AUTH_CAPTCHA_*`, nhưng không tắt CAPTCHA hoặc rate limit ở production nếu chưa có lớp bảo vệ tương đương tại edge.
 
-Các endpoint xác thực và hồ sơ đã hoàn thành đến M1.5:
+Các endpoint Identity đã hoàn thành đến M1.6:
 
 ```text
 POST /api/auth/register    Đăng ký tài khoản với role USER
@@ -720,7 +733,39 @@ POST /api/auth/logout      Thu hồi toàn bộ token family bằng refresh toke
 GET  /api/auth/my-info     Đọc hồ sơ của tài khoản trong access token
 PUT  /api/auth/my-info     Cập nhật hồ sơ của tài khoản trong access token
 PUT  /api/auth/my-info/password  Đổi mật khẩu và thu hồi mọi phiên hiện có
+GET    /api/system-administration/users                    Lọc và phân trang user
+GET    /api/system-administration/users/{userId}           Xem chi tiết user
+PATCH  /api/system-administration/users/{userId}/status    Khóa/mở khóa user
+PUT    /api/system-administration/users/{userId}/roles     Thay tập role của user
+GET    /api/system-administration/roles                    Xem role và permission đã gán
+POST   /api/system-administration/roles                    Tạo role tùy biến
+PUT    /api/system-administration/roles/{roleCode}         Sửa role tùy biến
+DELETE /api/system-administration/roles/{roleCode}         Xóa role tùy biến chưa sử dụng
+GET    /api/system-administration/permissions              Xem capability do hệ thống hỗ trợ
 ```
+
+Ma trận quyền quản trị:
+
+| Chức năng | SUPER_ADMIN | ADMIN | USER |
+|---|:---:|:---:|:---:|
+| Xem user/role/permission | Có | Có | Không |
+| Khóa/mở khóa user thường | Có | Có | Không |
+| Đổi role user thường | Có | Có, không vượt quyền hiện có | Không |
+| Quản lý tài khoản ADMIN | Có | Không | Không |
+| Tạo/sửa/xóa role tùy biến | Có | Không | Không |
+| Sửa/xóa role hệ thống hoặc tài khoản SUPER_ADMIN | Không | Không | Không |
+
+Tạo tài khoản cao nhất lần đầu bằng biến môi trường. Chỉ bật bootstrap khi khởi tạo, sau khi đăng nhập thành công phải tắt `SUPER_ADMIN_BOOTSTRAP_ENABLED` và xóa password khỏi môi trường chạy:
+
+```powershell
+$env:SUPER_ADMIN_BOOTSTRAP_ENABLED="true"
+$env:SUPER_ADMIN_USERNAME="platform-root"
+$env:SUPER_ADMIN_EMAIL="platform-root@example.com"
+$env:SUPER_ADMIN_PASSWORD="replace-with-a-strong-unique-password"
+.\mvnw.cmd spring-boot:run
+```
+
+Ứng dụng từ chối khởi tạo thêm nếu đã có một `SUPER_ADMIN`; nếu database bị can thiệp thành nhiều tài khoản `SUPER_ADMIN`, startup fail-fast. Role/permission nằm trong access token, vì vậy thay đổi status, role hoặc permission sẽ thu hồi refresh session tương ứng để access token cũ mất hiệu lực ngay.
 
 Đọc hồ sơ hiện tại:
 
@@ -846,3 +891,11 @@ Trạng thái: Accepted.
 Dự án `section3` bật Spring Cloud OpenFeign Circuit Breaker và đặt TimeLimiter mặc định 5 giây cho các lời gọi từ Account Service sang Notification/Statistic Service. Ý tưởng bảo vệ outbound call là đúng, nhưng cấu hình mẫu chưa chỉ định sliding window, số call tối thiểu, failure/slow-call threshold và hành vi half-open; fallback chỉ ghi log rồi bỏ qua lỗi nên không phù hợp cho payment hoặc thao tác bắt buộc phải thành công.
 
 Shop hiện là modular monolith và Identity không có HTTP client gọi dịch vụ ngoài, vì vậy chưa thêm Resilience4j hoặc Spring Cloud chỉ để tạo cấu hình không được thực thi. Circuit Breaker sẽ được thêm theo từng outbound adapter khi tích hợp object storage, payment provider hoặc khi tách microservice. Mỗi dependency có instance riêng, timeout hữu hạn, fallback theo nghiệp vụ, metrics và test cho trạng thái closed/open/half-open; retry chỉ dùng với thao tác an toàn hoặc có idempotency.
+
+### ADR-006: Phân quyền quản trị theo capability và một SUPER_ADMIN
+
+Trạng thái: Accepted.
+
+Giữ mô hình user–role–chức năng từ `khcn-sso`, nhưng không sao chép ID role hard-code, mật khẩu mặc định, service quản trị quá lớn hoặc annotation quyền bị comment. Shop dùng permission constant trùng với dữ liệu Flyway, controller kiểm tra bằng `@PreAuthorize` và service tiếp tục bảo vệ invariant quan trọng.
+
+Permission là capability mà code thực sự kiểm tra nên API chỉ cho xem danh mục, không cho tự tạo permission. Role tùy biến được cấu hình từ capability có sẵn. `SUPER_ADMIN` chỉ được bootstrap từ environment, không thể gán qua API và tài khoản này không thể bị khóa hoặc đổi role; sửa quyền làm thu hồi các phiên đang giữ claim cũ.

@@ -75,11 +75,11 @@ class MySqlCompatibilityIntegrationTests {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE", Integer.class);
         Integer defaultRoleCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'USER')", Integer.class);
+                "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('SUPER_ADMIN', 'ADMIN', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(5);
-        assertThat(defaultRoleCount).isEqualTo(2);
+        assertThat(migrationCount).isEqualTo(6);
+        assertThat(defaultRoleCount).isEqualTo(3);
     }
 
     @Test
