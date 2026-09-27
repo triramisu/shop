@@ -552,7 +552,7 @@ Ngày 2026-09-25:
 - Success/error response dùng chung `ApiResponse<T>` với mã số ổn định; không trả chi tiết exception nội bộ.
 - `GlobalExceptionHandler` dùng chung xử lý `AppException`, validation, access denied, request sai định dạng, 404, method sai và lỗi ngoài dự kiến.
 - CORS chỉ cho phép origin cấu hình bằng `CORS_ALLOWED_ORIGINS`; mặc định local là `localhost:3000` và `localhost:5173`.
-- Profile `prod` bắt buộc truyền `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SIGNER_KEY` và `CORS_ALLOWED_ORIGINS`; không dùng fallback local.
+- Profile `prod` bắt buộc truyền `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SIGNER_KEY` và `CORS_ALLOWED_ORIGINS`; không dùng fallback local.
 - `X-Correlation-ID` được truyền qua response và MDC; giá trị không hợp lệ được thay bằng UUID.
 - Spotless format/check được gắn vào Maven `verify`.
 - GitHub Actions CI chạy Java 21 và `mvnw clean verify`.
@@ -654,7 +654,23 @@ docker start mysql-8.0
 
 Project mặc định kết nối MySQL tại `localhost:3307`. Nếu chưa có container `mysql-8.0`, có thể dùng `docker compose up -d mysql`; không chạy đồng thời hai container trên cùng port.
 
-Ứng dụng dùng tài khoản MySQL riêng `shop` thay vì tài khoản quản trị `root`. Mật khẩu phải truyền qua `DB_PASSWORD` khi khác giá trị local mặc định; không ghi mật khẩu máy cá nhân vào source hoặc README.
+Ứng dụng dùng tài khoản MySQL riêng `shop` thay vì tài khoản quản trị `root`. Cấu hình datasource dùng đúng nhóm biến chuẩn của Spring Boot: `SPRING_DATASOURCE_DRIVER`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` và `SPRING_DATASOURCE_PASSWORD`. Các giá trị mặc định chỉ dành cho Docker local; production bắt buộc truyền từ secret manager hoặc môi trường chạy.
+
+Kết nối DataGrip vào MySQL local:
+
+1. Chọn `New` → `Data Source` → `MySQL`.
+2. Nhập `Host=localhost`, `Port=3307`, `User=shop`, `Password=shop-local-password`, `Database=shop`.
+3. JDBC URL tương ứng là `jdbc:mysql://localhost:3307/shop`.
+4. Chọn `Test Connection`, sau đó trong tab `Schemas` đánh dấu schema `shop` và bấm `Apply`.
+5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` phải có V1–V6 và các bảng Identity hiện hành phải mang tiền tố `xac_thuc_`.
+
+Nếu DataGrip vẫn hiển thị `identity_*`, chạy câu lệnh sau để kiểm tra. Kết quả dừng ở V4 nghĩa là container chưa được ứng dụng mới chạy Flyway V5–V6, không phải entity vẫn ánh xạ tên tiếng Anh:
+
+```sql
+SELECT installed_rank, version, description, success
+FROM flyway_schema_history
+ORDER BY installed_rank;
+```
 
 Kiểm tra:
 
@@ -849,9 +865,10 @@ Profile production không dùng signer key local. Cần truyền đầy đủ se
 
 ```powershell
 $env:SPRING_PROFILES_ACTIVE="prod"
-$env:DB_URL="jdbc:mysql://db-host:3306/shop"
-$env:DB_USERNAME="shop"
-$env:DB_PASSWORD="replace-me"
+$env:SPRING_DATASOURCE_DRIVER="com.mysql.cj.jdbc.Driver"
+$env:SPRING_DATASOURCE_URL="jdbc:mysql://db-host:3306/shop"
+$env:SPRING_DATASOURCE_USERNAME="shop"
+$env:SPRING_DATASOURCE_PASSWORD="replace-me"
 $env:JWT_SIGNER_KEY="replace-with-at-least-64-random-bytes"
 $env:CORS_ALLOWED_ORIGINS="https://shop.example.com"
 ```
