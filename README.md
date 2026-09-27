@@ -159,6 +159,28 @@ V1–V4 vẫn giữ nguyên tên bảng cũ trong file migration vì các migrat
 
 ## 6. Danh sách nhiệm vụ
 
+### Quy chuẩn bắt buộc cho mọi nhiệm vụ
+
+Mỗi mục công việc bên dưới là một task contract, không chỉ là tên chức năng. Trước khi viết code, task phải có đủ các nội dung sau; thiếu một mục thì giữ trạng thái chưa sẵn sàng và không bắt đầu triển khai:
+
+1. **Mục tiêu và phạm vi:** vấn đề cần giải quyết, actor/luồng được tác động và phần không thuộc task.
+2. **Đầu vào và phụ thuộc:** migration/API/event/config/tài khoản môi trường cần có, module sở hữu dữ liệu và task bắt buộc hoàn thành trước.
+3. **Yêu cầu chức năng:** happy path, validation, trạng thái và quy tắc nghiệp vụ phải thực hiện.
+4. **Yêu cầu bảo mật và phi chức năng:** authorization/ownership, secret/PII, idempotency, concurrency, timeout, logging, hiệu năng và khả năng vận hành có liên quan.
+5. **Đầu ra:** code, migration, API/event contract, cấu hình, tài liệu và test phải được tạo hoặc cập nhật.
+6. **Ví dụ kiểm chứng:** tối thiểu một trường hợp thành công, một trường hợp bị từ chối/lỗi và các boundary case quan trọng; ví dụ không được chứa secret hoặc PII thật.
+7. **Nghiệm thu:** lệnh kiểm tra, test và hành vi quan sát được; không dùng nhận xét chung như “chạy ổn” hoặc “code đẹp”.
+8. **Triển khai và khôi phục:** ảnh hưởng dữ liệu/cấu hình, tương thích ngược, cách rollout và phương án rollback khi task có thay đổi runtime hoặc database.
+
+Quy tắc thực hiện:
+
+- Chỉ làm một task tại một thời điểm. Chỉ chuyển task khi toàn bộ đầu ra và nghiệm thu của task hiện tại đạt.
+- Task code phải đi qua `spotless:check`, test phù hợp, Spring Modulith/ArchUnit và migration test nếu có thay đổi database.
+- Mọi API phải mô tả request, response, mã lỗi, authorization và ví dụ đã khử dữ liệu nhạy cảm trong OpenAPI.
+- Mọi tích hợp ngoài phải tách cấu hình dev/test/prod, dùng secret manager hoặc environment variable, có timeout, audit, health/diagnostic phù hợp và không commit credential.
+- Khi yêu cầu còn thiếu hoặc tài liệu tham khảo mâu thuẫn với security baseline, dừng task ở bước phân tích, ghi rõ điểm thiếu/sai và không sao chép nguyên trạng.
+- Các task đã đánh dấu `[x]` dùng bằng chứng trong mục tiến độ kiểm chứng làm hồ sơ nghiệm thu; nếu mở lại hoặc thay đổi phạm vi thì phải đặc tả lại theo đủ tám mục trên.
+
 ### M0 — Nền móng modular monolith
 
 - [x] M0.1 Khởi tạo Maven project, Java 21, Spring Boot và Spring Modulith.
@@ -192,8 +214,52 @@ Tiêu chí hoàn thành M0:
 - [x] M1.4H Gom CAPTCHA thành feature package và soát chất lượng toàn dự án.
 - [x] M1.5 API `my-info`, cập nhật hồ sơ và đổi mật khẩu.
 - [ ] M1.6 Admin quản lý user/role/permission.
+  - Yêu cầu: ADMIN được lọc/phân trang user, khóa/mở khóa tài khoản, gán/bỏ role và quản lý role-permission; bảo vệ role hệ thống và không cho vô hiệu hóa/xóa quản trị viên hoạt động cuối cùng.
+  - Đầu ra: controller, request/response DTO, service, repository query, permission constants, OpenAPI và migration nếu schema cần thay đổi; không trả entity hoặc password hash ra API.
+  - Ví dụ và nghiệm thu: ADMIN gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; thao tác làm mất quản trị viên cuối cùng trả `409`; unit, repository, controller và security integration test đạt.
 - [ ] M1.7 Kiểm tra ownership trước khi ghi dữ liệu; không dùng `@PostAuthorize` cho update.
+  - Yêu cầu: mọi lệnh sửa/xóa dữ liệu người dùng kiểm tra actor, ownership và quyền quản trị trước khi mutation; chốt chính sách trả `403` hoặc `404` để không rò sự tồn tại tài nguyên.
+  - Đầu ra: ownership policy dùng lại được ở service/repository predicate, error code thống nhất và test chéo tài khoản; không kiểm tra quyền sau khi dữ liệu đã bị ghi.
+  - Ví dụ và nghiệm thu: chủ sở hữu cập nhật được hồ sơ của mình, tài khoản A không sửa được tài khoản B, ADMIN làm được đúng phạm vi; test chứng minh database không đổi khi request bị từ chối.
 - [ ] M1.8 Unit, repository, controller và security integration test.
+  - Yêu cầu: lập ma trận test cho register, token, introspect, refresh, logout, CAPTCHA, rate limit, my-info, profile, password và admin RBAC; bao phủ happy path, validation, unauthorized, forbidden, replay và concurrency quan trọng.
+  - Đầu ra: test độc lập, dữ liệu fixture/builder dễ đọc và báo cáo JaCoCo dùng để phát hiện vùng chưa kiểm chứng; không viết test chỉ để tăng phần trăm coverage.
+  - Ví dụ và nghiệm thu: chạy `mvnw.cmd clean verify` với MySQL test thành công, không test flaky, Spring Modulith/ArchUnit đạt và mọi lỗi bảo mật đã biết trong M1 có regression test.
+- [ ] M1.9 Tích hợp đăng nhập ngoài theo OpenID Connect, ưu tiên adapter VNeID sau khi M1.8 đạt.
+  - [ ] M1.9A Chốt hồ sơ đăng ký và ma trận môi trường.
+    - Yêu cầu: xác định tên tổ chức/dịch vụ, mô tả, logo, callback, post-logout redirect, đầu mối, ngày dự kiến go-live và trạng thái riêng cho dev/test/prod; endpoint và credential phải được chủ hệ thống ngoài xác nhận.
+    - Đầu ra: tài liệu yêu cầu đã khử bí mật và bảng cấu hình typed properties; giá trị secret/private key chỉ tồn tại trong secret manager hoặc environment variable.
+    - Ví dụ và nghiệm thu: thiếu callback đã đăng ký hoặc thiếu cấu hình production thì ứng dụng fail-fast; không có client secret, private key, token, cookie hay PII thật trong Git/log/OpenAPI.
+  - [ ] M1.9B Xây provider adapter và hợp đồng OIDC.
+    - Yêu cầu: cô lập authorization, token, userinfo và logout endpoint sau interface; không để controller/service nghiệp vụ phụ thuộc trực tiếp URL hay response riêng của VNeID.
+    - Đầu ra: provider interface, VNeID adapter, request/response DTO, config validation và error mapping; chuẩn hóa `response_type=code`, `scope=openid` cùng content type thực tế của token endpoint.
+    - Ví dụ và nghiệm thu: adapter contract test ánh xạ đúng success/error/timeout; thay fake provider không cần sửa authentication controller.
+  - [ ] M1.9C Xây authorization redirect và callback an toàn.
+    - Yêu cầu: dùng Authorization Code flow; sinh, lưu một lần và kiểm tra `state`, `nonce` và PKCE khi provider hỗ trợ; callback/redirect dùng exact allowlist, chống open redirect và callback replay.
+    - Đầu ra: endpoint bắt đầu đăng nhập, callback handler và kho challenge TTL; query nhạy cảm phải được che khỏi access log.
+    - Ví dụ và nghiệm thu: callback đúng state dùng được một lần; state sai/hết hạn, redirect ngoài allowlist hoặc code replay đều bị từ chối và được audit mà không lộ code/encryption key.
+  - [ ] M1.9D Đổi authorization code lấy token và giải mã payload.
+    - Yêu cầu: token exchange chỉ chạy phía server qua TLS, dùng đúng content type, timeout và credential từ secret store; nếu payload dùng AES và khóa AES bọc RSA thì giới hạn thuật toán/kích thước, hỗ trợ key rotation và báo lỗi an toàn.
+    - Đầu ra: token client, crypto service riêng, zeroization/best-effort cleanup cho secret tạm, error code và metrics không gắn token.
+    - Ví dụ và nghiệm thu: token hợp lệ được xử lý; signature/decryption/tag sai, response thiếu field, timeout hoặc payload quá lớn bị từ chối; log/test report không chứa token hoặc key thô.
+  - [ ] M1.9E Ánh xạ danh tính và bảo vệ PII.
+    - Yêu cầu: ánh xạ định danh ngoài, họ tên, ngày sinh, loại/mức tài khoản theo data minimization; chốt quy tắc link/provision user, unique identity, consent, mã hóa và retention trước khi lưu `citizenPid` hoặc thuộc tính nhạy cảm.
+    - Đầu ra: external identity entity/migration, mapper và account-linking service; lưu issuer + subject/provider key thay vì coi tên hiển thị là định danh.
+    - Ví dụ và nghiệm thu: đăng nhập lặp liên kết cùng tài khoản; xung đột định danh không tự merge; userinfo thiếu/không hợp lệ trả lỗi kiểm soát và không tạo tài khoản rác.
+  - [ ] M1.9F Đồng bộ logout và phiên cục bộ.
+    - Yêu cầu: logout luôn revoke phiên/refresh token của Shop trước, sau đó mới điều hướng provider logout; post-logout redirect dùng allowlist và hành vi khi provider lỗi phải được xác định.
+    - Đầu ra: logout orchestration, audit event và tài liệu phân biệt local logout, provider logout và single logout.
+    - Ví dụ và nghiệm thu: provider logout thành công hoặc timeout đều không làm token Shop sống lại; redirect giả mạo bị từ chối; integration test xác nhận access token cũ không truy cập tài nguyên bảo mật.
+  - [ ] M1.9G Thêm resilience, audit và giới hạn chống lạm dụng.
+    - Yêu cầu: timeout, circuit breaker và retry chỉ áp dụng cho thao tác an toàn; rate limit điểm bắt đầu/callback; audit login success/failure/denied và correlation ID nhưng không lưu code/token/key/PII ngoài allowlist.
+    - Đầu ra: Resilience4j config theo từng endpoint, metrics/alert, redaction và runbook khi provider unavailable.
+    - Ví dụ và nghiệm thu: provider chậm/mất kết nối trả lỗi ổn định, circuit mở đúng ngưỡng, retry không đổi code hai lần và failure không làm đầy thread/connection pool.
+  - [ ] M1.9H Kiểm thử liên thông và go-live.
+    - Yêu cầu: hoàn thành sandbox/UAT cho web; mobile universal link chỉ triển khai khi có client mobile; kiểm tra clock skew, callback, consent, account mapping, logout, key rotation và rollback cấu hình.
+    - Đầu ra: test evidence đã che dữ liệu, checklist go-live trước hạn, owner/đầu mối, secret rotation plan và feature flag tắt provider.
+    - Ví dụ và nghiệm thu: E2E đăng nhập và logout đạt trên test; production config được xác nhận tách biệt; rollback bằng feature flag không ảnh hưởng đăng nhập nội bộ.
+
+Lưu ý an toàn cho M1.9: mọi client secret, private key, token, cookie hoặc mã định danh xuất hiện trong tài liệu/mẫu tích hợp đều được coi là dữ liệu nhạy cảm. Không sao chép các giá trị đó vào source, README, test fixture, OpenAPI hoặc log; nếu giá trị mẫu có khả năng là credential thật thì phải yêu cầu đầu mối provider xoay vòng trước khi tích hợp.
 
 Tiêu chí hoàn thành M1:
 
@@ -201,15 +267,34 @@ Tiêu chí hoàn thành M1:
 - API role/permission chỉ dành cho ADMIN.
 - Access token và refresh token tách biệt, có rotation/revoke test.
 - Trước production, JWT key local/dev phải được thay bằng environment/secret riêng.
+- External SSO bị tắt mặc định cho đến khi hoàn tất sandbox/UAT, callback allowlist và secret rotation; đăng nhập ngoài không được phép bỏ qua RBAC/ownership cục bộ.
 
 ### M2 — Catalog và hình ảnh
 
 - [ ] M2.1 Category, Product, SKU/variant và migration.
+  - Yêu cầu: định nghĩa aggregate ownership, quan hệ category-product-variant, trạng thái publish, SKU duy nhất, giá `BigDecimal` + currency và audit fields; chốt quy tắc xóa mềm trước khi tạo schema.
+  - Đầu ra: entity, enum, repository, Flyway migration và mapping tên bảng/cột tường minh trong package Catalog.
+  - Ví dụ và nghiệm thu: không tạo được SKU trùng, giá âm hoặc product không có category hợp lệ; migration chạy trên schema rỗng/schema hiện có và repository test đạt.
 - [ ] M2.2 CRUD sản phẩm với DTO, validation và phân trang.
+  - Yêu cầu: API tạo/xem/sửa/ẩn sản phẩm và variant dùng request/response DTO, validation theo trạng thái, optimistic locking và sort/page có allowlist; không binding trực tiếp entity.
+  - Đầu ra: controller, mapper, service, error code, OpenAPI và query phân trang ổn định.
+  - Ví dụ và nghiệm thu: tạo product hợp lệ trả response chuẩn; input sai trả đúng field error; version cũ trả conflict; page/sort bất hợp lệ không gây query tùy ý.
 - [ ] M2.3 Upload nhiều ảnh qua abstraction `ObjectStorage`.
+  - Yêu cầu: upload nhiều ảnh theo giới hạn số lượng/kích thước/type, kiểm tra magic bytes, sinh object key không đoán được và hỗ trợ ảnh đại diện/thứ tự; business service chỉ gọi abstraction.
+  - Đầu ra: `ObjectStorage` port, upload service, metadata entity/DTO, cleanup khi transaction thất bại và fake storage cho test.
+  - Ví dụ và nghiệm thu: JPEG/PNG hợp lệ được lưu; file giả MIME, quá lớn hoặc vượt số lượng bị từ chối; lỗi giữa chừng không để metadata/object mồ côi.
 - [ ] M2.4 MinIO cho local; lưu metadata/URL thay vì Base64.
+  - Yêu cầu: cấu hình bucket/policy/endpoint theo profile, health check, presigned URL có TTL khi cần; không lưu binary/Base64 trong MySQL hay response JSON thông thường.
+  - Đầu ra: MinIO adapter, Docker Compose local, typed properties có validation và hướng dẫn khởi tạo bucket.
+  - Ví dụ và nghiệm thu: upload/download/delete chạy với local MinIO; restart không mất dữ liệu volume; thiếu credential production làm ứng dụng fail-fast và secret không nằm trong Git.
 - [ ] M2.5 Tìm kiếm bằng query/index trước; chỉ dùng stored procedure sau benchmark.
+  - Yêu cầu: xác định trường tìm kiếm/filter/sort, chuẩn hóa keyword và index dựa trên query plan; dùng query repository rõ ràng trước khi cân nhắc stored procedure.
+  - Đầu ra: search request/response, query/index migration, benchmark dataset/kịch bản và tài liệu quyết định kỹ thuật.
+  - Ví dụ và nghiệm thu: tìm theo tên/SKU/category và filter trạng thái cho kết quả ổn định; query không full-scan ngoài ngưỡng đã chốt; ký tự đặc biệt không phá truy vấn.
 - [ ] M2.6 Admin authorization, test file type/size và integration test.
+  - Yêu cầu: chỉ actor có quyền Catalog phù hợp được mutation; API đọc công khai chỉ trả product đã publish; test cả ownership shop/seller nếu catalog đa shop.
+  - Đầu ra: permission constants/policy, security annotations/service guard và bộ unit, controller, storage, repository, integration test.
+  - Ví dụ và nghiệm thu: khách xem được hàng publish, không xem draft; USER mutation nhận `403`; file độc hại/quá lớn bị chặn; `clean verify` và test MinIO/MySQL đạt.
 
 Tiêu chí hoàn thành M2:
 
@@ -220,10 +305,25 @@ Tiêu chí hoàn thành M2:
 ### M3 — Inventory
 
 - [ ] M3.1 Stock item, stock movement và stock reservation.
+  - Yêu cầu: mô hình tồn theo SKU/location với `on_hand`, `reserved`, `available`; movement là sổ append-only và reservation có trạng thái/TTL rõ ràng.
+  - Đầu ra: aggregate, entity, migration, repository, invariant và event contract; Catalog chỉ được tham chiếu bằng SKU/id, không truy cập bảng Catalog.
+  - Ví dụ và nghiệm thu: nhập/xuất/reserve tạo movement cân bằng; quantity không âm; migration/repository/domain test đạt.
 - [ ] M3.2 Reserve tồn kho bằng atomic conditional update/locking.
+  - Yêu cầu: chọn atomic update hoặc locking dựa trên MySQL, kiểm tra available và cập nhật trong một transaction; xác định timeout/deadlock retry có giới hạn.
+  - Đầu ra: reservation service/repository query, transaction boundary, metrics conflict và tài liệu chiến lược locking.
+  - Ví dụ và nghiệm thu: hai request tranh SKU cuối chỉ một request thành công; không oversell, không lost update và deadlock không retry vô hạn.
 - [ ] M3.3 Confirm, release và expiration job.
+  - Yêu cầu: state machine cho `RESERVED`, `CONFIRMED`, `RELEASED`, `EXPIRED`; scheduled job dùng UTC, batch có giới hạn và an toàn khi nhiều instance chạy.
+  - Đầu ra: command service, expiration job, distributed/DB lock phù hợp, events và cấu hình batch/schedule.
+  - Ví dụ và nghiệm thu: confirm không release lại; reservation quá hạn được trả kho đúng một lần; job chạy đồng thời/restart vẫn idempotent.
 - [ ] M3.4 Idempotency theo `reservationId`.
+  - Yêu cầu: cùng key và cùng payload trả cùng kết quả; cùng key khác payload trả conflict; lưu fingerprint/result/status đủ để retry sau timeout.
+  - Đầu ra: unique constraint, idempotency record/policy và response replay contract.
+  - Ví dụ và nghiệm thu: gửi reserve/confirm/release lặp không đổi kho lần hai; conflict payload trả `409`; test crash/retry đạt.
 - [ ] M3.5 Concurrency test chứng minh không oversell.
+  - Yêu cầu: test nhiều thread/transaction trên MySQL thật với barrier đồng bộ, không dùng H2 để kết luận locking; đo success/failure và tổng quantity.
+  - Đầu ra: repeatable concurrency test, seed data và báo cáo invariant trước/sau.
+  - Ví dụ và nghiệm thu: tổng confirmed + reserved không vượt on-hand qua nhiều lần chạy; không flaky và không bỏ qua exception trong worker.
 
 Tiêu chí hoàn thành M3:
 
@@ -234,12 +334,33 @@ Tiêu chí hoàn thành M3:
 ### M4 — Cart, Checkout và Order
 
 - [ ] M4.1 Cart và cart item.
+  - Yêu cầu: mỗi user có cart hoạt động theo phạm vi shop đã chốt; add/update/remove/clear kiểm tra SKU tồn tại, quantity và ownership; cart không phải nguồn giá tin cậy.
+  - Đầu ra: entity/migration, DTO, service, controller, repository và error contract.
+  - Ví dụ và nghiệm thu: thêm cùng SKU gộp quantity theo rule; quantity 0/âm hoặc cart người khác bị từ chối; concurrent update không làm mất item.
 - [ ] M4.2 Order state machine và quy tắc chuyển trạng thái.
+  - Yêu cầu: liệt kê trạng thái và transition được phép theo actor/event; mọi đổi trạng thái qua một domain method và có version chống ghi đè.
+  - Đầu ra: enum/state machine, transition table, domain errors và audit/domain events.
+  - Ví dụ và nghiệm thu: `PENDING -> PAID` hợp lệ theo rule; `CANCELLED -> PAID` bị từ chối; unit test bao phủ toàn bộ ma trận transition.
 - [ ] M4.3 Checkout tính giá hoàn toàn ở server.
+  - Yêu cầu: bỏ qua giá/tổng client gửi lên; đọc catalog/promotion/tax authoritative, kiểm tra availability và dùng rounding/currency policy thống nhất.
+  - Đầu ra: pricing service, money value object, checkout quote/command DTO và breakdown response.
+  - Ví dụ và nghiệm thu: client sửa giá không ảnh hưởng total; giá thay đổi/hết hàng được báo rõ; tổng line, discount, tax và grand total reconcile chính xác.
 - [ ] M4.4 Order item lưu snapshot tên, SKU, giá, giảm giá, thuế và currency.
+  - Yêu cầu: snapshot đủ để hiển thị/hạch toán đơn cũ mà không truy cập Catalog; immutable sau khi tạo trừ trường được quy định rõ.
+  - Đầu ra: order/order-item migration và mapper từ pricing result sang snapshot.
+  - Ví dụ và nghiệm thu: đổi tên/giá/xóa mềm product không đổi đơn cũ; test reload order từ database cho cùng snapshot.
 - [ ] M4.5 Điều phối reserve/release inventory bằng domain event.
+  - Yêu cầu: Order không gọi repository Inventory; định nghĩa event/command contract và xử lý success/failure/timeout với correlation/business event ID.
+  - Đầu ra: publisher/listener, orchestration state và compensation event; chuẩn bị tương thích outbox M6.1.
+  - Ví dụ và nghiệm thu: reserve thành công đưa order sang bước kế; reserve thất bại không tạo order hoàn tất; event lặp không trừ/trả kho hai lần.
 - [ ] M4.6 Idempotency key cho checkout.
+  - Yêu cầu: key gắn user + operation, có fingerprint request, TTL/retention và trạng thái in-progress/completed/failed; chống hai request đồng thời cùng key.
+  - Đầu ra: idempotency entity/migration/service và response replay.
+  - Ví dụ và nghiệm thu: retry cùng key/payload trả cùng order; khác payload trả `409`; timeout client không tạo đơn thứ hai.
 - [ ] M4.7 Test lỗi giữa chừng và compensation.
+  - Yêu cầu: xác định failure point sau tạo order, reserve và trước/sau payment; mỗi lỗi có state cuối, retry và compensation rõ ràng.
+  - Đầu ra: integration/E2E failure-injection tests và runbook xử lý order mắc kẹt.
+  - Ví dụ và nghiệm thu: lỗi sau reserve phải release hoặc được reconciliation xử lý; không có order `PAID` thiếu payment hay tồn kho không giải phóng không có cảnh báo.
 
 Tiêu chí hoàn thành M4:
 
@@ -250,11 +371,29 @@ Tiêu chí hoàn thành M4:
 ### M5 — Payment
 
 - [ ] M5.1 Payment aggregate và provider interface.
+  - Yêu cầu: mô hình payment attempt, amount/currency, provider reference, status và transition; Order chỉ phụ thuộc payment port/event, không phụ thuộc SDK cụ thể.
+  - Đầu ra: aggregate/entity/migration, provider port, DTO/event và error taxonomy retryable/non-retryable.
+  - Ví dụ và nghiệm thu: amount phải khớp order; transition lùi hoặc currency sai bị chặn; domain/repository test đạt.
 - [ ] M5.2 Fake payment provider để hoàn chỉnh luồng trước.
+  - Yêu cầu: fake provider mô phỏng success, decline, timeout, pending và duplicate callback có thể cấu hình; tuyệt đối không được bật ở production.
+  - Đầu ra: adapter/profile local-test, deterministic test controls và sample flow trong OpenAPI/test.
+  - Ví dụ và nghiệm thu: từng mode đưa order/payment về trạng thái dự kiến; production profile fail-fast nếu fake provider được chọn.
 - [ ] M5.3 Tích hợp provider thật bằng hosted checkout/token; không lưu dữ liệu thẻ.
+  - Yêu cầu: dùng hosted page/tokenization, credential từ secret store, TLS, timeout/circuit breaker và redirect allowlist; hoàn thành PCI scope review trước go-live.
+  - Đầu ra: provider adapter, typed config, request signing/authentication, return/cancel handler và sanitized operational docs.
+  - Ví dụ và nghiệm thu: tạo session và return hợp lệ hoạt động trên sandbox; URL giả, amount mismatch, timeout và provider error được xử lý; database/log không có PAN/CVV.
 - [ ] M5.4 Xác minh chữ ký webhook và chống webhook lặp.
+  - Yêu cầu: đọc raw body đúng định dạng provider, kiểm tra signature/timestamp/replay window trước parse nghiệp vụ và deduplicate bằng provider event ID.
+  - Đầu ra: webhook endpoint, signature verifier, inbox/dedup persistence và audit/metrics.
+  - Ví dụ và nghiệm thu: chữ ký đúng xử lý một lần; chữ ký sai/cũ trả lỗi không side effect; cùng event gửi lặp không cập nhật lần hai.
 - [ ] M5.5 Payment success/failure/refund cập nhật Order qua event.
+  - Yêu cầu: định nghĩa versioned events và mapping state; xử lý event đến trễ/sai thứ tự, partial/full refund theo phạm vi đã chốt.
+  - Đầu ra: publisher/consumer, order transition handlers và compensation inventory tương ứng.
+  - Ví dụ và nghiệm thu: success confirm order/kho đúng một lần; failure release; refund cập nhật tổng và trạng thái hợp lệ; duplicate/out-of-order tests đạt.
 - [ ] M5.6 Reconciliation job cho trạng thái không chắc chắn.
+  - Yêu cầu: quét payment pending/unknown theo batch, gọi provider bằng rate limit/timeout, backoff và lock nhiều instance; không tự suy diễn success khi provider không xác nhận.
+  - Đầu ra: scheduled job, checkpoint/metrics/alert và operator runbook.
+  - Ví dụ và nghiệm thu: pending chuyển đúng theo provider; provider unavailable giữ trạng thái an toàn và retry sau; job lặp không tạo refund/confirm trùng.
 
 Tiêu chí hoàn thành M5:
 
@@ -265,58 +404,82 @@ Tiêu chí hoàn thành M5:
 ### M6 — Hoàn thiện monolith
 
 - [ ] M6.1 Transactional event/outbox trong monolith.
+  - Yêu cầu: ghi state và outbox event cùng transaction, claim/publish theo batch an toàn đa instance, retry/backoff, idempotent consumer và retention.
+  - Đầu ra: outbox schema/entity, dispatcher, event envelope/versioning, metrics và cleanup job.
+  - Ví dụ và nghiệm thu: rollback không phát event; crash sau commit được publish lại; publish/consume lặp không tạo side effect; integration test MySQL đạt.
 - [~] M6.2 OpenAPI và chiến lược versioning API.
   - [x] M6.2A Cấu hình nền Swagger UI/OpenAPI, Bearer JWT, security allowlist, production opt-in và integration test.
   - [x] M6.2A.1 Ngoại hóa metadata, contact và server URL bằng typed properties có validation; không áp dụng JWT toàn cục lên API công khai.
   - [ ] M6.2B Hoàn thiện mô tả operation/schema/response cho toàn bộ API sau khi các module nghiệp vụ được xây dựng.
+    - Yêu cầu: mỗi operation có summary, authorization, request/response/error schema, pagination/idempotency header và ví dụ đã khử dữ liệu; chốt quy tắc `/api/v1` cùng deprecation.
+    - Đầu ra: OpenAPI hoàn chỉnh, generated contract snapshot/diff trong CI và hướng dẫn consumer.
+    - Ví dụ và nghiệm thu: public auth không hiển thị yêu cầu Bearer, endpoint bảo mật có scheme đúng; schema/runtime response khớp qua contract test và không có undocumented `5xx` do input.
 - [ ] M6.3 Metrics, structured log và tracing.
+  - Yêu cầu: correlation/trace ID xuyên request-event-job, log JSON có redaction; RED/USE metrics cho auth, checkout, inventory, payment/outbox và trace không chứa secret/PII.
+  - Đầu ra: Micrometer/OpenTelemetry config, dashboards/alerts, log field contract và sampling policy.
+  - Ví dụ và nghiệm thu: từ `correlation_id` truy được request tới event; test/log scan không thấy token/password; alert kích hoạt với error/latency giả lập.
 - [ ] M6.4 Rate limiting phân tán tại gateway/edge cho checkout và các API tốn tài nguyên; login đã có lớp bảo vệ trong ứng dụng từ M1.4B.
+  - Yêu cầu: định nghĩa key theo IP/user/shop/API, quota/burst, `Retry-After`, trusted proxy và fail-open/fail-closed theo endpoint; edge limit không thay authorization.
+  - Đầu ra: gateway/WAF/Redis-backed config, dashboard và runbook điều chỉnh quota.
+  - Ví dụ và nghiệm thu: vượt quota trả `429`; nhiều instance dùng cùng counter; spoof header không đổi key; checkout/payment không bị retry tự động gây side effect.
 - [ ] M6.5 Backup/restore và migration test.
+  - Yêu cầu: chốt RPO/RTO, mã hóa backup, quyền truy cập, retention, restore drill và forward-only migration/rollback strategy.
+  - Đầu ra: script/runbook, automated migration test từ version hỗ trợ và bằng chứng restore vào môi trường cô lập.
+  - Ví dụ và nghiệm thu: restore khôi phục đủ schema/dữ liệu/checksum; migration failure không để schema nửa vời; secret/backup không commit vào repo.
 - [ ] M6.6 End-to-end test toàn bộ purchase flow.
+  - Yêu cầu: test register/login, catalog, cart, checkout, reserve, payment success/failure, order history và logout trên stack gần production; dữ liệu test cô lập/lặp lại được.
+  - Đầu ra: E2E suite, fixtures, environment bootstrap và artifact chẩn đoán đã redacted.
+  - Ví dụ và nghiệm thu: happy path hoàn tất; payment fail release kho; retry không tạo đơn/charge trùng; suite chạy ổn định trong CI.
 - [ ] M6.7 Load test các điểm login, search, checkout và reserve stock.
+  - Yêu cầu: xác định workload, concurrency, dataset, warm-up, p95/p99/error budget và giới hạn tài nguyên; không chạy vào production khi chưa được phép.
+  - Đầu ra: versioned load scripts, baseline report, bottleneck/query plan và capacity recommendation.
+  - Ví dụ và nghiệm thu: đạt SLO đã chốt không oversell/mất event; kết quả có CPU/RAM/DB pool/GC thay vì chỉ requests-per-second.
 - [ ] M6.8 Threat review và dependency/security scan.
+  - Yêu cầu: cập nhật data-flow/threat model cho auth, upload, checkout, payment, admin, SSO và audit; scan dependency/container/secret/SAST, triage theo mức độ và exploitability.
+  - Đầu ra: threat register, mitigation owner/deadline, SBOM và policy CI chặn mức nghiêm trọng đã chốt.
+  - Ví dụ và nghiệm thu: không còn finding Critical/High chưa chấp nhận có thời hạn; kiểm thử IDOR, SSRF, upload, webhook replay, JWT, CORS và secret leakage đạt.
 - [ ] M6.9 Audit trail và lịch sử truy cập.
 
 Trình tự thực hiện M6.9 — chỉ chuyển sang bước sau khi bước hiện tại đạt điều kiện nghiệm thu:
 
 - [ ] M6.9A Chốt phạm vi và danh mục sự kiện.
-  - Thực hiện: tách access log kỹ thuật khỏi audit event; lập ma trận `action_code` gồm điểm phát sinh, actor, resource, outcome, mức nhạy cảm, thời hạn lưu và module sở hữu.
+  - Yêu cầu: tách access log kỹ thuật khỏi audit event; lập ma trận `action_code` gồm điểm phát sinh, actor, resource, outcome, mức nhạy cảm, thời hạn lưu và module sở hữu.
   - Đầu ra: tài liệu danh mục cho các nhóm authentication, user/permission, product, order, inventory, payment, export và system job; request đọc thông thường không được ghi vào database nếu không truy cập dữ liệu nhạy cảm.
   - Nghiệm thu: mọi sự kiện đều có mã ổn định và lý do cần audit; không còn trường hợp dùng nhãn hiển thị làm định danh sự kiện.
 - [ ] M6.9B Tạo cấu trúc module và hợp đồng dữ liệu.
-  - Thực hiện: tạo package `audit` tách rõ `controller`, `dto.request`, `dto.response`, `entity`, `repository`, `service`, `event` và `config`; định nghĩa enum actor/outcome cùng DTO/event bất biến.
+  - Yêu cầu: tạo package `audit` tách rõ `controller`, `dto.request`, `dto.response`, `entity`, `repository`, `service`, `event` và `config`; định nghĩa enum actor/outcome cùng DTO/event bất biến.
   - Đầu ra: hợp đồng dữ liệu bên dưới được version hóa; module nghiệp vụ chỉ phụ thuộc cổng phát sự kiện, không gọi audit repository trực tiếp.
   - Nghiệm thu: compile thành công, Spring Modulith và ArchUnit không báo vi phạm phụ thuộc module.
 - [ ] M6.9C Tạo schema lưu trữ append-only.
-  - Thực hiện: thêm Flyway migration, entity và repository cho `he_thong_lich_su_truy_cap`; dùng UUID, `Instant` UTC, giới hạn độ dài cột/JSON và các index đã xác định.
+  - Yêu cầu: thêm Flyway migration, entity và repository cho `he_thong_lich_su_truy_cap`; dùng UUID, `Instant` UTC, giới hạn độ dài cột/JSON và các index đã xác định.
   - Đầu ra: migration chạy được trên schema rỗng và schema hiện có; tầng ứng dụng không cung cấp thao tác update/delete bản ghi audit.
   - Nghiệm thu: migration test, repository test và kiểm tra unique/idempotency đều đạt; tên bảng/cột được khai báo tường minh.
 - [ ] M6.9D Chuẩn hóa ngữ cảnh request và bảo vệ dữ liệu.
-  - Thực hiện: tạo resolver dùng `Clock`, correlation ID, user-agent và IP; chỉ đọc proxy header từ trusted proxy; tạo allowlist/redactor cho `detail_json`.
+  - Yêu cầu: tạo resolver dùng `Clock`, correlation ID, user-agent và IP; chỉ đọc proxy header từ trusted proxy; tạo allowlist/redactor cho `detail_json`.
   - Đầu ra: actor snapshot và request metadata được thu thập tại một nơi dùng chung, không sao chép logic trong từng service.
   - Nghiệm thu: test xác nhận không giả mạo được IP qua `X-Forwarded-For` từ nguồn không tin cậy và password/token/cookie/CAPTCHA answer luôn bị loại bỏ.
 - [ ] M6.9E Xây luồng ghi sự kiện tin cậy.
-  - Thực hiện: tạo cổng phát audit event, writer và cơ chế transaction/outbox; dùng `business_event_id` làm khóa chống ghi trùng khi consumer retry.
+  - Yêu cầu: tạo cổng phát audit event, writer và cơ chế transaction/outbox; dùng `business_event_id` làm khóa chống ghi trùng khi consumer retry.
   - Đầu ra: business service phát sự kiện có kiểu thay vì tự dựng entity; quy tắc xử lý lỗi ghi audit được tài liệu hóa riêng cho security event và business event.
   - Nghiệm thu: integration test chứng minh commit tạo đúng một audit record, rollback không tạo bản ghi sai và retry không tạo bản ghi trùng.
 - [ ] M6.9F Gắn audit vào authentication và quản trị tài khoản.
-  - Thực hiện: phát sự kiện cho login success/failure/denied, logout, refresh/revoke, đổi/reset mật khẩu, cập nhật hồ sơ và thay đổi role/permission; login thất bại cho phép `actor_user_id = null`.
+  - Yêu cầu: phát sự kiện cho login success/failure/denied, logout, refresh/revoke, đổi/reset mật khẩu, cập nhật hồ sơ và thay đổi role/permission; login thất bại cho phép `actor_user_id = null`.
   - Đầu ra: mỗi luồng có `outcome`, HTTP metadata và lý do thất bại đã chuẩn hóa nhưng không lộ thông tin giúp dò tài khoản.
   - Nghiệm thu: test API xác nhận từng luồng tạo đúng sự kiện, token đã logout/revoke không được chấp nhận và log không chứa credential/token thô.
 - [ ] M6.9G Gắn audit vào nghiệp vụ và tác vụ hệ thống.
-  - Thực hiện: phát sự kiện cho thay đổi trạng thái quan trọng của Product, Order, Inventory và Payment; scheduled job dùng `actor_type = SYSTEM`.
+  - Yêu cầu: phát sự kiện cho thay đổi trạng thái quan trọng của Product, Order, Inventory và Payment; scheduled job dùng `actor_type = SYSTEM`.
   - Đầu ra: mỗi event có `resource_type`, `resource_id` và snapshot/diff tối thiểu có schema/version; không tạo foreign key xuyên module.
   - Nghiệm thu: test timeline của resource đúng thứ tự và tác vụ hệ thống không cần giả lập người dùng đăng nhập.
 - [ ] M6.9H Xây API tra cứu có phân quyền.
-  - Thực hiện: thêm quyền riêng `AUDIT_READ`; xây API lọc theo actor, action, module, outcome, IP, correlation ID, resource và khoảng thời gian UTC; hỗ trợ timeline resource và cursor/keyset pagination.
+  - Yêu cầu: thêm quyền riêng `AUDIT_READ`; xây API lọc theo actor, action, module, outcome, IP, correlation ID, resource và khoảng thời gian UTC; hỗ trợ timeline resource và cursor/keyset pagination.
   - Đầu ra: platform admin xem theo phạm vi được cấp, shop/seller chỉ xem dữ liệu thuộc shop của mình; không có API sửa/xóa audit.
   - Nghiệm thu: test trả `403` khi thiếu quyền, không rò dữ liệu chéo shop/seller, khoảng ngày dùng `[from, to)` và kết quả sắp xếp ổn định theo `occurred_at`, `id`.
 - [ ] M6.9I Xây xuất dữ liệu và chính sách vòng đời.
-  - Thực hiện: thêm quyền `AUDIT_EXPORT`, giới hạn khoảng ngày/số lượng và xuất bằng streaming hoặc job bất đồng bộ; cấu hình retention/archive và cleanup theo batch.
+  - Yêu cầu: thêm quyền `AUDIT_EXPORT`, giới hạn khoảng ngày/số lượng và xuất bằng streaming hoặc job bất đồng bộ; cấu hình retention/archive và cleanup theo batch.
   - Đầu ra: không tải toàn bộ dữ liệu vào RAM, không trả file Base64 trong JSON; chính thao tác yêu cầu/tải bản xuất cũng được audit.
   - Nghiệm thu: test giới hạn export, quyền truy cập file, thời hạn file, cleanup/archive và tải lớn không làm cạn heap.
 - [ ] M6.9J Hoàn tất quality gate và tài liệu vận hành.
-  - Thực hiện: chạy Spotless, unit test, integration test, Modulith, ArchUnit, migration test và security test; cập nhật OpenAPI, retention, quyền xem IP/user-agent và runbook điều tra sự cố.
+  - Yêu cầu: chạy Spotless, unit test, integration test, Modulith, ArchUnit, migration test và security test; cập nhật OpenAPI, retention, quyền xem IP/user-agent và runbook điều tra sự cố.
   - Đầu ra: báo cáo kiểm thử và ví dụ truy vết hoàn chỉnh từ `correlation_id` hoặc resource tới audit record và structured log.
   - Nghiệm thu: toàn bộ tiêu chí M6.9 bên dưới đạt, không còn lỗi đã biết mức cao/nghiêm trọng; chỉ khi đó mới đánh dấu M6.9 hoàn thành và chuyển nhiệm vụ.
 
@@ -350,15 +513,45 @@ Tiêu chí hoàn thành M6.9:
 ### M7 — Tách microservices
 
 - [ ] M7.1 Thêm API Gateway; monolith vẫn chạy phía sau gateway.
+  - Yêu cầu: route/version/auth propagation, CORS, rate limit, request size, timeout và correlation ID được cấu hình tập trung; gateway không chứa nghiệp vụ.
+  - Đầu ra: gateway service/config, local compose, health/metrics và migration plan giữ monolith hoạt động.
+  - Ví dụ và nghiệm thu: route public/protected đúng, header giả bị loại, timeout/`429` chuẩn; có thể tắt gateway và rollback traffic về monolith.
 - [ ] M7.2 Tách Identity Service và chuyển các service sang xác minh JWT bằng public key/JWKS.
+  - Yêu cầu: xác định ownership user/role/token, issuer/audience/key rotation/JWKS cache; service khác không gọi Identity cho mọi request và không dùng shared signing secret.
+  - Đầu ra: Identity deployable, JWKS endpoint/client config, data migration/dual-run và contract tests.
+  - Ví dụ và nghiệm thu: key rotation không downtime; token issuer/audience sai hoặc revoked theo policy bị từ chối; rollback không mất account/session hợp lệ.
 - [ ] M7.3 Tách Catalog Service và object storage.
+  - Yêu cầu: Catalog sở hữu product/category/media schema và storage credential; consumer dùng API/event versioned, không truy cập bảng trực tiếp.
+  - Đầu ra: service/database pipeline, migration/sync/cutover plan và backward-compatible contracts.
+  - Ví dụ và nghiệm thu: đọc/ghi catalog qua service mới, media vẫn truy cập được, dual-write/replay không tạo SKU trùng và rollback đã thử.
 - [ ] M7.4 Tách Inventory Service; thay lời gọi trong tiến trình bằng contract/event.
+  - Yêu cầu: Inventory sở hữu stock/reservation, reserve/confirm/release có idempotency, timeout và consistency model rõ; Order không dùng repository Inventory.
+  - Đầu ra: sync/async contracts, outbox/inbox, data migration và reconciliation.
+  - Ví dụ và nghiệm thu: network timeout/retry không oversell; event lặp/sai thứ tự an toàn; invariant kho giữ đúng trong cutover.
 - [ ] M7.5 Tách Payment Service và webhook endpoint.
+  - Yêu cầu: Payment sở hữu provider credential/webhook/payment data; signature verification ở boundary, network/PCI scope và callback routing được chốt.
+  - Đầu ra: isolated service/database/secret, public webhook route, event contract và cutover/runbook.
+  - Ví dụ và nghiệm thu: duplicate webhook/timeout an toàn; không lộ credential/PAN; reconciliation so khớp trước và sau cutover.
 - [ ] M7.6 Tách Order Service cuối cùng vì đây là module điều phối nhiều nhất.
+  - Yêu cầu: chỉ tách sau khi Catalog/Inventory/Payment contract ổn định; Order giữ snapshot, saga/orchestration, idempotency và compensation rõ ràng.
+  - Đầu ra: Order service/database, migration, event state machine và traffic cutover theo phase.
+  - Ví dụ và nghiệm thu: purchase flow E2E đạt khi service lỗi/chậm; không mất/nhân đôi order; rollback traffic/data có bằng chứng.
 - [ ] M7.7 Mỗi service có database/schema, pipeline và health check riêng.
+  - Yêu cầu: cấm foreign key/query xuyên service, credential tối thiểu quyền, readiness khác liveness, migration độc lập và pipeline có security/contract gates.
+  - Đầu ra: database/schema ownership matrix, CI/CD template, deployment/rollback và backup policy từng service.
+  - Ví dụ và nghiệm thu: dừng dependency làm readiness phản ánh đúng mà không restart loop; service không thể đọc schema ngoài phạm vi bằng credential của nó.
 - [ ] M7.8 Broker + transactional outbox/inbox + retry + dead-letter queue.
+  - Yêu cầu: chọn broker theo throughput/ordering/retention, version envelope, partition key, at-least-once semantics, idempotent consumer, retry backoff và DLQ ownership.
+  - Đầu ra: broker config, outbox/inbox library/contract, schema registry strategy, replay/DLQ runbook và metrics.
+  - Ví dụ và nghiệm thu: publish/consume duplicate, poison message, broker outage và replay không gây side effect trùng; DLQ có alert và cách xử lý được thử.
 - [ ] M7.9 Distributed tracing, centralized logs và dashboard/SLO.
+  - Yêu cầu: trace context qua HTTP/broker/job, log chuẩn hóa/redacted, SLI/SLO/error budget cho từng service và alert theo tác động người dùng.
+  - Đầu ra: collector/backend config, dashboards, retention/access policy và incident links từ trace tới log/metric.
+  - Ví dụ và nghiệm thu: theo dõi được một checkout qua toàn bộ service; sampling vẫn giữ error trace; dữ liệu quan sát không chứa token/PII cấm.
 - [ ] M7.10 Resilience test: timeout, retry, duplicate event và service unavailable.
+  - Yêu cầu: fault-injection matrix cho từng dependency, retry budget, circuit breaker, bulkhead, fallback và recovery/reconciliation; không retry mù thao tác không idempotent.
+  - Đầu ra: automated resilience/chaos tests, SLO impact report và runbook.
+  - Ví dụ và nghiệm thu: service mất kết nối không gây cascading failure; duplicate/out-of-order event an toàn; hệ thống tự phục hồi hoặc phát cảnh báo có hành động rõ ràng.
 
 Không tạo foreign key xuyên service. Việc tra cứu dữ liệu giữa service phải qua API hoặc event; Order giữ snapshot cần thiết để hiển thị lịch sử.
 
@@ -446,6 +639,8 @@ Ngày 2026-09-27:
 - `mvnw.cmd spotless:check clean verify` sau M6.2A.1: thành công với 55 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
 - Đã phân tích 47.588 bản ghi mẫu trong `ht_lich_su_truy_cap.xlsx` và bổ sung backlog M6.9; giữ các trường actor/action/module/time/IP/business reference hữu ích, loại bỏ hai trường rỗng hoàn toàn và bổ sung outcome, correlation ID, user-agent, HTTP/resource metadata, retention cùng quy tắc không lưu secret.
 - M6.9 hiện chỉ là thiết kế tương lai, chưa tạo entity, migration hoặc API và không thay đổi nhiệm vụ kế tiếp M1.6.
+- Đã chuẩn hóa task contract bắt buộc gồm mục tiêu/phạm vi, phụ thuộc, yêu cầu chức năng, bảo mật/phi chức năng, đầu ra, ví dụ, nghiệm thu và rollout/rollback; toàn bộ nhiệm vụ chưa hoàn thành từ M1.6 đến M7.10 đã có yêu cầu, đầu ra và ví dụ nghiệm thu cụ thể.
+- Đã phân tích biểu mẫu đăng ký dịch vụ và đặc tả VNeID SSO do người dùng cung cấp để bổ sung M1.9; chỉ học luồng OpenID Connect, ma trận môi trường, callback/token/userinfo/logout và go-live, không sao chép URL/credential/token/cookie/mã định danh cụ thể từ tài liệu vào repository.
 
 Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
 
