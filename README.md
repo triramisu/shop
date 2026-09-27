@@ -267,6 +267,7 @@ Tiêu chí hoàn thành M5:
 - [ ] M6.1 Transactional event/outbox trong monolith.
 - [~] M6.2 OpenAPI và chiến lược versioning API.
   - [x] M6.2A Cấu hình nền Swagger UI/OpenAPI, Bearer JWT, security allowlist, production opt-in và integration test.
+  - [x] M6.2A.1 Ngoại hóa metadata, contact và server URL bằng typed properties có validation; không áp dụng JWT toàn cục lên API công khai.
   - [ ] M6.2B Hoàn thiện mô tả operation/schema/response cho toàn bộ API sau khi các module nghiệp vụ được xây dựng.
 - [ ] M6.3 Metrics, structured log và tracing.
 - [ ] M6.4 Rate limiting phân tán tại gateway/edge cho checkout và các API tốn tài nguyên; login đã có lớp bảo vệ trong ứng dụng từ M1.4B.
@@ -377,8 +378,11 @@ Ngày 2026-09-27:
 - Integration test phát hiện và đã sửa persistence context cũ sau bulk revoke; refresh token vừa bị thu hồi không thể được dùng lại trong transaction dài.
 - OpenAPI công bố đủ ba endpoint mới với Bearer JWT security requirement.
 - `mvnw.cmd spotless:apply clean verify` sau M1.5: thành công với 54 test, 0 failure, 0 error, 0 skipped; H2, MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, Swagger và Spotless đều đạt.
+- M6.2A.1 học phần phù hợp từ `NT_KHCN_DMST_QG`: metadata, contact và server URL của OpenAPI được cấu hình theo môi trường bằng immutable typed properties có validation.
+- Không sao chép global security requirement; integration test xác nhận register, token và CAPTCHA vẫn là API công khai trên tài liệu, còn `my-info` tiếp tục yêu cầu Bearer JWT.
+- `mvnw.cmd spotless:check clean verify` sau M6.2A.1: thành công với 55 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
 
-Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H và M1.5 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
+Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
 
 ## 8. Luồng nghiệp vụ đích
 

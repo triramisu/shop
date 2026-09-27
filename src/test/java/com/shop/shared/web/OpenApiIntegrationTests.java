@@ -11,7 +11,13 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(
+        properties = {
+            "app.open-api.info.title=Shop Integration API",
+            "app.open-api.info.contact.name=Integration Team",
+            "app.open-api.server.url=/integration",
+            "app.open-api.server.description=Integration environment"
+        })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class OpenApiIntegrationTests {
@@ -24,8 +30,12 @@ class OpenApiIntegrationTests {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openapi").isNotEmpty())
-                .andExpect(jsonPath("$.info.title").value("Shop API"))
+                .andExpect(jsonPath("$.info.title").value("Shop Integration API"))
                 .andExpect(jsonPath("$.info.version").value("v1"))
+                .andExpect(jsonPath("$.info.description").value("REST API for the Shop modular monolith"))
+                .andExpect(jsonPath("$.info.contact.name").value("Integration Team"))
+                .andExpect(jsonPath("$.servers[0].url").value("/integration"))
+                .andExpect(jsonPath("$.servers[0].description").value("Integration environment"))
                 .andExpect(
                         jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")
@@ -35,6 +45,11 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info/password'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/auth/token'].post.security").doesNotExist())
+                .andExpect(
+                        jsonPath("$.paths['/api/auth/register'].post.security").doesNotExist())
+                .andExpect(
+                        jsonPath("$.paths['/api/auth/captcha'].post.security").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].get.security[0].bearerAuth")
                         .isArray());
     }

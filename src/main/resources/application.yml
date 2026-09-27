@@ -44,6 +44,18 @@ springdoc:
     tags-sorter: alpha
 
 app:
+  open-api:
+    info:
+      title: ${OPENAPI_TITLE:Shop API}
+      version: ${OPENAPI_VERSION:v1}
+      description: ${OPENAPI_DESCRIPTION:REST API for the Shop modular monolith}
+      contact:
+        name: ${OPENAPI_CONTACT_NAME:Shop Development Team}
+        url: ${OPENAPI_CONTACT_URL:}
+        email: ${OPENAPI_CONTACT_EMAIL:}
+    server:
+      url: ${OPENAPI_SERVER_URL:/}
+      description: ${OPENAPI_SERVER_DESCRIPTION:Current environment}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   security:
