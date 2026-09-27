@@ -31,7 +31,12 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")
                         .value("bearer"))
                 .andExpect(jsonPath("$.paths['/api/auth/captcha'].post").exists())
-                .andExpect(jsonPath("$.paths['/api/auth/token'].post").exists());
+                .andExpect(jsonPath("$.paths['/api/auth/token'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/auth/my-info'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/auth/my-info'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/auth/my-info/password'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/auth/my-info'].get.security[0].bearerAuth")
+                        .isArray());
     }
 
     @Test

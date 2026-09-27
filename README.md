@@ -12,8 +12,8 @@ Cách làm này giúp phát triển và debug nhanh ở giai đoạn đầu như
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M1 — Identity và RBAC`
-- Nhiệm vụ vừa hoàn thành: `M1.4H — Gom CAPTCHA thành feature package và soát chất lượng toàn dự án`
-- Nhiệm vụ kế tiếp: `M1.5 — API my-info, cập nhật hồ sơ và đổi mật khẩu` (**chưa bắt đầu**)
+- Nhiệm vụ vừa hoàn thành: `M1.5 — API my-info, cập nhật hồ sơ và đổi mật khẩu`
+- Nhiệm vụ kế tiếp: `M1.6 — Admin quản lý user/role/permission` (**chưa bắt đầu**)
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
 - Kiến trúc đích: Gateway + Identity + Catalog + Inventory + Order + Payment.
@@ -126,6 +126,14 @@ POST /api/auth/token
 Scheduled cleanup
   → captcha.service.AdaptiveCaptchaCleanupService
   → xóa challenge và login-failure hết hạn
+
+GET/PUT /api/auth/my-info
+  → UserProfileController lấy username từ JWT đã xác thực
+  → UserProfileService chỉ đọc/cập nhật đúng tài khoản hiện tại
+
+PUT /api/auth/my-info/password
+  → xác minh mật khẩu hiện tại → BCrypt mật khẩu mới
+  → thu hồi mọi refresh-token family → access token cũ mất hiệu lực
 ```
 
 Spring Modulith kiểm soát ranh giới giữa module; ArchUnit kiểm soát việc controller/security không truy cập persistence trực tiếp. Package `internal` không phải API cho module khác. Contract dùng chung phải được công khai có chủ đích bằng named interface, ví dụ `shared :: error`.
@@ -158,6 +166,7 @@ V1–V4 vẫn giữ nguyên tên bảng cũ trong file migration vì các migrat
 - [x] M0.3 Cấu hình MySQL, Flyway, profile test và Docker Compose.
 - [x] M0.4 Chuẩn hóa response lỗi, logging, correlation ID và health endpoint.
 - [x] M0.5 Thiết lập format/check, unit test và CI cơ bản.
+- [x] M0.6 Tạo Git baseline đã kiểm chứng, nhánh `develop` và đồng bộ GitHub remote.
 
 Tiêu chí hoàn thành M0:
 
@@ -181,7 +190,7 @@ Tiêu chí hoàn thành M0:
 - [x] M1.4F Việt hóa tên bảng Identity bằng migration giữ nguyên dữ liệu.
 - [x] M1.4G Chuẩn hóa artifact, application name và JWT issuer thành `shop`.
 - [x] M1.4H Gom CAPTCHA thành feature package và soát chất lượng toàn dự án.
-- [ ] M1.5 API `my-info`, cập nhật hồ sơ và đổi mật khẩu.
+- [x] M1.5 API `my-info`, cập nhật hồ sơ và đổi mật khẩu.
 - [ ] M1.6 Admin quản lý user/role/permission.
 - [ ] M1.7 Kiểm tra ownership trước khi ghi dữ liệu; không dùng `@PostAuthorize` cho update.
 - [ ] M1.8 Unit, repository, controller và security integration test.
@@ -358,7 +367,18 @@ Ngày 2026-09-26:
 - Architecture test được mở rộng để kiểm soát các tầng lồng trong feature package và ngăn component CAPTCHA bị đặt rải rác trở lại.
 - `mvnw.cmd spotless:check clean verify` sau M1.4H: thành công với 46 test, 0 failure, 0 error, 0 skipped; H2, MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, Swagger và Spotless đều đạt.
 
-Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G và M1.4H đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.5 chưa bắt đầu.
+Ngày 2026-09-27:
+
+- M0.6 tạo commit baseline trên nhánh `develop`, cấu hình `origin` và đồng bộ repository GitHub mà không đưa `.env`, mật khẩu máy cá nhân hoặc private key vào Git.
+- M1.5 thêm `GET /api/auth/my-info`, `PUT /api/auth/my-info` và `PUT /api/auth/my-info/password`; cả ba endpoint bắt buộc access token.
+- Controller luôn lấy username từ JWT đã xác thực, không nhận `userId` từ client; người dùng không thể dùng API hồ sơ để sửa tài khoản khác.
+- Cập nhật hồ sơ chuẩn hóa email về chữ thường, chống email trùng, chuẩn hóa tên tùy chọn và đặt lại `emailVerified=false` khi email thay đổi.
+- Đổi mật khẩu xác minh mật khẩu hiện tại, không cho dùng lại mật khẩu cũ, BCrypt mật khẩu mới và thu hồi toàn bộ phiên của tài khoản trong cùng transaction.
+- Integration test phát hiện và đã sửa persistence context cũ sau bulk revoke; refresh token vừa bị thu hồi không thể được dùng lại trong transaction dài.
+- OpenAPI công bố đủ ba endpoint mới với Bearer JWT security requirement.
+- `mvnw.cmd spotless:apply clean verify` sau M1.5: thành công với 54 test, 0 failure, 0 error, 0 skipped; H2, MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, Swagger và Spotless đều đạt.
+
+Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H và M1.5 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
 
 ## 8. Luồng nghiệp vụ đích
 
@@ -460,7 +480,7 @@ Content-Type: application/json
 
 Mỗi CAPTCHA chỉ dùng một lần và mặc định hết hạn sau hai phút. Login thành công xóa bộ đếm thất bại. Có thể điều chỉnh bằng `AUTH_CAPTCHA_*`, nhưng không tắt CAPTCHA hoặc rate limit ở production nếu chưa có lớp bảo vệ tương đương tại edge.
 
-Các endpoint xác thực đã hoàn thành đến M1.4:
+Các endpoint xác thực và hồ sơ đã hoàn thành đến M1.5:
 
 ```text
 POST /api/auth/register    Đăng ký tài khoản với role USER
@@ -469,7 +489,47 @@ POST /api/auth/captcha     Sinh CAPTCHA một lần cho username
 POST /api/auth/introspect  Kiểm tra access token
 POST /api/auth/refresh     Rotation refresh token
 POST /api/auth/logout      Thu hồi toàn bộ token family bằng refresh token
+GET  /api/auth/my-info     Đọc hồ sơ của tài khoản trong access token
+PUT  /api/auth/my-info     Cập nhật hồ sơ của tài khoản trong access token
+PUT  /api/auth/my-info/password  Đổi mật khẩu và thu hồi mọi phiên hiện có
 ```
+
+Đọc hồ sơ hiện tại:
+
+```http
+GET http://localhost:8080/api/auth/my-info
+Authorization: Bearer access-token
+```
+
+Cập nhật hồ sơ; username, role, trạng thái và quyền không được nhận từ request này:
+
+```http
+PUT http://localhost:8080/api/auth/my-info
+Authorization: Bearer access-token
+Content-Type: application/json
+
+{
+  "email": "customer.updated@example.com",
+  "firstName": "Customer",
+  "lastName": "Updated",
+  "dateOfBirth": "1995-05-20"
+}
+```
+
+Đổi mật khẩu:
+
+```http
+PUT http://localhost:8080/api/auth/my-info/password
+Authorization: Bearer access-token
+Content-Type: application/json
+
+{
+  "currentPassword": "Str0ngPassword!",
+  "newPassword": "An0therStrongPassword!"
+}
+```
+
+Sau khi đổi mật khẩu thành công, toàn bộ access/refresh token cũ của tài khoản mất hiệu lực; client phải đăng nhập lại bằng mật khẩu mới.
 
 Logout dùng body sau và có tính idempotent:
 

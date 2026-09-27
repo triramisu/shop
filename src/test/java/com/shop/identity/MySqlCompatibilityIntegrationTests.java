@@ -3,6 +3,15 @@ package com.shop.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.identity.internal.captcha.service.AdaptiveCaptchaService;
+import com.shop.identity.internal.dto.request.AuthenticationRequest;
+import com.shop.identity.internal.dto.request.ChangePasswordRequest;
+import com.shop.identity.internal.dto.request.RegisterUserRequest;
+import com.shop.identity.internal.dto.request.UpdateProfileRequest;
+import com.shop.identity.internal.dto.response.AuthenticationResponse;
+import com.shop.identity.internal.dto.response.UserResponse;
+import com.shop.identity.internal.service.AuthenticationService;
+import com.shop.identity.internal.service.RegistrationService;
+import com.shop.identity.internal.service.UserProfileService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -41,6 +50,15 @@ class MySqlCompatibilityIntegrationTests {
 
     @Autowired
     private AdaptiveCaptchaService adaptiveCaptchaService;
+
+    @Autowired
+    private RegistrationService registrationService;
+
+    @Autowired
+    private AuthenticationService authenticationService;
+
+    @Autowired
+    private UserProfileService userProfileService;
 
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
@@ -101,6 +119,53 @@ class MySqlCompatibilityIntegrationTests {
                 Integer.class,
                 principalHash);
         assertThat(activeChallenges).isEqualTo(1);
+    }
+
+    @Test
+    void updatesProfilesAndRevokesSessionsOnMySql() {
+        String username = "mysql-profile-user";
+        String currentPassword = "Str0ngPassword!";
+        String newPassword = "An0therStrongPassword!";
+        registrationService.register(RegisterUserRequest.builder()
+                .username(username)
+                .email("mysql-profile-user@example.com")
+                .password(currentPassword)
+                .build());
+        AuthenticationResponse session = authenticationService.authenticate(AuthenticationRequest.builder()
+                .username(username)
+                .password(currentPassword)
+                .build());
+
+        UserResponse updatedProfile = userProfileService.updateProfile(
+                username,
+                UpdateProfileRequest.builder()
+                        .email("updated-mysql-profile@example.com")
+                        .firstName("MySQL")
+                        .build());
+        userProfileService.changePassword(
+                username,
+                ChangePasswordRequest.builder()
+                        .currentPassword(currentPassword)
+                        .newPassword(newPassword)
+                        .build());
+
+        assertThat(updatedProfile.getEmail()).isEqualTo("updated-mysql-profile@example.com");
+        Integer activeSessions = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM xac_thuc_phien_lam_moi refresh_token
+                  JOIN xac_thuc_nguoi_dung shop_user ON shop_user.id = refresh_token.user_id
+                 WHERE shop_user.username = ?
+                   AND refresh_token.revoked_at IS NULL
+                """, Integer.class, username);
+        assertThat(activeSessions).isZero();
+        assertThat(session.getRefreshToken()).isNotBlank();
+        assertThat(authenticationService
+                        .authenticate(AuthenticationRequest.builder()
+                                .username(username)
+                                .password(newPassword)
+                                .build())
+                        .isAuthenticated())
+                .isTrue();
     }
 
     private String hash(String value) throws Exception {

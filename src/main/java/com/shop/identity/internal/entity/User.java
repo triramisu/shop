@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -125,6 +126,21 @@ public class User {
     @PreUpdate
     void beforeUpdate() {
         updatedAt = Instant.now();
+    }
+
+    public void updateProfile(String email, String firstName, String lastName, LocalDate dateOfBirth) {
+        String requiredEmail = Objects.requireNonNull(email);
+        if (!this.email.equalsIgnoreCase(requiredEmail)) {
+            emailVerified = false;
+        }
+        this.email = requiredEmail;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.dateOfBirth = dateOfBirth;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = Objects.requireNonNull(passwordHash);
     }
 
     public UUID getId() {

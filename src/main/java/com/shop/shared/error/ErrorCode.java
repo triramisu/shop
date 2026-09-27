@@ -38,6 +38,8 @@ public enum ErrorCode {
     INVALID_CAPTCHA(1026, "Captcha is invalid or expired", HttpStatus.BAD_REQUEST),
     CAPTCHA_UNAVAILABLE(1027, "Captcha is temporarily unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     CAPTCHA_NOT_REQUIRED(1028, "Captcha is not required", HttpStatus.CONFLICT),
+    CURRENT_PASSWORD_INVALID(1029, "Current password is invalid", HttpStatus.BAD_REQUEST),
+    PASSWORD_UNCHANGED(1030, "New password must be different from the current password", HttpStatus.BAD_REQUEST),
     REQUIRED_ROLE_MISSING(1500, "Required role is missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;
