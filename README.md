@@ -275,6 +275,30 @@ Tiêu chí hoàn thành M5:
 - [ ] M6.6 End-to-end test toàn bộ purchase flow.
 - [ ] M6.7 Load test các điểm login, search, checkout và reserve stock.
 - [ ] M6.8 Threat review và dependency/security scan.
+- [ ] M6.9 Audit trail và lịch sử truy cập.
+  - [ ] M6.9A Tách access log kỹ thuật khỏi audit event nghiệp vụ; không ghi mọi request đọc thông thường vào database.
+  - [ ] M6.9B Tạo entity và migration cho bảng append-only `he_thong_lich_su_truy_cap`, dùng UUID và thời gian UTC.
+  - [ ] M6.9C Ghi nhận đăng nhập thành công/thất bại, logout, refresh/revoke token, thay đổi mật khẩu/hồ sơ, thao tác quản trị và thay đổi trạng thái nghiệp vụ quan trọng.
+  - [ ] M6.9D Phát audit event tin cậy qua transaction/outbox; sự kiện bảo mật và thanh toán không được mất khi tiến trình bị lỗi.
+  - [ ] M6.9E Cung cấp API quản trị có phân quyền để lọc, phân trang và xuất lịch sử; không có API sửa hoặc xóa từng bản ghi audit.
+  - [ ] M6.9F Thiết lập index, retention/archive, giới hạn kích thước chi tiết, che dữ liệu cá nhân và test chống ghi trùng/lộ bí mật.
+
+Hợp đồng dữ liệu dự kiến cho M6.9:
+
+| Nhóm | Trường chính | Quy tắc |
+| --- | --- | --- |
+| Chủ thể | `actor_user_id`, `actor_username_snapshot`, `shop_id` | `actor_user_id` dùng UUID và được phép `null` cho đăng nhập thất bại; snapshot giúp tra cứu sau khi tài khoản đổi tên hoặc bị xóa. |
+| Hành động | `action_code`, `feature`, `module`, `outcome` | Dùng mã ổn định thay vì chỉ lưu nhãn hiển thị; `outcome` tối thiểu gồm `SUCCESS`, `FAILURE`, `DENIED`. |
+| Thời điểm/request | `occurred_at`, `ip_address`, `user_agent`, `correlation_id`, `http_method`, `request_path`, `http_status` | Lưu UTC; `correlation_id` liên kết với structured log và distributed trace. Chỉ tin proxy header khi request đến từ trusted proxy. |
+| Đối tượng nghiệp vụ | `resource_type`, `resource_id`, `business_event_id` | Cho phép truy vết User, Product, Order, Inventory và Payment mà không tạo foreign key xuyên module/service. |
+| Chi tiết | `detail_json` | Chỉ lưu metadata đã allowlist và giới hạn kích thước; cấm password, token, signing key, CAPTCHA answer, cookie và request/response body thô. |
+
+Tiêu chí hoàn thành M6.9:
+
+- Access log dung lượng lớn đi vào centralized logging với retention ngắn; database chỉ giữ audit event có giá trị bảo mật/nghiệp vụ hoặc lượt đọc dữ liệu nhạy cảm.
+- Audit record là bất biến ở tầng ứng dụng; thao tác quản trị phải được phân quyền riêng và chính thao tác xuất lịch sử cũng được audit.
+- Có index tối thiểu theo `(actor_user_id, occurred_at)`, `(module, occurred_at)`, `correlation_id` và `(resource_type, resource_id, occurred_at)`; mọi API dùng cursor/keyset pagination hoặc giới hạn phân trang rõ ràng.
+- Chính sách retention, archive và quyền xem IP/user-agent được tài liệu hóa; test xác nhận không có secret/PII ngoài allowlist trong `detail_json`.
 
 Điều kiện được phép bắt đầu tách microservices:
 
@@ -282,7 +306,7 @@ Tiêu chí hoàn thành M5:
 - Module verification, unit test, integration test và E2E đều đạt.
 - API/event contract đã version hóa.
 - Không module nào truy cập repository hoặc bảng thuộc module khác.
-- Có idempotency, outbox, metrics, trace ID và quy trình rollback migration.
+- Có idempotency, outbox, audit trail, metrics, trace ID và quy trình rollback migration.
 
 ### M7 — Tách microservices
 
@@ -381,6 +405,8 @@ Ngày 2026-09-27:
 - M6.2A.1 học phần phù hợp từ `NT_KHCN_DMST_QG`: metadata, contact và server URL của OpenAPI được cấu hình theo môi trường bằng immutable typed properties có validation.
 - Không sao chép global security requirement; integration test xác nhận register, token và CAPTCHA vẫn là API công khai trên tài liệu, còn `my-info` tiếp tục yêu cầu Bearer JWT.
 - `mvnw.cmd spotless:check clean verify` sau M6.2A.1: thành công với 55 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V5, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
+- Đã phân tích 47.588 bản ghi mẫu trong `ht_lich_su_truy_cap.xlsx` và bổ sung backlog M6.9; giữ các trường actor/action/module/time/IP/business reference hữu ích, loại bỏ hai trường rỗng hoàn toàn và bổ sung outcome, correlation ID, user-agent, HTTP/resource metadata, retention cùng quy tắc không lưu secret.
+- M6.9 hiện chỉ là thiết kế tương lai, chưa tạo entity, migration hoặc API và không thay đổi nhiệm vụ kế tiếp M1.6.
 
 Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
 
