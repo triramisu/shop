@@ -6,8 +6,10 @@ import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.modulith.NamedInterface;
 
 @Configuration
+@NamedInterface("web")
 @OpenAPIDefinition(
         info = @Info(title = "Shop API", version = "v1", description = "REST API for the Shop modular monolith"))
 @SecurityScheme(
