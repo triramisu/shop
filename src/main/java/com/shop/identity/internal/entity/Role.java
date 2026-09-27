@@ -11,8 +11,8 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
-import lombok.Builder;
 
 @Entity
 @Table(name = IdentityTableNames.ROLES)
@@ -25,6 +25,9 @@ public class Role {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "system_role", nullable = false)
+    private boolean systemRole;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = IdentityTableNames.ROLE_PERMISSIONS,
@@ -34,10 +37,25 @@ public class Role {
 
     protected Role() {}
 
-    @Builder
-    public Role(String code, String description) {
+    private Role(String code, String description, boolean systemRole, Set<Permission> permissions) {
         this.code = code;
         this.description = description;
+        this.systemRole = systemRole;
+        this.permissions.addAll(permissions);
+    }
+
+    public static Role createCustom(String code, String description, Set<Permission> permissions) {
+        return new Role(
+                Objects.requireNonNull(code), description, false, new HashSet<>(Objects.requireNonNull(permissions)));
+    }
+
+    public void update(String description, Set<Permission> permissions) {
+        if (systemRole) {
+            throw new IllegalStateException("System roles cannot be modified");
+        }
+        this.description = description;
+        this.permissions.clear();
+        this.permissions.addAll(Objects.requireNonNull(permissions));
     }
 
     public String getCode() {
@@ -46,6 +64,10 @@ public class Role {
 
     public String getDescription() {
         return description;
+    }
+
+    public boolean isSystemRole() {
+        return systemRole;
     }
 
     public Set<Permission> getPermissions() {

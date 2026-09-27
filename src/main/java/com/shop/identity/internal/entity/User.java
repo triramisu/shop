@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = IdentityTableNames.USERS)
@@ -71,6 +72,7 @@ public class User {
     private Instant updatedAt;
 
     @ManyToMany(fetch = FetchType.LAZY)
+    @BatchSize(size = 50)
     @JoinTable(
             name = IdentityTableNames.USER_ROLES,
             joinColumns = @JoinColumn(name = "user_id"),
@@ -143,6 +145,23 @@ public class User {
         this.passwordHash = Objects.requireNonNull(passwordHash);
     }
 
+    public void changeStatus(UserStatus status) {
+        this.status = Objects.requireNonNull(status);
+    }
+
+    public void replaceRoles(Set<Role> roles) {
+        Objects.requireNonNull(roles);
+        if (roles.isEmpty()) {
+            throw new IllegalArgumentException("A user must have at least one role");
+        }
+        this.roles.clear();
+        this.roles.addAll(roles);
+    }
+
+    public boolean hasRole(String roleCode) {
+        return roles.stream().anyMatch(role -> role.getCode().equals(roleCode));
+    }
+
     public UUID getId() {
         return id;
     }
@@ -181,6 +200,10 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public Set<Role> getRoles() {

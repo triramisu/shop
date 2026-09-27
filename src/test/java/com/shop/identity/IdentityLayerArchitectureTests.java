@@ -78,6 +78,18 @@ class IdentityLayerArchitectureTests {
     }
 
     @Test
+    void systemAdministrationComponentsResideInTheAdministrationFeaturePackage() {
+        assertThat(applicationClasses.stream()
+                        .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.identity.internal"))
+                        .filter(javaClass -> javaClass.getSimpleName().contains("Administration")
+                                || javaClass.getSimpleName().contains("SuperAdmin"))
+                        .toList())
+                .isNotEmpty()
+                .allSatisfy(javaClass ->
+                        assertThat(javaClass.getPackageName()).startsWith("com.shop.identity.internal.administration"));
+    }
+
+    @Test
     void identityEntitiesUseExplicitVietnameseModulePrefixedTableNames() {
         assertThat(applicationClasses.stream()
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.identity.internal"))

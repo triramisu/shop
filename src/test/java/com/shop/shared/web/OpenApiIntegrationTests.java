@@ -45,12 +45,24 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info/password'].put").exists())
+                .andExpect(jsonPath("$.paths['/api/system-administration/users'].get")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/system-administration/users/{userId}/status'].patch")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/system-administration/users/{userId}/roles'].put")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/system-administration/roles'].post")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/system-administration/permissions'].get")
+                        .exists())
                 .andExpect(jsonPath("$.paths['/api/auth/token'].post.security").doesNotExist())
                 .andExpect(
                         jsonPath("$.paths['/api/auth/register'].post.security").doesNotExist())
                 .andExpect(
                         jsonPath("$.paths['/api/auth/captcha'].post.security").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].get.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/system-administration/users'].get.security[0].bearerAuth")
                         .isArray());
     }
 
