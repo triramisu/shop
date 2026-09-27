@@ -225,41 +225,6 @@ Tiêu chí hoàn thành M0:
   - Yêu cầu: lập ma trận test cho register, token, introspect, refresh, logout, CAPTCHA, rate limit, my-info, profile, password và admin RBAC; bao phủ happy path, validation, unauthorized, forbidden, replay và concurrency quan trọng.
   - Đầu ra: test độc lập, dữ liệu fixture/builder dễ đọc và báo cáo JaCoCo dùng để phát hiện vùng chưa kiểm chứng; không viết test chỉ để tăng phần trăm coverage.
   - Ví dụ và nghiệm thu: chạy `mvnw.cmd clean verify` với MySQL test thành công, không test flaky, Spring Modulith/ArchUnit đạt và mọi lỗi bảo mật đã biết trong M1 có regression test.
-- [ ] M1.9 Tích hợp đăng nhập ngoài theo OpenID Connect, ưu tiên adapter VNeID sau khi M1.8 đạt.
-  - [ ] M1.9A Chốt hồ sơ đăng ký và ma trận môi trường.
-    - Yêu cầu: xác định tên tổ chức/dịch vụ, mô tả, logo, callback, post-logout redirect, đầu mối, ngày dự kiến go-live và trạng thái riêng cho dev/test/prod; endpoint và credential phải được chủ hệ thống ngoài xác nhận.
-    - Đầu ra: tài liệu yêu cầu đã khử bí mật và bảng cấu hình typed properties; giá trị secret/private key chỉ tồn tại trong secret manager hoặc environment variable.
-    - Ví dụ và nghiệm thu: thiếu callback đã đăng ký hoặc thiếu cấu hình production thì ứng dụng fail-fast; không có client secret, private key, token, cookie hay PII thật trong Git/log/OpenAPI.
-  - [ ] M1.9B Xây provider adapter và hợp đồng OIDC.
-    - Yêu cầu: cô lập authorization, token, userinfo và logout endpoint sau interface; không để controller/service nghiệp vụ phụ thuộc trực tiếp URL hay response riêng của VNeID.
-    - Đầu ra: provider interface, VNeID adapter, request/response DTO, config validation và error mapping; chuẩn hóa `response_type=code`, `scope=openid` cùng content type thực tế của token endpoint.
-    - Ví dụ và nghiệm thu: adapter contract test ánh xạ đúng success/error/timeout; thay fake provider không cần sửa authentication controller.
-  - [ ] M1.9C Xây authorization redirect và callback an toàn.
-    - Yêu cầu: dùng Authorization Code flow; sinh, lưu một lần và kiểm tra `state`, `nonce` và PKCE khi provider hỗ trợ; callback/redirect dùng exact allowlist, chống open redirect và callback replay.
-    - Đầu ra: endpoint bắt đầu đăng nhập, callback handler và kho challenge TTL; query nhạy cảm phải được che khỏi access log.
-    - Ví dụ và nghiệm thu: callback đúng state dùng được một lần; state sai/hết hạn, redirect ngoài allowlist hoặc code replay đều bị từ chối và được audit mà không lộ code/encryption key.
-  - [ ] M1.9D Đổi authorization code lấy token và giải mã payload.
-    - Yêu cầu: token exchange chỉ chạy phía server qua TLS, dùng đúng content type, timeout và credential từ secret store; nếu payload dùng AES và khóa AES bọc RSA thì giới hạn thuật toán/kích thước, hỗ trợ key rotation và báo lỗi an toàn.
-    - Đầu ra: token client, crypto service riêng, zeroization/best-effort cleanup cho secret tạm, error code và metrics không gắn token.
-    - Ví dụ và nghiệm thu: token hợp lệ được xử lý; signature/decryption/tag sai, response thiếu field, timeout hoặc payload quá lớn bị từ chối; log/test report không chứa token hoặc key thô.
-  - [ ] M1.9E Ánh xạ danh tính và bảo vệ PII.
-    - Yêu cầu: ánh xạ định danh ngoài, họ tên, ngày sinh, loại/mức tài khoản theo data minimization; chốt quy tắc link/provision user, unique identity, consent, mã hóa và retention trước khi lưu `citizenPid` hoặc thuộc tính nhạy cảm.
-    - Đầu ra: external identity entity/migration, mapper và account-linking service; lưu issuer + subject/provider key thay vì coi tên hiển thị là định danh.
-    - Ví dụ và nghiệm thu: đăng nhập lặp liên kết cùng tài khoản; xung đột định danh không tự merge; userinfo thiếu/không hợp lệ trả lỗi kiểm soát và không tạo tài khoản rác.
-  - [ ] M1.9F Đồng bộ logout và phiên cục bộ.
-    - Yêu cầu: logout luôn revoke phiên/refresh token của Shop trước, sau đó mới điều hướng provider logout; post-logout redirect dùng allowlist và hành vi khi provider lỗi phải được xác định.
-    - Đầu ra: logout orchestration, audit event và tài liệu phân biệt local logout, provider logout và single logout.
-    - Ví dụ và nghiệm thu: provider logout thành công hoặc timeout đều không làm token Shop sống lại; redirect giả mạo bị từ chối; integration test xác nhận access token cũ không truy cập tài nguyên bảo mật.
-  - [ ] M1.9G Thêm resilience, audit và giới hạn chống lạm dụng.
-    - Yêu cầu: timeout, circuit breaker và retry chỉ áp dụng cho thao tác an toàn; rate limit điểm bắt đầu/callback; audit login success/failure/denied và correlation ID nhưng không lưu code/token/key/PII ngoài allowlist.
-    - Đầu ra: Resilience4j config theo từng endpoint, metrics/alert, redaction và runbook khi provider unavailable.
-    - Ví dụ và nghiệm thu: provider chậm/mất kết nối trả lỗi ổn định, circuit mở đúng ngưỡng, retry không đổi code hai lần và failure không làm đầy thread/connection pool.
-  - [ ] M1.9H Kiểm thử liên thông và go-live.
-    - Yêu cầu: hoàn thành sandbox/UAT cho web; mobile universal link chỉ triển khai khi có client mobile; kiểm tra clock skew, callback, consent, account mapping, logout, key rotation và rollback cấu hình.
-    - Đầu ra: test evidence đã che dữ liệu, checklist go-live trước hạn, owner/đầu mối, secret rotation plan và feature flag tắt provider.
-    - Ví dụ và nghiệm thu: E2E đăng nhập và logout đạt trên test; production config được xác nhận tách biệt; rollback bằng feature flag không ảnh hưởng đăng nhập nội bộ.
-
-Lưu ý an toàn cho M1.9: mọi client secret, private key, token, cookie hoặc mã định danh xuất hiện trong tài liệu/mẫu tích hợp đều được coi là dữ liệu nhạy cảm. Không sao chép các giá trị đó vào source, README, test fixture, OpenAPI hoặc log; nếu giá trị mẫu có khả năng là credential thật thì phải yêu cầu đầu mối provider xoay vòng trước khi tích hợp.
 
 Tiêu chí hoàn thành M1:
 
@@ -267,7 +232,6 @@ Tiêu chí hoàn thành M1:
 - API role/permission chỉ dành cho ADMIN.
 - Access token và refresh token tách biệt, có rotation/revoke test.
 - Trước production, JWT key local/dev phải được thay bằng environment/secret riêng.
-- External SSO bị tắt mặc định cho đến khi hoàn tất sandbox/UAT, callback allowlist và secret rotation; đăng nhập ngoài không được phép bỏ qua RBAC/ownership cục bộ.
 
 ### M2 — Catalog và hình ảnh
 
@@ -435,7 +399,7 @@ Tiêu chí hoàn thành M5:
   - Đầu ra: versioned load scripts, baseline report, bottleneck/query plan và capacity recommendation.
   - Ví dụ và nghiệm thu: đạt SLO đã chốt không oversell/mất event; kết quả có CPU/RAM/DB pool/GC thay vì chỉ requests-per-second.
 - [ ] M6.8 Threat review và dependency/security scan.
-  - Yêu cầu: cập nhật data-flow/threat model cho auth, upload, checkout, payment, admin, SSO và audit; scan dependency/container/secret/SAST, triage theo mức độ và exploitability.
+  - Yêu cầu: cập nhật data-flow/threat model cho auth, upload, checkout, payment, admin và audit; scan dependency/container/secret/SAST, triage theo mức độ và exploitability.
   - Đầu ra: threat register, mitigation owner/deadline, SBOM và policy CI chặn mức nghiêm trọng đã chốt.
   - Ví dụ và nghiệm thu: không còn finding Critical/High chưa chấp nhận có thời hạn; kiểm thử IDOR, SSRF, upload, webhook replay, JWT, CORS và secret leakage đạt.
 - [ ] M6.9 Audit trail và lịch sử truy cập.
@@ -640,7 +604,7 @@ Ngày 2026-09-27:
 - Đã phân tích 47.588 bản ghi mẫu trong `ht_lich_su_truy_cap.xlsx` và bổ sung backlog M6.9; giữ các trường actor/action/module/time/IP/business reference hữu ích, loại bỏ hai trường rỗng hoàn toàn và bổ sung outcome, correlation ID, user-agent, HTTP/resource metadata, retention cùng quy tắc không lưu secret.
 - M6.9 hiện chỉ là thiết kế tương lai, chưa tạo entity, migration hoặc API và không thay đổi nhiệm vụ kế tiếp M1.6.
 - Đã chuẩn hóa task contract bắt buộc gồm mục tiêu/phạm vi, phụ thuộc, yêu cầu chức năng, bảo mật/phi chức năng, đầu ra, ví dụ, nghiệm thu và rollout/rollback; toàn bộ nhiệm vụ chưa hoàn thành từ M1.6 đến M7.10 đã có yêu cầu, đầu ra và ví dụ nghiệm thu cụ thể.
-- Đã phân tích biểu mẫu đăng ký dịch vụ và đặc tả VNeID SSO do người dùng cung cấp để bổ sung M1.9; chỉ học luồng OpenID Connect, ma trận môi trường, callback/token/userinfo/logout và go-live, không sao chép URL/credential/token/cookie/mã định danh cụ thể từ tài liệu vào repository.
+- Hai tài liệu tích hợp SSO do người dùng cung cấp chỉ được dùng làm ví dụ về cách viết yêu cầu, đầu ra và nghiệm thu; VNeID SSO không thuộc phạm vi Shop và không được thêm vào backlog.
 
 Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.6 chưa bắt đầu.
 
