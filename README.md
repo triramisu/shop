@@ -278,26 +278,29 @@ Tiêu chí hoàn thành M5:
 - [ ] M6.9 Audit trail và lịch sử truy cập.
   - [ ] M6.9A Tách access log kỹ thuật khỏi audit event nghiệp vụ; không ghi mọi request đọc thông thường vào database.
   - [ ] M6.9B Tạo entity và migration cho bảng append-only `he_thong_lich_su_truy_cap`, dùng UUID và thời gian UTC.
-  - [ ] M6.9C Ghi nhận đăng nhập thành công/thất bại, logout, refresh/revoke token, thay đổi mật khẩu/hồ sơ, thao tác quản trị và thay đổi trạng thái nghiệp vụ quan trọng.
+  - [ ] M6.9C Ghi nhận đăng nhập thành công/thất bại, logout, refresh/revoke token, thay đổi mật khẩu/hồ sơ, thao tác quản trị, thay đổi trạng thái nghiệp vụ quan trọng và tác vụ tự động do hệ thống thực hiện.
   - [ ] M6.9D Phát audit event tin cậy qua transaction/outbox; sự kiện bảo mật và thanh toán không được mất khi tiến trình bị lỗi.
-  - [ ] M6.9E Cung cấp API quản trị có phân quyền để lọc, phân trang và xuất lịch sử; không có API sửa hoặc xóa từng bản ghi audit.
-  - [ ] M6.9F Thiết lập index, retention/archive, giới hạn kích thước chi tiết, che dữ liệu cá nhân và test chống ghi trùng/lộ bí mật.
+  - [ ] M6.9E Cung cấp API quản trị có quyền riêng và data scope theo shop/seller để lọc theo actor, action, module, outcome, IP, correlation ID, resource và khoảng thời gian; hỗ trợ phân trang và timeline theo đối tượng nghiệp vụ; không có API sửa hoặc xóa từng bản ghi audit.
+  - [ ] M6.9F Xuất lịch sử theo giới hạn thời gian/kích thước bằng streaming hoặc job bất đồng bộ; không tải toàn bộ dữ liệu rồi trả file Base64 trong JSON và phải audit chính thao tác xuất.
+  - [ ] M6.9G Thiết lập index, retention/archive, giới hạn kích thước chi tiết, che dữ liệu cá nhân và test chống ghi trùng/lộ bí mật; chi tiết riêng của module dùng snapshot/JSON có schema thay vì quan hệ `OneToOne` cứng với một bảng nghiệp vụ dùng chung.
 
 Hợp đồng dữ liệu dự kiến cho M6.9:
 
 | Nhóm | Trường chính | Quy tắc |
 | --- | --- | --- |
-| Chủ thể | `actor_user_id`, `actor_username_snapshot`, `shop_id` | `actor_user_id` dùng UUID và được phép `null` cho đăng nhập thất bại; snapshot giúp tra cứu sau khi tài khoản đổi tên hoặc bị xóa. |
+| Chủ thể | `actor_type`, `actor_user_id`, `actor_username_snapshot`, `shop_id` | `actor_type` tối thiểu gồm `USER`, `SYSTEM`; `actor_user_id` dùng UUID và được phép `null` cho đăng nhập thất bại hoặc tác vụ hệ thống; snapshot giúp tra cứu sau khi tài khoản đổi tên hoặc bị xóa. |
 | Hành động | `action_code`, `feature`, `module`, `outcome` | Dùng mã ổn định thay vì chỉ lưu nhãn hiển thị; `outcome` tối thiểu gồm `SUCCESS`, `FAILURE`, `DENIED`. |
 | Thời điểm/request | `occurred_at`, `ip_address`, `user_agent`, `correlation_id`, `http_method`, `request_path`, `http_status` | Lưu UTC; `correlation_id` liên kết với structured log và distributed trace. Chỉ tin proxy header khi request đến từ trusted proxy. |
 | Đối tượng nghiệp vụ | `resource_type`, `resource_id`, `business_event_id` | Cho phép truy vết User, Product, Order, Inventory và Payment mà không tạo foreign key xuyên module/service. |
-| Chi tiết | `detail_json` | Chỉ lưu metadata đã allowlist và giới hạn kích thước; cấm password, token, signing key, CAPTCHA answer, cookie và request/response body thô. |
+| Chi tiết | `detail_schema`, `detail_json` | Snapshot/diff tùy module phải có schema/version, chỉ lưu metadata đã allowlist và giới hạn kích thước; cấm password, token, signing key, CAPTCHA answer, cookie và request/response body thô. |
 
 Tiêu chí hoàn thành M6.9:
 
 - Access log dung lượng lớn đi vào centralized logging với retention ngắn; database chỉ giữ audit event có giá trị bảo mật/nghiệp vụ hoặc lượt đọc dữ liệu nhạy cảm.
 - Audit record là bất biến ở tầng ứng dụng; thao tác quản trị phải được phân quyền riêng và chính thao tác xuất lịch sử cũng được audit.
 - Có index tối thiểu theo `(actor_user_id, occurred_at)`, `(module, occurred_at)`, `correlation_id` và `(resource_type, resource_id, occurred_at)`; mọi API dùng cursor/keyset pagination hoặc giới hạn phân trang rõ ràng.
+- Truy vấn thời gian dùng khoảng nửa mở `[from, to)` theo UTC, giới hạn độ dài khoảng tìm kiếm và sắp xếp ổn định theo `occurred_at` cùng `id`.
+- Integration test bao phủ actor `SYSTEM`, đăng nhập thất bại, data scope giữa các shop/seller, timeline theo resource, redaction dữ liệu nhạy cảm, idempotency/outbox và giới hạn xuất dữ liệu.
 - Chính sách retention, archive và quyền xem IP/user-agent được tài liệu hóa; test xác nhận không có secret/PII ngoài allowlist trong `detail_json`.
 
 Điều kiện được phép bắt đầu tách microservices:
