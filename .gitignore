@@ -27,3 +27,6 @@ target/
 Thumbs.db
 .env
 *.log
+
+# Local project progress and planning
+/README.md
