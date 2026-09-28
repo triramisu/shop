@@ -76,6 +76,16 @@ class SystemAdministrationIntegrationTests {
     }
 
     @Test
+    void returnsTheMalformedRequestContractForAnInvalidUserId() throws Exception {
+        Account staff = accountWithRole("invalid-id-staff", RoleCode.STAFF);
+
+        mockMvc.perform(get(BASE + "/users/not-a-uuid").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(1010))
+                .andExpect(jsonPath("$.message").value("Dữ liệu yêu cầu không đúng định dạng"));
+    }
+
+    @Test
     void letsStaffAssignASafeCustomRoleAndRevokeTheUsersExistingSession() throws Exception {
         Account admin = accountWithRole("role-admin", RoleCode.ADMIN);
         Account staff = accountWithRole("role-staff", RoleCode.STAFF);

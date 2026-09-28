@@ -7,6 +7,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
+  flyway:
+    url: ${SPRING_FLYWAY_URL}
+    user: ${SPRING_FLYWAY_USERNAME}
+    password: ${SPRING_FLYWAY_PASSWORD}
 
 springdoc:
   api-docs:

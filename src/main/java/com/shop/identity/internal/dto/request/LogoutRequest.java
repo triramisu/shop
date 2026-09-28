@@ -1,6 +1,9 @@
 package com.shop.identity.internal.dto.request;
 
+import static com.shop.identity.internal.constant.IdentityValidationConstants.MAX_TOKEN_LENGTH;
+
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,5 +19,6 @@ import lombok.experimental.FieldDefaults;
 public class LogoutRequest {
 
     @NotBlank(message = "INVALID_TOKEN")
+    @Size(max = MAX_TOKEN_LENGTH, message = "INVALID_TOKEN")
     String token;
 }

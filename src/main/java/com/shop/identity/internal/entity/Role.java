@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
@@ -27,6 +28,10 @@ public class Role {
 
     @Column(name = "system_role", nullable = false)
     private boolean systemRole;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

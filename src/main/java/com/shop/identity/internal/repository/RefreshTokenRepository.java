@@ -3,7 +3,7 @@ package com.shop.identity.internal.repository;
 import com.shop.identity.internal.entity.RefreshToken;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -14,8 +14,13 @@ import org.springframework.data.repository.query.Param;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select token from RefreshToken token join fetch token.user where token.jti = :jti")
-    Optional<RefreshToken> findByJtiForUpdate(@Param("jti") String jti);
+    @Query("""
+            select token
+              from RefreshToken token
+             where token.familyId = :familyId
+             order by token.createdAt, token.jti
+            """)
+    List<RefreshToken> findFamilyForUpdate(@Param("familyId") String familyId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
