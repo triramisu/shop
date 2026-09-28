@@ -7,8 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
+import com.shop.shared.error.ErrorMessageResolver;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +25,7 @@ class GlobalWebContractTests {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new StubController())
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(createMessageResolver()))
                 .addFilters(new CorrelationIdFilter())
                 .build();
     }
@@ -33,7 +36,7 @@ class GlobalWebContractTests {
                 .andExpect(status().isNotFound())
                 .andExpect(header().string(CorrelationIdFilter.HEADER_NAME, "contract-test-123"))
                 .andExpect(jsonPath("$.code").value(1011))
-                .andExpect(jsonPath("$.message").value("Resource not found"));
+                .andExpect(jsonPath("$.message").value("Không tìm thấy tài nguyên"));
     }
 
     @RestController
@@ -44,5 +47,12 @@ class GlobalWebContractTests {
         void missing() {
             throw new AppException(ErrorCode.RESOURCE_NOT_FOUND);
         }
+    }
+
+    private static ErrorMessageResolver createMessageResolver() {
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("message");
+        messageSource.setDefaultEncoding(StandardCharsets.UTF_8.name());
+        return new ErrorMessageResolver(messageSource);
     }
 }

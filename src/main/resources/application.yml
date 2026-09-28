@@ -1,6 +1,9 @@
 spring:
   application:
     name: shop
+  messages:
+    basename: message
+    encoding: UTF-8
   datasource:
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:com.mysql.cj.jdbc.Driver}
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/shop?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
@@ -46,23 +49,23 @@ springdoc:
 
 app:
   identity:
-    super-admin:
-      bootstrap-enabled: ${SUPER_ADMIN_BOOTSTRAP_ENABLED:false}
-      username: ${SUPER_ADMIN_USERNAME:}
-      email: ${SUPER_ADMIN_EMAIL:}
-      password: ${SUPER_ADMIN_PASSWORD:}
+    admin:
+      bootstrap-enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+      username: ${ADMIN_USERNAME:}
+      email: ${ADMIN_EMAIL:}
+      password: ${ADMIN_PASSWORD:}
   open-api:
     info:
       title: ${OPENAPI_TITLE:Shop API}
       version: ${OPENAPI_VERSION:v1}
-      description: ${OPENAPI_DESCRIPTION:REST API for the Shop modular monolith}
+      description: ${OPENAPI_DESCRIPTION:REST API cho hệ thống Shop dạng modular monolith}
       contact:
-        name: ${OPENAPI_CONTACT_NAME:Shop Development Team}
+        name: ${OPENAPI_CONTACT_NAME:Nhóm phát triển Shop}
         url: ${OPENAPI_CONTACT_URL:}
         email: ${OPENAPI_CONTACT_EMAIL:}
     server:
       url: ${OPENAPI_SERVER_URL:/}
-      description: ${OPENAPI_SERVER_DESCRIPTION:Current environment}
+      description: ${OPENAPI_SERVER_DESCRIPTION:Môi trường hiện tại}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   security:

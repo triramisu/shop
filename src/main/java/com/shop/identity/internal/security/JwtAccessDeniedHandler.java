@@ -1,6 +1,7 @@
 package com.shop.identity.internal.security;
 
 import com.shop.shared.error.ErrorCode;
+import com.shop.shared.error.ErrorMessageResolver;
 import com.shop.shared.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
     ObjectMapper objectMapper;
+    ErrorMessageResolver messageResolver;
 
     @Override
     public void handle(
@@ -31,7 +33,7 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
         ApiResponse<Void> apiResponse = ApiResponse.<Void>builder()
                 .code(errorCode.getCode())
-                .message(errorCode.getMessage())
+                .message(messageResolver.resolve(errorCode, request.getLocale()))
                 .build();
         objectMapper.writeValue(response.getOutputStream(), apiResponse);
     }

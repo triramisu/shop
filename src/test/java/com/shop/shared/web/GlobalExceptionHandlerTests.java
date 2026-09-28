@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
+import com.shop.shared.error.ErrorMessageResolver;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
 
 class GlobalExceptionHandlerTests {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final ErrorMessageResolver messageResolver = createMessageResolver();
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(messageResolver);
 
     @Test
     void mapsAppExceptionToApiResponse() {
@@ -20,7 +24,7 @@ class GlobalExceptionHandlerTests {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo(1011);
-        assertThat(response.getBody().getMessage()).isEqualTo("Resource not found");
+        assertThat(response.getBody().getMessage()).isEqualTo("Không tìm thấy tài nguyên");
     }
 
     @Test
@@ -30,7 +34,15 @@ class GlobalExceptionHandlerTests {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo(9999);
-        assertThat(response.getBody().getMessage()).isEqualTo(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+        assertThat(response.getBody().getMessage())
+                .isEqualTo(messageResolver.resolve(ErrorCode.UNCATEGORIZED_EXCEPTION));
         assertThat(response.getBody().getMessage()).doesNotContain("sensitive internal detail");
+    }
+
+    private static ErrorMessageResolver createMessageResolver() {
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("message");
+        messageSource.setDefaultEncoding(StandardCharsets.UTF_8.name());
+        return new ErrorMessageResolver(messageSource);
     }
 }

@@ -176,7 +176,7 @@ class IdentityAuthenticationIntegrationTests {
                         .content(tokenJson("not-a-jwt")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(1014))
-                .andExpect(jsonPath("$.message").value("Token is invalid or expired"));
+                .andExpect(jsonPath("$.message").value("Token không hợp lệ hoặc đã hết hạn"));
     }
 
     @Test

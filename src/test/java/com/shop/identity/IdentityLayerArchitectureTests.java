@@ -82,7 +82,7 @@ class IdentityLayerArchitectureTests {
         assertThat(applicationClasses.stream()
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.identity.internal"))
                         .filter(javaClass -> javaClass.getSimpleName().contains("Administration")
-                                || javaClass.getSimpleName().contains("SuperAdmin"))
+                                || javaClass.getSimpleName().contains("Admin"))
                         .toList())
                 .isNotEmpty()
                 .allSatisfy(javaClass ->

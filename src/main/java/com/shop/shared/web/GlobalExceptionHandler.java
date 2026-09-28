@@ -2,9 +2,13 @@ package com.shop.shared.web;
 
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
+import com.shop.shared.error.ErrorMessageResolver;
 import jakarta.validation.ConstraintViolation;
 import java.util.Map;
 import java.util.Objects;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -17,11 +21,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class GlobalExceptionHandler {
 
     private static final String MIN_ATTRIBUTE = "min";
     private static final String MAX_ATTRIBUTE = "max";
+
+    ErrorMessageResolver messageResolver;
 
     @ExceptionHandler(AppException.class)
     ResponseEntity<ApiResponse<Void>> handleAppException(AppException exception) {
@@ -37,7 +45,7 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException exception) {
         FieldError fieldError = exception.getBindingResult().getFieldError();
         ErrorCode errorCode = resolveValidationError(fieldError);
-        String message = errorCode.getMessage();
+        String message = messageResolver.resolve(errorCode);
 
         if (fieldError != null) {
             try {
@@ -101,7 +109,7 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiResponse<Void>> errorResponse(ErrorCode errorCode) {
-        return errorResponse(errorCode, errorCode.getMessage());
+        return errorResponse(errorCode, messageResolver.resolve(errorCode));
     }
 
     private ResponseEntity<ApiResponse<Void>> errorResponse(ErrorCode errorCode, String message) {

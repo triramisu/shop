@@ -45,14 +45,14 @@ class SystemAdministrationIntegrationTests {
     private EntityManager entityManager;
 
     @Test
-    void allowsAdminToSearchUsersButRejectsAnOrdinaryUser() throws Exception {
-        Account admin = accountWithRole("search-admin", RoleCode.ADMIN);
+    void allowsStaffToSearchUsersButRejectsAnOrdinaryUser() throws Exception {
+        Account staff = accountWithRole("search-staff", RoleCode.STAFF);
         Account customer = accountWithRole("search-customer", RoleCode.USER);
 
         mockMvc.perform(get(BASE + "/users")
                         .param("keyword", "search-")
                         .param("size", "10")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.content.length()").value(2))
                 .andExpect(jsonPath("$.result.content[0].passwordHash").doesNotExist())
@@ -64,27 +64,27 @@ class SystemAdministrationIntegrationTests {
 
         mockMvc.perform(get(BASE + "/users")
                         .param("page", "-1")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(1048));
 
         mockMvc.perform(get(BASE + "/users")
                         .param("status", "UNKNOWN")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(1010));
     }
 
     @Test
-    void letsAdminAssignASafeCustomRoleAndRevokeTheUsersExistingSession() throws Exception {
-        Account superAdmin = accountWithRole("role-root", RoleCode.SUPER_ADMIN);
+    void letsStaffAssignASafeCustomRoleAndRevokeTheUsersExistingSession() throws Exception {
         Account admin = accountWithRole("role-admin", RoleCode.ADMIN);
+        Account staff = accountWithRole("role-staff", RoleCode.STAFF);
         Account customer = accountWithRole("role-customer", RoleCode.USER);
 
-        createRole(superAdmin.accessToken(), "SUPPORT", Set.of("SYSTEM_USER_READ"));
+        createRole(admin.accessToken(), "SUPPORT", Set.of("SYSTEM_USER_READ"));
 
         mockMvc.perform(put(BASE + "/users/{userId}/roles", customer.id())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roleCodes":["USER","SUPPORT"]}
@@ -100,12 +100,12 @@ class SystemAdministrationIntegrationTests {
 
     @Test
     void protectsTopAdministratorAndSystemRoles() throws Exception {
-        Account superAdmin = accountWithRole("protected-root", RoleCode.SUPER_ADMIN);
         Account admin = accountWithRole("protected-admin", RoleCode.ADMIN);
+        Account staff = accountWithRole("protected-staff", RoleCode.STAFF);
         Account customer = accountWithRole("protected-customer", RoleCode.USER);
 
-        mockMvc.perform(patch(BASE + "/users/{userId}/status", superAdmin.id())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+        mockMvc.perform(patch(BASE + "/users/{userId}/status", admin.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status":"LOCKED"}
@@ -114,43 +114,42 @@ class SystemAdministrationIntegrationTests {
                 .andExpect(jsonPath("$.code").value(1042));
 
         mockMvc.perform(put(BASE + "/users/{userId}/roles", customer.id())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"roleCodes":["ADMIN","USER"]}
+                                {"roleCodes":["STAFF","USER"]}
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(1044));
 
-        mockMvc.perform(delete(BASE + "/roles/ADMIN")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken())))
+        mockMvc.perform(delete(BASE + "/roles/STAFF").header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(1040));
     }
 
     @Test
-    void letsOnlySuperAdminManageCustomRolesAndValidatesReferences() throws Exception {
-        Account superAdmin = accountWithRole("manage-root", RoleCode.SUPER_ADMIN);
+    void letsOnlyAdminManageCustomRolesAndValidatesReferences() throws Exception {
         Account admin = accountWithRole("manage-admin", RoleCode.ADMIN);
+        Account staff = accountWithRole("manage-staff", RoleCode.STAFF);
 
         mockMvc.perform(post(BASE + "/roles")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(roleJson("OPS", Set.of())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(1007));
 
         mockMvc.perform(post(BASE + "/roles")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(roleJson("POWER_USER", Set.of("SYSTEM_ROLE_MANAGE"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(1055));
 
-        createRole(superAdmin.accessToken(), "OPS", Set.of("SYSTEM_USER_READ"));
+        createRole(admin.accessToken(), "OPS", Set.of("SYSTEM_USER_READ"));
 
         mockMvc.perform(put(BASE + "/roles/OPS")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -163,13 +162,13 @@ class SystemAdministrationIntegrationTests {
                 .andExpect(jsonPath("$.result.permissions[0]").value("SYSTEM_PERMISSION_READ"));
 
         mockMvc.perform(post(BASE + "/roles")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(roleJson("BROKEN", Set.of("MISSING_PERMISSION"))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(1038));
 
-        mockMvc.perform(delete(BASE + "/roles/OPS").header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken())))
+        mockMvc.perform(delete(BASE + "/roles/OPS").header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
                 .andExpect(status().isOk());
         Integer roleCount =
                 jdbcTemplate.queryForObject("SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code = 'OPS'", Integer.class);
@@ -177,12 +176,12 @@ class SystemAdministrationIntegrationTests {
     }
 
     @Test
-    void letsSuperAdminLockAnAdminAndImmediatelyRevokesTheirSession() throws Exception {
-        Account superAdmin = accountWithRole("status-root", RoleCode.SUPER_ADMIN);
+    void letsAdminLockAStaffAccountAndImmediatelyRevokesItsSession() throws Exception {
         Account admin = accountWithRole("status-admin", RoleCode.ADMIN);
+        Account staff = accountWithRole("status-staff", RoleCode.STAFF);
 
-        mockMvc.perform(patch(BASE + "/users/{userId}/status", admin.id())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+        mockMvc.perform(patch(BASE + "/users/{userId}/status", staff.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status":"LOCKED"}
@@ -190,18 +189,18 @@ class SystemAdministrationIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.status").value("LOCKED"));
 
-        mockMvc.perform(get(BASE + "/users").header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
+        mockMvc.perform(get(BASE + "/users").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void revokesSessionsWhenPermissionsOfAnAssignedRoleChange() throws Exception {
-        Account superAdmin = accountWithRole("permission-root", RoleCode.SUPER_ADMIN);
+        Account admin = accountWithRole("permission-admin", RoleCode.ADMIN);
         Account customer = accountWithRole("permission-customer", RoleCode.USER);
-        createRole(superAdmin.accessToken(), "AUDITOR", Set.of("SYSTEM_USER_READ"));
+        createRole(admin.accessToken(), "AUDITOR", Set.of("SYSTEM_USER_READ"));
 
         mockMvc.perform(put(BASE + "/users/{userId}/roles", customer.id())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"roleCodes":["USER","AUDITOR"]}
@@ -213,7 +212,7 @@ class SystemAdministrationIntegrationTests {
                 .andExpect(status().isOk());
 
         mockMvc.perform(put(BASE + "/roles/AUDITOR")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(superAdmin.accessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"description":"No longer an auditor","permissionCodes":[]}

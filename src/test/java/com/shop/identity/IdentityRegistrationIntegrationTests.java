@@ -86,13 +86,14 @@ class IdentityRegistrationIntegrationTests {
 
     @Test
     void returnsSpecificMessagesForEachValidationConstraint() throws Exception {
-        assertValidationError("""
+        assertValidationError(
+                """
                 {
                   "username": "bad user",
                   "email": "valid@example.com",
                   "password": "Str0ngPassword!"
                 }
-                """, 1020, "Username may contain only letters, numbers, dots, underscores, and hyphens");
+                """, 1020, "Tên đăng nhập chỉ được chứa chữ cái, chữ số, dấu chấm, dấu gạch dưới và dấu gạch ngang");
 
         assertValidationError("""
                 {
@@ -100,7 +101,7 @@ class IdentityRegistrationIntegrationTests {
                   "email": "valid@example.com",
                   "password": "Str0ngPassword!"
                 }
-                """, 1019, "Username is required");
+                """, 1019, "Tên đăng nhập là bắt buộc");
 
         assertValidationError("""
                 {
@@ -109,7 +110,7 @@ class IdentityRegistrationIntegrationTests {
                   "password": "Str0ngPassword!",
                   "firstName": "%s"
                 }
-                """.formatted("x".repeat(101)), 1022, "First name must not exceed 100 characters");
+                """.formatted("x".repeat(101)), 1022, "Tên không được vượt quá 100 ký tự");
     }
 
     @Test

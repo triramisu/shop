@@ -57,7 +57,7 @@ class AuthenticationRateLimitIntegrationTests {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
                 .andExpect(jsonPath("$.code").value(1024))
-                .andExpect(jsonPath("$.message").value("Too many requests. Please try again later"));
+                .andExpect(jsonPath("$.message").value("Bạn đã gửi quá nhiều yêu cầu, vui lòng thử lại sau"));
 
         loginFrom("192.0.2.11", null).andExpect(status().isUnauthorized());
     }
