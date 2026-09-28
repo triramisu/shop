@@ -1,0 +1,1 @@
+Tệp tạm dùng để kiểm chứng pull request và required checks của nhánh main.
