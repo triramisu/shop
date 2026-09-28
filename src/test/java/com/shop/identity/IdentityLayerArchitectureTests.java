@@ -11,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.prepost.PostAuthorize;
 
 class IdentityLayerArchitectureTests {
 
@@ -51,6 +52,18 @@ class IdentityLayerArchitectureTests {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..identity.internal..entity..", "..identity.internal..repository..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void identityDoesNotAuthorizeAfterReturningFromAMethod() {
+        noClasses()
+                .that()
+                .resideInAPackage("..identity.internal..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(PostAuthorize.class.getName())
+                .because("ownership and authorization must be checked before a mutation")
                 .check(applicationClasses);
     }
 

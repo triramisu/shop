@@ -138,6 +138,45 @@ class SystemAdministrationIntegrationTests {
     }
 
     @Test
+    void rejectsStaffMutatingAnotherStaffBeforeAnyDataIsChanged() throws Exception {
+        Account actor = accountWithRole("ownership-staff-actor", RoleCode.STAFF);
+        Account target = accountWithRole("ownership-staff-target", RoleCode.STAFF);
+
+        mockMvc.perform(patch(BASE + "/users/{userId}/status", target.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"LOCKED"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(1044));
+
+        mockMvc.perform(put(BASE + "/users/{userId}/roles", target.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleCodes":["USER"]}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(1044));
+
+        String storedStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM xac_thuc_nguoi_dung WHERE username = ?", String.class, "ownership-staff-target");
+        Integer staffRoleCount = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                          FROM xac_thuc_nguoi_dung_vai_tro user_role
+                          JOIN xac_thuc_nguoi_dung user_account ON user_account.id = user_role.user_id
+                         WHERE user_account.username = ?
+                           AND user_role.role_code = 'STAFF'
+                        """, Integer.class, "ownership-staff-target");
+
+        assertThat(storedStatus).isEqualTo("ACTIVE");
+        assertThat(staffRoleCount).isOne();
+        mockMvc.perform(get("/api/auth/my-info").header(HttpHeaders.AUTHORIZATION, bearer(target.accessToken())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void letsOnlyAdminManageCustomRolesAndValidatesReferences() throws Exception {
         Account admin = accountWithRole("manage-admin", RoleCode.ADMIN);
         Account staff = accountWithRole("manage-staff", RoleCode.STAFF);

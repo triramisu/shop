@@ -103,6 +103,24 @@ class IdentityUserProfileIntegrationTests {
     }
 
     @Test
+    void updatesOnlyTheProfileResolvedFromTheAuthenticatedPrincipal() throws Exception {
+        registerUser("ownership-actor", "ownership-actor@example.com");
+        registerUser("ownership-target", "ownership-target@example.com");
+        TokenPair actorTokens = authenticate("ownership-actor", CURRENT_PASSWORD);
+
+        mockMvc.perform(put("/api/auth/my-info")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actorTokens.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validProfileJson("ownership-actor-updated@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.username").value("ownership-actor"))
+                .andExpect(jsonPath("$.result.email").value("ownership-actor-updated@example.com"));
+
+        assertThat(emailOf("ownership-actor")).isEqualTo("ownership-actor-updated@example.com");
+        assertThat(emailOf("ownership-target")).isEqualTo("ownership-target@example.com");
+    }
+
+    @Test
     void rejectsAnotherUsersEmailWithoutChangingTheProfile() throws Exception {
         registerUser("email-owner", "email-owner@example.com");
         registerUser("profile-editor", "profile-editor@example.com");
@@ -214,6 +232,11 @@ class IdentityUserProfileIntegrationTests {
                                 """.formatted(username, password)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(1006));
+    }
+
+    private String emailOf(String username) {
+        return jdbcTemplate.queryForObject(
+                "SELECT email FROM xac_thuc_nguoi_dung WHERE username = ?", String.class, username);
     }
 
     private String validProfileJson(String email) {
