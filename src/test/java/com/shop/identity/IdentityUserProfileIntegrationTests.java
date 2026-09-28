@@ -193,6 +193,33 @@ class IdentityUserProfileIntegrationTests {
                 .andExpect(jsonPath("$.code").value(1030));
     }
 
+    @Test
+    void rejectsInvalidProfileAndPasswordPayloadsBeforeChangingTheUser() throws Exception {
+        registerUser("profile-validation", "profile-validation@example.com");
+        TokenPair tokens = authenticate("profile-validation", CURRENT_PASSWORD);
+
+        mockMvc.perform(put("/api/auth/my-info")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"not-an-email",
+                                  "dateOfBirth":"2999-01-01"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/auth/my-info/password")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(changePasswordJson(CURRENT_PASSWORD, "short")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(1004));
+
+        assertThat(emailOf("profile-validation")).isEqualTo("profile-validation@example.com");
+        authenticate("profile-validation", CURRENT_PASSWORD);
+    }
+
     private void registerUser(String username, String email) throws Exception {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

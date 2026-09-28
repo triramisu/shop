@@ -9,11 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.jayway.jsonpath.JsonPath;
 import com.shop.identity.internal.constant.RoleCode;
+import com.shop.identity.support.IdentityApiTestClient;
 import jakarta.persistence.EntityManager;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +24,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class SystemAdministrationIntegrationTests {
 
-    private static final String PASSWORD = "Str0ngPassword!";
     private static final String BASE = "/api/system-administration";
 
     @Autowired
@@ -43,6 +42,13 @@ class SystemAdministrationIntegrationTests {
 
     @Autowired
     private EntityManager entityManager;
+
+    private IdentityApiTestClient testClient;
+
+    @BeforeEach
+    void setUpTestClient() {
+        testClient = new IdentityApiTestClient(mockMvc);
+    }
 
     @Test
     void allowsStaffToSearchUsersButRejectsAnOrdinaryUser() throws Exception {
@@ -83,6 +89,36 @@ class SystemAdministrationIntegrationTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(1010))
                 .andExpect(jsonPath("$.message").value("Dữ liệu yêu cầu không đúng định dạng"));
+    }
+
+    @Test
+    void readsUserRoleAndPermissionCatalogsWithoutExposingSensitiveFields() throws Exception {
+        Account staff = accountWithRole("catalog-staff", RoleCode.STAFF);
+        Account customer = accountWithRole("catalog-customer", RoleCode.USER);
+
+        mockMvc.perform(get(BASE + "/users/{userId}", customer.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.id").value(customer.id().toString()))
+                .andExpect(jsonPath("$.result.username").value("catalog-customer"))
+                .andExpect(jsonPath("$.result.roles[0]").value("USER"))
+                .andExpect(jsonPath("$.result.passwordHash").doesNotExist());
+
+        mockMvc.perform(get(BASE + "/roles").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.length()").value(3))
+                .andExpect(jsonPath("$.result[0].code").value("ADMIN"))
+                .andExpect(jsonPath("$.result[1].code").value("STAFF"))
+                .andExpect(jsonPath("$.result[2].code").value("USER"));
+
+        mockMvc.perform(get(BASE + "/permissions").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.length()").value(6))
+                .andExpect(jsonPath("$.result[0].code").value("SYSTEM_PERMISSION_READ"));
+
+        mockMvc.perform(get(BASE + "/roles").header(HttpHeaders.AUTHORIZATION, bearer(customer.accessToken())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(1007));
     }
 
     @Test
@@ -225,6 +261,73 @@ class SystemAdministrationIntegrationTests {
     }
 
     @Test
+    void rejectsDuplicateAndInUseRolesWithoutRemovingAssignments() throws Exception {
+        Account admin = accountWithRole("role-guard-admin", RoleCode.ADMIN);
+        Account customer = accountWithRole("role-guard-customer", RoleCode.USER);
+        createRole(admin.accessToken(), "TEMP_SUPPORT", Set.of("SYSTEM_USER_READ"));
+
+        mockMvc.perform(post(BASE + "/roles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(roleJson("TEMP_SUPPORT", Set.of("SYSTEM_USER_READ"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(1039));
+
+        mockMvc.perform(put(BASE + "/users/{userId}/roles", customer.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleCodes":["USER","TEMP_SUPPORT"]}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete(BASE + "/roles/TEMP_SUPPORT")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(1041));
+
+        Integer assignmentCount = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                          FROM xac_thuc_nguoi_dung_vai_tro user_role
+                          JOIN xac_thuc_nguoi_dung user_account ON user_account.id = user_role.user_id
+                         WHERE user_account.username = 'role-guard-customer'
+                           AND user_role.role_code = 'TEMP_SUPPORT'
+                        """, Integer.class);
+        assertThat(assignmentCount).isOne();
+    }
+
+    @Test
+    void preventsSelfLockAndPreservesTheOperatorsSession() throws Exception {
+        Account admin = accountWithRole("self-lock-admin", RoleCode.ADMIN);
+        Account operator = accountWithRole("self-lock-operator", RoleCode.USER);
+        createRole(admin.accessToken(), "STATUS_OPERATOR", Set.of("SYSTEM_USER_STATUS_UPDATE"));
+
+        mockMvc.perform(put(BASE + "/users/{userId}/roles", operator.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleCodes":["USER","STATUS_OPERATOR"]}
+                                """))
+                .andExpect(status().isOk());
+
+        String operatorToken = testClient.authenticate("self-lock-operator").accessToken();
+        mockMvc.perform(patch(BASE + "/users/{userId}/status", operator.id())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(operatorToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"LOCKED"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(1045));
+
+        String statusValue = jdbcTemplate.queryForObject(
+                "SELECT status FROM xac_thuc_nguoi_dung WHERE username = ?", String.class, "self-lock-operator");
+        assertThat(statusValue).isEqualTo("ACTIVE");
+        mockMvc.perform(get("/api/auth/my-info").header(HttpHeaders.AUTHORIZATION, bearer(operatorToken)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void letsAdminLockAStaffAccountAndImmediatelyRevokesItsSession() throws Exception {
         Account admin = accountWithRole("status-admin", RoleCode.ADMIN);
         Account staff = accountWithRole("status-staff", RoleCode.STAFF);
@@ -256,7 +359,8 @@ class SystemAdministrationIntegrationTests {
                                 """))
                 .andExpect(status().isOk());
 
-        String auditorAccessToken = authenticate("permission-customer");
+        String auditorAccessToken =
+                testClient.authenticate("permission-customer").accessToken();
         mockMvc.perform(get(BASE + "/users").header(HttpHeaders.AUTHORIZATION, bearer(auditorAccessToken)))
                 .andExpect(status().isOk());
 
@@ -273,7 +377,7 @@ class SystemAdministrationIntegrationTests {
     }
 
     private Account accountWithRole(String username, RoleCode roleCode) throws Exception {
-        UUID userId = register(username);
+        UUID userId = testClient.register(username);
         if (roleCode != RoleCode.USER) {
             jdbcTemplate.update("""
                     INSERT INTO xac_thuc_nguoi_dung_vai_tro (user_id, role_code)
@@ -281,33 +385,7 @@ class SystemAdministrationIntegrationTests {
                     """, roleCode.name(), username);
             entityManager.clear();
         }
-        return new Account(userId, authenticate(username));
-    }
-
-    private UUID register(String username) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username":"%s",
-                                  "email":"%s@example.com",
-                                  "password":"%s"
-                                }
-                                """.formatted(username, username, PASSWORD)))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return UUID.fromString(JsonPath.read(result.getResponse().getContentAsString(), "$.result.id"));
-    }
-
-    private String authenticate(String username) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"username":"%s","password":"%s"}
-                                """.formatted(username, PASSWORD)))
-                .andExpect(status().isOk())
-                .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.result.accessToken");
+        return new Account(userId, testClient.authenticate(username).accessToken());
     }
 
     private void createRole(String accessToken, String code, Set<String> permissions) throws Exception {
@@ -334,7 +412,7 @@ class SystemAdministrationIntegrationTests {
     }
 
     private String bearer(String token) {
-        return "Bearer " + token;
+        return IdentityApiTestClient.bearer(token);
     }
 
     private record Account(UUID id, String accessToken) {}

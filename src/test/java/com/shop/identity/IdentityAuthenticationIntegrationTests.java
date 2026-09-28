@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.nimbusds.jwt.SignedJWT;
 import com.shop.identity.internal.service.RefreshTokenCleanupService;
+import com.shop.identity.support.IdentityApiTestClient;
+import com.shop.identity.support.IdentityApiTestClient.TokenPair;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +46,13 @@ class IdentityAuthenticationIntegrationTests {
 
     @Autowired
     private EntityManager entityManager;
+
+    private IdentityApiTestClient testClient;
+
+    @BeforeEach
+    void setUpTestClient() {
+        testClient = new IdentityApiTestClient(mockMvc);
+    }
 
     @Test
     void logsInWithSeparateTokensAndAuthorizesAccessToken() throws Exception {
@@ -180,6 +190,64 @@ class IdentityAuthenticationIntegrationTests {
     }
 
     @Test
+    void rejectsAnAccessTokenAtRefreshAndLogoutBoundaries() throws Exception {
+        registerUser("wrong-token-type", "wrong-token-type@example.com");
+        TokenPair tokens = authenticate("wrong-token-type", "Str0ngPassword!");
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson(tokens.accessToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1016));
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson(tokens.accessToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1016));
+
+        introspect(tokens.accessToken(), true);
+    }
+
+    @Test
+    void rejectsMalformedAndBlankRefreshTokensWithStableContracts() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson("not-a-jwt")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1014));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson("")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1014));
+    }
+
+    @Test
+    void preservesAnUnconsumedRefreshTokenWhileTheAccountIsInactive() throws Exception {
+        registerUser("inactive-refresh", "inactive-refresh@example.com");
+        TokenPair tokens = authenticate("inactive-refresh", "Str0ngPassword!");
+
+        jdbcTemplate.update("UPDATE xac_thuc_nguoi_dung SET status = 'LOCKED' WHERE username = ?", "inactive-refresh");
+        entityManager.clear();
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson(tokens.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1017));
+
+        Integer consumedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM xac_thuc_phien_lam_moi WHERE consumed_at IS NOT NULL", Integer.class);
+        assertThat(consumedCount).isZero();
+
+        jdbcTemplate.update("UPDATE xac_thuc_nguoi_dung SET status = 'ACTIVE' WHERE username = ?", "inactive-refresh");
+        entityManager.clear();
+        refresh(tokens.refreshToken());
+    }
+
+    @Test
     void rejectsOversizedCredentialsAndTokensBeforeAuthenticationProcessing() throws Exception {
         mockMvc.perform(post("/api/auth/token")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -218,33 +286,14 @@ class IdentityAuthenticationIntegrationTests {
     }
 
     private void registerUser(String username, String email) throws Exception {
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username": "%s",
-                                  "email": "%s",
-                                  "password": "Str0ngPassword!"
-                                }
-                                """.formatted(username, email)))
-                .andExpect(status().isCreated());
+        testClient.register(username, email, IdentityApiTestClient.DEFAULT_PASSWORD);
     }
 
     private TokenPair authenticate(String username, String password) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username": "%s",
-                                  "password": "%s"
-                                }
-                                """.formatted(username, password)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1000))
-                .andExpect(jsonPath("$.result.authenticated").value(true))
-                .andExpect(jsonPath("$.result.tokenType").value("Bearer"))
-                .andReturn();
-        return readTokenPair(result);
+        TokenPair tokenPair = testClient.authenticate(username, password);
+        assertThat(tokenPair.accessToken()).isNotBlank();
+        assertThat(tokenPair.refreshToken()).isNotBlank();
+        return tokenPair;
     }
 
     private TokenPair refresh(String refreshToken) throws Exception {
@@ -297,10 +346,6 @@ class IdentityAuthenticationIntegrationTests {
     }
 
     private String tokenJson(String token) {
-        return """
-                {"token":"%s"}
-                """.formatted(token);
+        return IdentityApiTestClient.tokenJson(token);
     }
-
-    private record TokenPair(String accessToken, String refreshToken) {}
 }

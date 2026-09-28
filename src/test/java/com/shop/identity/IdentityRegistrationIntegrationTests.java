@@ -141,6 +141,23 @@ class IdentityRegistrationIntegrationTests {
     }
 
     @Test
+    void rejectsCaseInsensitiveUsernameAndEmailDuplicates() throws Exception {
+        register("CaseSensitiveOwner", "Owner.Email@example.com");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationJson("casesensitiveowner", "different@example.com")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(1002));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationJson("different-owner", "OWNER.EMAIL@EXAMPLE.COM")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(1009));
+    }
+
+    @Test
     void protectsNonPublicEndpoints() throws Exception {
         mockMvc.perform(get("/api/admin/users"))
                 .andExpect(status().isUnauthorized())
