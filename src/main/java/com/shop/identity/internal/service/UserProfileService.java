@@ -8,6 +8,7 @@ import com.shop.identity.internal.entity.UserStatus;
 import com.shop.identity.internal.mapper.UserResponseMapper;
 import com.shop.identity.internal.repository.RefreshTokenRepository;
 import com.shop.identity.internal.repository.UserRepository;
+import com.shop.identity.internal.service.policy.UserOwnershipPolicy;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.time.Instant;
@@ -29,15 +30,16 @@ public class UserProfileService {
     RefreshTokenRepository refreshTokenRepository;
     PasswordEncoder passwordEncoder;
     UserResponseMapper userResponseMapper;
+    UserOwnershipPolicy userOwnershipPolicy;
 
     @Transactional(readOnly = true)
     public UserResponse getMyInfo(String username) {
-        return userResponseMapper.toResponse(getActiveUser(username));
+        return userResponseMapper.toResponse(getOwnedActiveUser(username));
     }
 
     @Transactional
     public UserResponse updateProfile(String username, UpdateProfileRequest request) {
-        User user = getActiveUser(username);
+        User user = getOwnedActiveUser(username);
         String email = request.getEmail().strip().toLowerCase(Locale.ROOT);
 
         if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, user.getId())) {
@@ -51,7 +53,8 @@ public class UserProfileService {
                 request.getDateOfBirth());
 
         try {
-            return userResponseMapper.toResponse(userRepository.saveAndFlush(user));
+            User savedUser = userRepository.saveAndFlush(user);
+            return userResponseMapper.toResponse(savedUser);
         } catch (DataIntegrityViolationException exception) {
             throw new AppException(ErrorCode.IDENTITY_CONFLICT);
         }
@@ -59,7 +62,7 @@ public class UserProfileService {
 
     @Transactional
     public void changePassword(String username, ChangePasswordRequest request) {
-        User user = getActiveUser(username);
+        User user = getOwnedActiveUser(username);
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new AppException(ErrorCode.CURRENT_PASSWORD_INVALID);
         }
@@ -79,6 +82,12 @@ public class UserProfileService {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new AppException(ErrorCode.USER_DISABLED);
         }
+        return user;
+    }
+
+    private User getOwnedActiveUser(String actorUsername) {
+        User user = getActiveUser(actorUsername);
+        userOwnershipPolicy.requireOwner(actorUsername, user);
         return user;
     }
 
