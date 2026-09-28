@@ -25,6 +25,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -72,7 +73,7 @@ public class AuthenticationService {
         return IntrospectResponse.builder().valid(valid).build();
     }
 
-    @Transactional(noRollbackFor = AppException.class)
+    @Transactional(isolation = Isolation.READ_COMMITTED, noRollbackFor = AppException.class)
     public AuthenticationResponse refreshToken(RefreshRequest request) throws ParseException, JOSEException {
         SignedJWT signedJwt = jwtTokenService.verifyRefreshToken(request.getToken());
         String jti = signedJwt.getJWTClaimsSet().getJWTID();
@@ -106,7 +107,7 @@ public class AuthenticationService {
         return toResponse(tokenPair);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void logout(LogoutRequest request) throws ParseException, JOSEException {
         SignedJWT signedJwt = jwtTokenService.verifyRefreshToken(request.getToken());
         String jti = signedJwt.getJWTClaimsSet().getJWTID();
