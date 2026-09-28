@@ -1,0 +1,7 @@
+.gitattributes text eol=lf
+.mvn/maven.config text eol=lf
+ci/*.xml text eol=lf
+mvnw text eol=lf
+Dockerfile text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf

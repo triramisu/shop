@@ -1,8 +1,15 @@
-FROM maven:3.9.8-amazoncorretto-21 AS build
+# syntax=docker/dockerfile:1.7
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
-COPY pom.xml .
+
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+COPY ci ci
+RUN chmod +x mvnw
+
 COPY src ./src
-RUN mvn --batch-mode clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw --batch-mode clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
