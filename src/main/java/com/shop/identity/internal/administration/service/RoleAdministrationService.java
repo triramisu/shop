@@ -25,6 +25,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,9 +72,13 @@ public class RoleAdministrationService {
         Role role = getRole(roleCode);
         protectSystemRole(role);
         role.update(normalizeDescription(request.getDescription()), resolvePermissions(request.getPermissionCodes()));
-        RoleResponse response = mapper.toRoleResponse(roleRepository.saveAndFlush(role));
-        refreshTokenRepository.revokeAllForRole(role.getCode(), Instant.now());
-        return response;
+        try {
+            RoleResponse response = mapper.toRoleResponse(roleRepository.saveAndFlush(role));
+            refreshTokenRepository.revokeAllForRole(role.getCode(), Instant.now());
+            return response;
+        } catch (OptimisticLockingFailureException exception) {
+            throw new AppException(ErrorCode.ADMINISTRATION_CONFLICT);
+        }
     }
 
     @Transactional
@@ -89,6 +94,8 @@ public class RoleAdministrationService {
             roleRepository.flush();
         } catch (DataIntegrityViolationException exception) {
             throw new AppException(ErrorCode.ROLE_IN_USE);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new AppException(ErrorCode.ADMINISTRATION_CONFLICT);
         }
     }
 

@@ -79,9 +79,7 @@ public class AuthenticationService {
         String subject = signedJwt.getJWTClaimsSet().getSubject();
         String familyId = signedJwt.getJWTClaimsSet().getStringClaim(JwtTokenService.FAMILY_ID_CLAIM);
 
-        RefreshToken storedToken = refreshTokenRepository
-                .findByJtiForUpdate(jti)
-                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+        RefreshToken storedToken = findTokenInLockedFamily(familyId, jti, ErrorCode.UNAUTHENTICATED);
 
         if (!Objects.equals(familyId, storedToken.getFamilyId())
                 || !Objects.equals(subject, storedToken.getUser().getUsername())
@@ -115,9 +113,7 @@ public class AuthenticationService {
         String subject = signedJwt.getJWTClaimsSet().getSubject();
         String familyId = signedJwt.getJWTClaimsSet().getStringClaim(JwtTokenService.FAMILY_ID_CLAIM);
 
-        RefreshToken storedToken = refreshTokenRepository
-                .findByJtiForUpdate(jti)
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+        RefreshToken storedToken = findTokenInLockedFamily(familyId, jti, ErrorCode.INVALID_TOKEN);
 
         if (!Objects.equals(familyId, storedToken.getFamilyId())
                 || !Objects.equals(subject, storedToken.getUser().getUsername())
@@ -126,6 +122,16 @@ public class AuthenticationService {
         }
 
         refreshTokenRepository.revokeFamily(storedToken.getFamilyId(), Instant.now());
+    }
+
+    private RefreshToken findTokenInLockedFamily(String familyId, String jti, ErrorCode missingTokenError) {
+        if (familyId == null) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+        return refreshTokenRepository.findFamilyForUpdate(familyId).stream()
+                .filter(token -> Objects.equals(token.getJti(), jti))
+                .findFirst()
+                .orElseThrow(() -> new AppException(missingTokenError));
     }
 
     private AuthenticationResponse issueAndPersist(User user, String familyId) {

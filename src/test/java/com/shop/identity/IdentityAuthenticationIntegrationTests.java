@@ -180,6 +180,23 @@ class IdentityAuthenticationIntegrationTests {
     }
 
     @Test
+    void rejectsOversizedCredentialsAndTokensBeforeAuthenticationProcessing() throws Exception {
+        mockMvc.perform(post("/api/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"%s","password":"Str0ngPassword!"}
+                                """.formatted("u".repeat(51))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(1003));
+
+        mockMvc.perform(post("/api/auth/introspect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenJson("a".repeat(8193))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1014));
+    }
+
+    @Test
     void deletesOnlyExpiredRefreshTokens() throws Exception {
         registerUser("expired-token-user", "expired-token-user@example.com");
         authenticate("expired-token-user", "Str0ngPassword!");

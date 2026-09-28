@@ -12,7 +12,7 @@ Cách làm này giúp phát triển và debug nhanh ở giai đoạn đầu như
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M1 — Identity và RBAC`
-- Nhiệm vụ vừa hoàn thành: `M1.6 — Phân hệ quản trị hệ thống và RBAC`
+- Nhiệm vụ vừa hoàn thành: `M1.6A — Hardening cấu hình, token và cạnh tranh dữ liệu`
 - Nhiệm vụ kế tiếp: `M1.7 — Ownership trước mutation` (**chưa bắt đầu**)
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
@@ -155,7 +155,7 @@ Hai quan hệ nhiều-nhiều dùng bảng nối `xac_thuc_nguoi_dung_vai_tro` v
 
 Bảng hạ tầng `xac_thuc_khoa_captcha` không ánh xạ thành entity nghiệp vụ. Bảng chỉ chứa guard row do Flyway quản lý để tuần tự hóa thao tác cấp CAPTCHA giữa nhiều instance và giữ chính xác giới hạn dung lượng kho.
 
-V1–V4 vẫn giữ nguyên tên bảng cũ trong file migration vì các migration đã chạy không được sửa checksum. V5 đổi tên bằng `ALTER TABLE ... RENAME TO`, nhờ đó database hiện có được nâng cấp mà không xóa hoặc tạo lại dữ liệu.
+V1–V4 vẫn giữ nguyên tên bảng cũ trong file migration vì các migration đã chạy không được sửa checksum. V5 đổi tên bằng `ALTER TABLE ... RENAME TO`, nhờ đó database hiện có được nâng cấp mà không xóa hoặc tạo lại dữ liệu. V6–V7 bổ sung và chuẩn hóa RBAC; V8 thêm optimistic locking cho role mà không sửa checksum của migration cũ.
 
 ## 6. Danh sách nhiệm vụ
 
@@ -221,6 +221,15 @@ Tiêu chí hoàn thành M0:
   - Đầu ra: feature package `identity.internal.administration`, request/response DTO, service, repository query, permission constants, OpenAPI, Flyway V6-V7 và test H2/MySQL; không trả entity hoặc password hash ra API.
   - Ví dụ và nghiệm thu: STAFF lọc user và gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; role hệ thống/tài khoản cao nhất trả `409`; token mang quyền cũ bị từ chối ngay sau mutation; toàn bộ quality gate đạt.
   - Ngoài phạm vi: lịch sử truy cập vẫn thuộc M6.9 vì cần kho append-only, event/outbox, retention và quyền xem dữ liệu nhạy cảm. API tra cứu sau này sẽ nằm trong không gian quản trị hệ thống nhưng không được ghi trực tiếp rải rác từ service M1.6.
+- [x] M1.6A Hardening cấu hình, token và cạnh tranh dữ liệu.
+  - Mục tiêu/phạm vi: đóng các rủi ro phát hiện khi rà soát M1.6; không thêm nghiệp vụ mới, audit trail, MFA hoặc rate limit phân tán.
+  - Đầu vào/phụ thuộc: M1.6, MySQL 8.0.46, Flyway V1–V7 và profile dev/test/prod hiện có.
+  - Yêu cầu chức năng: request đăng nhập/token có giới hạn; UUID sai trả contract `400`; refresh/logout vẫn giữ nguyên API và tính idempotent.
+  - Bảo mật/phi chức năng: production fail-closed nếu thiếu datasource/JWT/CORS; tài khoản migration tách khỏi runtime; token family được khóa khi rotation/replay; role dùng optimistic lock; MySQL local chỉ bind loopback.
+  - Đầu ra: profile `dev`, production/Docker hardening, Flyway V8, validation constants, exception mapping, JaCoCo gate và regression test H2/MySQL.
+  - Ví dụ kiểm chứng: token dài hơn 8.192 ký tự bị từ chối; hai refresh đồng thời chỉ một request rotation thành công và replay thu hồi cả family; cập nhật role stale trả conflict.
+  - Nghiệm thu: `mvnw.cmd spotless:check clean verify`, `docker compose config`, Flyway/Hibernate trên MySQL 8.0.46 và kiểm tra profile production thiếu secret phải fail-fast.
+  - Triển khai/khôi phục: chạy backup trước V8; V8 chỉ thêm cột `version` mặc định `0`. Rollback ứng dụng cần giữ cột thừa vô hại; không sửa/xóa migration đã áp dụng. Trước khi nâng từ đúng V6 lên V7 phải xác nhận chưa tồn tại custom role `STAFF`.
 - [ ] M1.7 Kiểm tra ownership trước khi ghi dữ liệu; không dùng `@PostAuthorize` cho update.
   - Yêu cầu: mọi lệnh sửa/xóa dữ liệu người dùng kiểm tra actor, ownership và quyền quản trị trước khi mutation; chốt chính sách trả `403` hoặc `404` để không rò sự tồn tại tài nguyên.
   - Đầu ra: ownership policy dùng lại được ở service/repository predicate, error code thống nhất và test chéo tài khoản; không kiểm tra quyền sau khi dữ liệu đã bị ghi.
@@ -626,8 +635,18 @@ Ngày 2026-09-28:
 - Migration V7 đã chạy thành công trên H2 2.3, MySQL 8.0.46 qua Testcontainers và database Docker `shop` tại cổng `3307`; database có đủ 9 bảng `xac_thuc_*`, ba role mới và không còn phiên refresh cũ đang hoạt động.
 - `mvnw.cmd spotless:check clean verify` sau chuẩn hóa thông báo và role: thành công với 65 test, 0 failure, 0 error, 0 skipped; Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
 - Database local hiện chưa có tài khoản được gán role `ADMIN`. Đây là trạng thái an toàn có chủ đích: chỉ bật bootstrap một lần sau khi cung cấp bộ `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` riêng, sau đó tắt `ADMIN_BOOTSTRAP_ENABLED`.
+- M1.6A tách toàn bộ giá trị local sang profile `dev`; cấu hình nền và image Docker không còn fallback datasource, CORS hoặc JWT key. Image mặc định dùng `prod`, nơi Flyway bắt buộc dùng credential migration riêng với datasource runtime.
+- Docker Compose dùng đúng MySQL 8.0.46 như Testcontainers và chỉ publish database trên `127.0.0.1:3307`, tránh vô tình mở MySQL ra mạng LAN.
+- Request login giới hạn username/password giống register; request introspect/refresh/logout giới hạn token tối đa 8.192 ký tự để loại payload bất thường trước khi parse JWT.
+- Refresh/logout dùng pessimistic lock trên toàn token family. Regression test MySQL chạy hai refresh đồng thời chứng minh chỉ một rotation thành công, request replay thu hồi family và access token vừa cấp không còn hợp lệ.
+- Flyway V8 thêm cột `version` cho `xac_thuc_vai_tro`; JPA `@Version` ngăn hai cập nhật role đồng thời âm thầm ghi đè nhau. UUID path sai định dạng trả HTTP `400`/mã `1010` thay vì lỗi `500`.
+- JaCoCo đã trở thành quality gate bắt buộc với line coverage tối thiểu 85% và branch coverage tối thiểu 65%, thay vì chỉ sinh báo cáo.
+- CI đã nâng các GitHub-maintained action lên runtime hiện hành, chặn pull request bổ sung dependency có lỗ hổng từ mức `moderate` và bật Dependabot hàng tuần cho Maven/GitHub Actions.
+- `mvnw.cmd clean verify`: thành công với 69 test, 0 failure, 0 error, 0 skipped; line coverage 89,38% và branch coverage 67,85%, đều vượt ngưỡng bắt buộc.
+- Kiểm tra fail-closed xác nhận profile `prod` thoát với mã `1` khi thiếu `SPRING_FLYWAY_URL`, thay vì khởi động nhầm bằng cấu hình local.
+- Database Docker local đã được nâng từ V7 lên V8, giữ nguyên 2 user và 2 liên kết user-role; ba role hệ thống đều có `version=0`. Container được bind lại thành `127.0.0.1:3307` và health MySQL đạt. Container cũ dừng tại `mysql-8.0-network-backup-20260928`; bản sao volume độc lập là `shop-mysql-backup-before-local-bind-20260928` để có thể khôi phục.
 
-Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5, M1.6 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.7 chưa bắt đầu.
+Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5, M1.6, M1.6A và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.7 chưa bắt đầu.
 
 ## 8. Luồng nghiệp vụ đích
 
@@ -650,19 +669,20 @@ Yêu cầu: Java 21 và Docker.
 
 ```bash
 docker compose up -d mysql
-./mvnw spring-boot:run
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
 Windows PowerShell:
 
 ```powershell
 docker start mysql-8.0
+$env:SPRING_PROFILES_ACTIVE="dev"
 .\mvnw.cmd spring-boot:run
 ```
 
 Project mặc định kết nối MySQL tại `localhost:3307`. Nếu chưa có container `mysql-8.0`, có thể dùng `docker compose up -d mysql`; không chạy đồng thời hai container trên cùng port.
 
-Ứng dụng dùng tài khoản MySQL riêng `shop` thay vì tài khoản quản trị `root`. Cấu hình datasource dùng đúng nhóm biến chuẩn của Spring Boot: `SPRING_DATASOURCE_DRIVER`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` và `SPRING_DATASOURCE_PASSWORD`. Các giá trị mặc định chỉ dành cho Docker local; production bắt buộc truyền từ secret manager hoặc môi trường chạy.
+Ứng dụng dùng tài khoản MySQL riêng `shop` thay vì tài khoản quản trị `root`. Cấu hình datasource dùng đúng nhóm biến chuẩn của Spring Boot: `SPRING_DATASOURCE_DRIVER`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` và `SPRING_DATASOURCE_PASSWORD`. Mọi giá trị mặc định local chỉ tồn tại trong profile `dev`; chạy không chọn profile và không truyền biến bắt buộc sẽ fail-fast.
 
 Kết nối DataGrip vào MySQL local:
 
@@ -670,9 +690,9 @@ Kết nối DataGrip vào MySQL local:
 2. Nhập `Host=localhost`, `Port=3307`, `User=shop`, `Password=shop-local-password`, `Database=shop`.
 3. JDBC URL tương ứng là `jdbc:mysql://localhost:3307/shop`.
 4. Chọn `Test Connection`, sau đó trong tab `Schemas` đánh dấu schema `shop` và bấm `Apply`.
-5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` phải có V1–V6 và các bảng Identity hiện hành phải mang tiền tố `xac_thuc_`.
+5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` phải có V1–V8 và các bảng Identity hiện hành phải mang tiền tố `xac_thuc_`.
 
-Nếu DataGrip vẫn hiển thị `identity_*`, chạy câu lệnh sau để kiểm tra. Kết quả dừng ở V4 nghĩa là container chưa được ứng dụng mới chạy Flyway V5–V6, không phải entity vẫn ánh xạ tên tiếng Anh:
+Nếu DataGrip vẫn hiển thị `identity_*`, chạy câu lệnh sau để kiểm tra. Kết quả dừng trước V8 nghĩa là container chưa được ứng dụng mới chạy đủ migration, không phải entity vẫn ánh xạ tên tiếng Anh:
 
 ```sql
 SELECT installed_rank, version, description, success
@@ -786,6 +806,7 @@ $env:ADMIN_BOOTSTRAP_ENABLED="true"
 $env:ADMIN_USERNAME="platform-root"
 $env:ADMIN_EMAIL="platform-root@example.com"
 $env:ADMIN_PASSWORD="replace-with-a-strong-unique-password"
+$env:SPRING_PROFILES_ACTIVE="dev"
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -877,9 +898,14 @@ $env:SPRING_DATASOURCE_DRIVER="com.mysql.cj.jdbc.Driver"
 $env:SPRING_DATASOURCE_URL="jdbc:mysql://db-host:3306/shop"
 $env:SPRING_DATASOURCE_USERNAME="shop"
 $env:SPRING_DATASOURCE_PASSWORD="replace-me"
+$env:SPRING_FLYWAY_URL="jdbc:mysql://db-host:3306/shop"
+$env:SPRING_FLYWAY_USERNAME="shop_migration"
+$env:SPRING_FLYWAY_PASSWORD="replace-with-a-separate-migration-secret"
 $env:JWT_SIGNER_KEY="replace-with-at-least-64-random-bytes"
 $env:CORS_ALLOWED_ORIGINS="https://shop.example.com"
 ```
+
+`SPRING_DATASOURCE_*` là credential runtime chỉ có quyền DML cần thiết; `SPRING_FLYWAY_*` là credential triển khai có quyền DDL và chỉ dùng để chạy migration. Không dùng tài khoản `root` cho một trong hai nhóm. Trước khi triển khai bản có V7 lên database đang đúng V6, chạy `SELECT code FROM xac_thuc_vai_tro WHERE code = 'STAFF'`; nếu đã có custom role trùng tên thì phải đổi mã role đó có kiểm soát trước khi chạy migration.
 
 ## 10. Nhật ký quyết định
 

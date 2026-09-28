@@ -1,5 +1,11 @@
 package com.shop.identity.internal.dto.request;
 
+import static com.shop.identity.internal.constant.IdentityValidationConstants.MAX_PASSWORD_LENGTH;
+import static com.shop.identity.internal.constant.IdentityValidationConstants.MAX_USERNAME_LENGTH;
+import static com.shop.identity.internal.constant.IdentityValidationConstants.MIN_PASSWORD_LENGTH;
+import static com.shop.identity.internal.constant.IdentityValidationConstants.MIN_USERNAME_LENGTH;
+import static com.shop.identity.internal.constant.IdentityValidationConstants.USERNAME_PATTERN;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
@@ -21,8 +27,8 @@ import lombok.experimental.FieldDefaults;
 public class RegisterUserRequest {
 
     @NotBlank(message = "USERNAME_REQUIRED")
-    @Size(min = 3, max = 50, message = "USERNAME_INVALID")
-    @Pattern(regexp = "^[A-Za-z0-9._-]+$", message = "USERNAME_FORMAT_INVALID")
+    @Size(min = MIN_USERNAME_LENGTH, max = MAX_USERNAME_LENGTH, message = "USERNAME_INVALID")
+    @Pattern(regexp = USERNAME_PATTERN, message = "USERNAME_FORMAT_INVALID")
     String username;
 
     @NotBlank(message = "INVALID_EMAIL")
@@ -31,7 +37,7 @@ public class RegisterUserRequest {
     String email;
 
     @NotBlank(message = "PASSWORD_REQUIRED")
-    @Size(min = 8, max = 64, message = "INVALID_PASSWORD")
+    @Size(min = MIN_PASSWORD_LENGTH, max = MAX_PASSWORD_LENGTH, message = "INVALID_PASSWORD")
     String password;
 
     @Size(max = 100, message = "FIRST_NAME_INVALID")

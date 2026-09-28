@@ -1,0 +1,2 @@
+ALTER TABLE xac_thuc_vai_tro
+    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

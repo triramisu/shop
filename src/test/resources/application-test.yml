@@ -21,6 +21,8 @@ jwt:
   audience: shop-api-test
 
 app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
   security:
     rate-limit:
       enabled: false

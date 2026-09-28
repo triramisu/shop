@@ -48,6 +48,8 @@ class IdentitySchemaMigrationTests {
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT description FROM xac_thuc_vai_tro WHERE code = 'STAFF'", String.class))
                 .isEqualTo("Nhân viên quản trị");
+        assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
+                .containsOnly(0L);
     }
 
     private long rowCount(String table) {
