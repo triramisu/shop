@@ -60,12 +60,12 @@ public class SystemUserAdministrationService {
     public SystemUserResponse updateStatus(String actorUsername, UUID userId, UpdateUserStatusRequest request) {
         User actor = getActor(actorUsername);
         User target = getUser(userId);
-        boolean superAdmin = actor.hasRole(RoleCode.SUPER_ADMIN.name());
+        boolean admin = actor.hasRole(RoleCode.ADMIN.name());
 
-        if (target.hasRole(RoleCode.SUPER_ADMIN.name())) {
-            throw new AppException(ErrorCode.SUPER_ADMIN_PROTECTED);
+        if (target.hasRole(RoleCode.ADMIN.name())) {
+            throw new AppException(ErrorCode.ADMIN_PROTECTED);
         }
-        if (target.hasRole(RoleCode.ADMIN.name()) && !superAdmin) {
+        if (target.hasRole(RoleCode.STAFF.name()) && !admin) {
             throw new AppException(ErrorCode.PROTECTED_ROLE_ASSIGNMENT_FORBIDDEN);
         }
         if (actor.getId().equals(target.getId()) && request.getStatus() != UserStatus.ACTIVE) {
@@ -83,16 +83,16 @@ public class SystemUserAdministrationService {
     public SystemUserResponse replaceRoles(String actorUsername, UUID userId, ReplaceUserRolesRequest request) {
         User actor = getActor(actorUsername);
         User target = getUser(userId);
-        boolean superAdmin = actor.hasRole(RoleCode.SUPER_ADMIN.name());
+        boolean admin = actor.hasRole(RoleCode.ADMIN.name());
 
-        if (target.hasRole(RoleCode.SUPER_ADMIN.name())) {
-            throw new AppException(ErrorCode.SUPER_ADMIN_PROTECTED);
+        if (target.hasRole(RoleCode.ADMIN.name())) {
+            throw new AppException(ErrorCode.ADMIN_PROTECTED);
         }
 
         Set<String> requestedCodes =
                 request.getRoleCodes().stream().map(String::strip).collect(Collectors.toUnmodifiableSet());
-        if (requestedCodes.contains(RoleCode.SUPER_ADMIN.name())) {
-            throw new AppException(ErrorCode.SUPER_ADMIN_ASSIGNMENT_FORBIDDEN);
+        if (requestedCodes.contains(RoleCode.ADMIN.name())) {
+            throw new AppException(ErrorCode.ADMIN_ASSIGNMENT_FORBIDDEN);
         }
 
         Set<Role> requestedRoles = new HashSet<>(roleRepository.findAllById(requestedCodes));
@@ -100,20 +100,20 @@ public class SystemUserAdministrationService {
             throw new AppException(ErrorCode.ROLE_NOT_FOUND);
         }
 
-        validateAssignableRoles(actor, target, requestedRoles, superAdmin);
+        validateAssignableRoles(actor, target, requestedRoles, admin);
         target.replaceRoles(requestedRoles);
         saveAndRevokeSessions(target);
         return mapper.toUserResponse(target);
     }
 
-    private void validateAssignableRoles(User actor, User target, Set<Role> requestedRoles, boolean superAdmin) {
-        boolean targetIsAdmin = target.hasRole(RoleCode.ADMIN.name());
-        boolean requestsAdmin =
-                requestedRoles.stream().anyMatch(role -> role.getCode().equals(RoleCode.ADMIN.name()));
-        if (!superAdmin && (targetIsAdmin || requestsAdmin)) {
+    private void validateAssignableRoles(User actor, User target, Set<Role> requestedRoles, boolean admin) {
+        boolean targetIsStaff = target.hasRole(RoleCode.STAFF.name());
+        boolean requestsStaff =
+                requestedRoles.stream().anyMatch(role -> role.getCode().equals(RoleCode.STAFF.name()));
+        if (!admin && (targetIsStaff || requestsStaff)) {
             throw new AppException(ErrorCode.PROTECTED_ROLE_ASSIGNMENT_FORBIDDEN);
         }
-        if (superAdmin) {
+        if (admin) {
             return;
         }
 

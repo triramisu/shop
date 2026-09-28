@@ -48,7 +48,7 @@ public class RoleAdministrationService {
 
     @Transactional
     public RoleResponse create(String actorUsername, CreateRoleRequest request) {
-        requireSuperAdmin(actorUsername);
+        requireAdmin(actorUsername);
         String roleCode = request.getCode().strip();
         if (roleRepository.existsById(roleCode)) {
             throw new AppException(ErrorCode.ROLE_ALREADY_EXISTS);
@@ -67,7 +67,7 @@ public class RoleAdministrationService {
 
     @Transactional
     public RoleResponse update(String actorUsername, String roleCode, UpdateRoleRequest request) {
-        requireSuperAdmin(actorUsername);
+        requireAdmin(actorUsername);
         Role role = getRole(roleCode);
         protectSystemRole(role);
         role.update(normalizeDescription(request.getDescription()), resolvePermissions(request.getPermissionCodes()));
@@ -78,7 +78,7 @@ public class RoleAdministrationService {
 
     @Transactional
     public void delete(String actorUsername, String roleCode) {
-        requireSuperAdmin(actorUsername);
+        requireAdmin(actorUsername);
         Role role = getRole(roleCode);
         protectSystemRole(role);
         if (userRepository.existsByRolesCode(role.getCode())) {
@@ -92,11 +92,11 @@ public class RoleAdministrationService {
         }
     }
 
-    private void requireSuperAdmin(String username) {
+    private void requireAdmin(String username) {
         User actor = userRepository
                 .findDetailedByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
-        if (!actor.hasRole(RoleCode.SUPER_ADMIN.name())) {
+        if (!actor.hasRole(RoleCode.ADMIN.name())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
     }

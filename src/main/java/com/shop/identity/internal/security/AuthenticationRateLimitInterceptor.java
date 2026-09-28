@@ -2,6 +2,7 @@ package com.shop.identity.internal.security;
 
 import com.shop.identity.internal.constant.IdentityApiPaths;
 import com.shop.shared.error.ErrorCode;
+import com.shop.shared.error.ErrorMessageResolver;
 import com.shop.shared.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,6 +34,7 @@ public class AuthenticationRateLimitInterceptor implements HandlerInterceptor {
 
     AuthenticationRateLimitService rateLimitService;
     ObjectMapper objectMapper;
+    ErrorMessageResolver messageResolver;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -51,7 +53,7 @@ public class AuthenticationRateLimitInterceptor implements HandlerInterceptor {
         ErrorCode errorCode = ErrorCode.RATE_LIMIT_EXCEEDED;
         ApiResponse<Void> body = ApiResponse.<Void>builder()
                 .code(errorCode.getCode())
-                .message(errorCode.getMessage())
+                .message(messageResolver.resolve(errorCode, request.getLocale()))
                 .build();
 
         response.setStatus(errorCode.getStatusCode().value());

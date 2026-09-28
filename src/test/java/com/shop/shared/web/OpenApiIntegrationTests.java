@@ -14,9 +14,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(
         properties = {
             "app.open-api.info.title=Shop Integration API",
-            "app.open-api.info.contact.name=Integration Team",
+            "app.open-api.info.contact.name=Nhóm tích hợp",
             "app.open-api.server.url=/integration",
-            "app.open-api.server.description=Integration environment"
+            "app.open-api.server.description=Môi trường tích hợp"
         })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -32,10 +32,10 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.openapi").isNotEmpty())
                 .andExpect(jsonPath("$.info.title").value("Shop Integration API"))
                 .andExpect(jsonPath("$.info.version").value("v1"))
-                .andExpect(jsonPath("$.info.description").value("REST API for the Shop modular monolith"))
-                .andExpect(jsonPath("$.info.contact.name").value("Integration Team"))
+                .andExpect(jsonPath("$.info.description").value("REST API cho hệ thống Shop dạng modular monolith"))
+                .andExpect(jsonPath("$.info.contact.name").value("Nhóm tích hợp"))
                 .andExpect(jsonPath("$.servers[0].url").value("/integration"))
-                .andExpect(jsonPath("$.servers[0].description").value("Integration environment"))
+                .andExpect(jsonPath("$.servers[0].description").value("Môi trường tích hợp"))
                 .andExpect(
                         jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")

@@ -215,11 +215,11 @@ Tiêu chí hoàn thành M0:
 - [x] M1.5 API `my-info`, cập nhật hồ sơ và đổi mật khẩu.
 - [x] M1.6 Phân hệ quản trị hệ thống: user, role và permission.
   - Yêu cầu chức năng: lọc/phân trang user; xem chi tiết; khóa/mở khóa; gán/bỏ role; xem danh mục permission; tạo/sửa/xóa role tùy biến và cấu hình role-permission. Permission là capability do code sở hữu, không cho tạo chuỗi permission tùy ý qua API.
-  - Mô hình quyền: `SUPER_ADMIN` là cấp cao nhất và là tài khoản duy nhất được quản lý role; `ADMIN` được quản lý user trong phạm vi quyền mình đang có; `USER` không được truy cập phân hệ. `SUPER_ADMIN`, `ADMIN`, `USER` là role hệ thống, không được sửa/xóa.
-  - Bảo vệ: không gán `SUPER_ADMIN` qua API; không khóa, vô hiệu hóa hoặc đổi role của tài khoản `SUPER_ADMIN`; `ADMIN` không thể sửa tài khoản `ADMIN` khác hay tự nâng quyền; mọi thay đổi status/role/role-permission thu hồi phiên liên quan ngay.
-  - Bootstrap: tạo đúng một tài khoản `SUPER_ADMIN` từ biến môi trường có kiểm tra; không có username/password mặc định và không lưu mật khẩu rõ trong source/database.
-  - Đầu ra: feature package `identity.internal.administration`, request/response DTO, service, repository query, permission constants, OpenAPI, Flyway V6 và test H2/MySQL; không trả entity hoặc password hash ra API.
-  - Ví dụ và nghiệm thu: ADMIN lọc user và gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; role hệ thống/tài khoản cao nhất trả `409`; token mang quyền cũ bị từ chối ngay sau mutation; toàn bộ quality gate đạt.
+  - Mô hình quyền: `ADMIN` là cấp cao nhất và là tài khoản duy nhất được quản lý role; `STAFF` được quản lý user trong phạm vi quyền mình đang có; `USER` không được truy cập phân hệ. `ADMIN`, `STAFF`, `USER` là role hệ thống, không được sửa/xóa.
+  - Bảo vệ: không gán `ADMIN` qua API; không khóa, vô hiệu hóa hoặc đổi role của tài khoản `ADMIN`; `STAFF` không thể sửa tài khoản `STAFF` khác hay tự nâng quyền; mọi thay đổi status/role/role-permission thu hồi phiên liên quan ngay.
+  - Bootstrap: tạo đúng một tài khoản `ADMIN` từ biến môi trường có kiểm tra; không có username/password mặc định và không lưu mật khẩu rõ trong source/database.
+  - Đầu ra: feature package `identity.internal.administration`, request/response DTO, service, repository query, permission constants, OpenAPI, Flyway V6-V7 và test H2/MySQL; không trả entity hoặc password hash ra API.
+  - Ví dụ và nghiệm thu: STAFF lọc user và gán role hợp lệ thành công; USER nhận `403`; role/permission không tồn tại trả lỗi chuẩn; role hệ thống/tài khoản cao nhất trả `409`; token mang quyền cũ bị từ chối ngay sau mutation; toàn bộ quality gate đạt.
   - Ngoài phạm vi: lịch sử truy cập vẫn thuộc M6.9 vì cần kho append-only, event/outbox, retention và quyền xem dữ liệu nhạy cảm. API tra cứu sau này sẽ nằm trong không gian quản trị hệ thống nhưng không được ghi trực tiếp rải rác từ service M1.6.
 - [ ] M1.7 Kiểm tra ownership trước khi ghi dữ liệu; không dùng `@PostAuthorize` cho update.
   - Yêu cầu: mọi lệnh sửa/xóa dữ liệu người dùng kiểm tra actor, ownership và quyền quản trị trước khi mutation; chốt chính sách trả `403` hoặc `404` để không rò sự tồn tại tài nguyên.
@@ -232,8 +232,8 @@ Tiêu chí hoàn thành M0:
 
 Tiêu chí hoàn thành M1:
 
-- USER không thể tự cấp ADMIN hoặc sửa dữ liệu người khác.
-- API quản trị áp dụng permission tường minh; chỉ `SUPER_ADMIN` quản lý role, còn `ADMIN` không thể cấp quyền cao hơn quyền đang có.
+- USER không thể tự cấp STAFF/ADMIN hoặc sửa dữ liệu người khác.
+- API quản trị áp dụng permission tường minh; chỉ `ADMIN` quản lý role, còn `STAFF` không thể cấp quyền cao hơn quyền đang có.
 - Access token và refresh token tách biệt, có rotation/revoke test.
 - Trước production, JWT key local/dev phải được thay bằng environment/secret riêng.
 
@@ -610,14 +610,22 @@ Ngày 2026-09-27:
 - Đã chuẩn hóa task contract bắt buộc gồm mục tiêu/phạm vi, phụ thuộc, yêu cầu chức năng, bảo mật/phi chức năng, đầu ra, ví dụ, nghiệm thu và rollout/rollback; toàn bộ nhiệm vụ chưa hoàn thành từ M1.7 đến M7.10 đã có yêu cầu, đầu ra và ví dụ nghiệm thu cụ thể.
 - Hai tài liệu tích hợp SSO do người dùng cung cấp chỉ được dùng làm ví dụ về cách viết yêu cầu, đầu ra và nghiệm thu; VNeID SSO không thuộc phạm vi Shop và không được thêm vào backlog.
 - M1.6 học mô hình user–role–chức năng từ `khcn-sso` và gom toàn bộ use case mới trong feature package `identity.internal.administration`; không sao chép role ID hard-code, mật khẩu mặc định, controller trả `Object` hoặc service quản trị quá lớn.
-- Flyway V6 thêm cờ bảo vệ role hệ thống, seed `SUPER_ADMIN`, sáu capability quản trị và ma trận permission cho `SUPER_ADMIN`/`ADMIN`; migration đã chạy trên H2 2.3 và MySQL 8.0.46.
-- Tài khoản `SUPER_ADMIN` duy nhất được bootstrap bằng bốn biến môi trường, mật khẩu BCrypt và không có credential mặc định; API không thể gán role này, khóa tài khoản này hoặc sửa/xóa ba role hệ thống.
+- Flyway V6 tạo nền RBAC quản trị; Flyway V7 đổi role cũ `SUPER_ADMIN` thành `ADMIN`, đổi role cũ `ADMIN` thành `STAFF`, giữ nguyên các liên kết user/quyền và thu hồi phiên mang claim cũ.
+- Tài khoản `ADMIN` duy nhất được bootstrap bằng bốn biến môi trường, mật khẩu BCrypt và không có credential mặc định; API không thể gán role này, khóa tài khoản này hoặc sửa/xóa ba role hệ thống.
 - Phân hệ công bố API lọc/phân trang user, xem chi tiết, đổi status/role, xem permission và CRUD role tùy biến; request/response dùng DTO, validation chuẩn và không lộ entity/password hash.
-- `ADMIN` chỉ gán được role có tập permission không vượt quyền của chính mình; chỉ `SUPER_ADMIN` quản lý role hoặc tài khoản `ADMIN`. `USER` nhận `403` tại toàn bộ endpoint quản trị.
+- `STAFF` chỉ gán được role có tập permission không vượt quyền của chính mình; chỉ `ADMIN` quản lý role hoặc tài khoản `STAFF`. `USER` nhận `403` tại toàn bộ endpoint quản trị.
 - Thay đổi status, tập role hoặc role-permission thu hồi refresh session liên quan trong cùng transaction; regression test xác nhận access token chứa claim cũ lập tức nhận `401`.
 - Test MySQL thật đã phát hiện cú pháp escape chỉ H2 chấp nhận trong bản migration đầu; migration được sửa thành seed tường minh và chạy lại thành công trên cả hai database.
 - `mvnw.cmd spotless:check clean verify` sau M1.6: thành công với 63 test, 0 failure, 0 error, 0 skipped; MySQL 8.0.46, Flyway V6, Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
 - Lịch sử truy cập chưa được code trong M1.6; backlog M6.9 tiếp tục sở hữu kho audit append-only và sau này cung cấp API đọc trong không gian quản trị hệ thống.
+
+Ngày 2026-09-28:
+
+- Đã tập trung toàn bộ thông báo lỗi API, validation, security và bootstrap vào `message.properties`; response lỗi và mô tả OpenAPI mặc định đã được Việt hóa, còn mã role/permission, tên header và thuật ngữ kỹ thuật trong log vẫn giữ nguyên để bảo đảm khả năng tích hợp và vận hành.
+- Đã chuẩn hóa hệ role thành `ADMIN` cấp cao nhất, `STAFF` quản trị giới hạn và `USER` người dùng thường. Flyway V7 chuyển dữ liệu từ tên role cũ mà không mất liên kết user–role/role–permission và thu hồi các phiên chứa claim cũ.
+- Migration V7 đã chạy thành công trên H2 2.3, MySQL 8.0.46 qua Testcontainers và database Docker `shop` tại cổng `3307`; database có đủ 9 bảng `xac_thuc_*`, ba role mới và không còn phiên refresh cũ đang hoạt động.
+- `mvnw.cmd spotless:check clean verify` sau chuẩn hóa thông báo và role: thành công với 65 test, 0 failure, 0 error, 0 skipped; Spring Modulith, ArchUnit, OpenAPI, Spotless và JaCoCo đều đạt.
+- Database local hiện chưa có tài khoản được gán role `ADMIN`. Đây là trạng thái an toàn có chủ đích: chỉ bật bootstrap một lần sau khi cung cấp bộ `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` riêng, sau đó tắt `ADMIN_BOOTSTRAP_ENABLED`.
 
 Toàn bộ M0, M1.1, M1.2, M1.3, M1.4, M1.4A, M1.4B, M1.4C, M1.4D, M1.4E, M1.4F, M1.4G, M1.4H, M1.5, M1.6 và M6.2A.1 đã vượt quality gate. Dừng tại đây theo nguyên tắc một nhiệm vụ; M1.7 chưa bắt đầu.
 
@@ -762,26 +770,26 @@ GET    /api/system-administration/permissions              Xem capability do h�
 
 Ma trận quyền quản trị:
 
-| Chức năng | SUPER_ADMIN | ADMIN | USER |
+| Chức năng | ADMIN | STAFF | USER |
 |---|:---:|:---:|:---:|
 | Xem user/role/permission | Có | Có | Không |
 | Khóa/mở khóa user thường | Có | Có | Không |
 | Đổi role user thường | Có | Có, không vượt quyền hiện có | Không |
-| Quản lý tài khoản ADMIN | Có | Không | Không |
+| Quản lý tài khoản STAFF | Có | Không | Không |
 | Tạo/sửa/xóa role tùy biến | Có | Không | Không |
-| Sửa/xóa role hệ thống hoặc tài khoản SUPER_ADMIN | Không | Không | Không |
+| Sửa/xóa role hệ thống hoặc tài khoản ADMIN | Không | Không | Không |
 
-Tạo tài khoản cao nhất lần đầu bằng biến môi trường. Chỉ bật bootstrap khi khởi tạo, sau khi đăng nhập thành công phải tắt `SUPER_ADMIN_BOOTSTRAP_ENABLED` và xóa password khỏi môi trường chạy:
+Tạo tài khoản cao nhất lần đầu bằng biến môi trường. Chỉ bật bootstrap khi khởi tạo, sau khi đăng nhập thành công phải tắt `ADMIN_BOOTSTRAP_ENABLED` và xóa password khỏi môi trường chạy:
 
 ```powershell
-$env:SUPER_ADMIN_BOOTSTRAP_ENABLED="true"
-$env:SUPER_ADMIN_USERNAME="platform-root"
-$env:SUPER_ADMIN_EMAIL="platform-root@example.com"
-$env:SUPER_ADMIN_PASSWORD="replace-with-a-strong-unique-password"
+$env:ADMIN_BOOTSTRAP_ENABLED="true"
+$env:ADMIN_USERNAME="platform-root"
+$env:ADMIN_EMAIL="platform-root@example.com"
+$env:ADMIN_PASSWORD="replace-with-a-strong-unique-password"
 .\mvnw.cmd spring-boot:run
 ```
 
-Ứng dụng từ chối khởi tạo thêm nếu đã có một `SUPER_ADMIN`; nếu database bị can thiệp thành nhiều tài khoản `SUPER_ADMIN`, startup fail-fast. Role/permission nằm trong access token, vì vậy thay đổi status, role hoặc permission sẽ thu hồi refresh session tương ứng để access token cũ mất hiệu lực ngay.
+Ứng dụng từ chối khởi tạo thêm nếu đã có một `ADMIN`; nếu database bị can thiệp thành nhiều tài khoản `ADMIN`, startup fail-fast. Role/permission nằm trong access token, vì vậy thay đổi status, role hoặc permission sẽ thu hồi refresh session tương ứng để access token cũ mất hiệu lực ngay.
 
 Đọc hồ sơ hiện tại:
 
@@ -909,10 +917,10 @@ Dự án `section3` bật Spring Cloud OpenFeign Circuit Breaker và đặt Time
 
 Shop hiện là modular monolith và Identity không có HTTP client gọi dịch vụ ngoài, vì vậy chưa thêm Resilience4j hoặc Spring Cloud chỉ để tạo cấu hình không được thực thi. Circuit Breaker sẽ được thêm theo từng outbound adapter khi tích hợp object storage, payment provider hoặc khi tách microservice. Mỗi dependency có instance riêng, timeout hữu hạn, fallback theo nghiệp vụ, metrics và test cho trạng thái closed/open/half-open; retry chỉ dùng với thao tác an toàn hoặc có idempotency.
 
-### ADR-006: Phân quyền quản trị theo capability và một SUPER_ADMIN
+### ADR-006: Phân quyền quản trị theo capability và một ADMIN cấp cao nhất
 
 Trạng thái: Accepted.
 
 Giữ mô hình user–role–chức năng từ `khcn-sso`, nhưng không sao chép ID role hard-code, mật khẩu mặc định, service quản trị quá lớn hoặc annotation quyền bị comment. Shop dùng permission constant trùng với dữ liệu Flyway, controller kiểm tra bằng `@PreAuthorize` và service tiếp tục bảo vệ invariant quan trọng.
 
-Permission là capability mà code thực sự kiểm tra nên API chỉ cho xem danh mục, không cho tự tạo permission. Role tùy biến được cấu hình từ capability có sẵn. `SUPER_ADMIN` chỉ được bootstrap từ environment, không thể gán qua API và tài khoản này không thể bị khóa hoặc đổi role; sửa quyền làm thu hồi các phiên đang giữ claim cũ.
+Permission là capability mà code thực sự kiểm tra nên API chỉ cho xem danh mục, không cho tự tạo permission. Role tùy biến được cấu hình từ capability có sẵn. `ADMIN` chỉ được bootstrap từ environment, không thể gán qua API và tài khoản này không thể bị khóa hoặc đổi role; sửa quyền làm thu hồi các phiên đang giữ claim cũ.

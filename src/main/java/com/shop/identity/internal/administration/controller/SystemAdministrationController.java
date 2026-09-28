@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(BASE)
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH_SCHEME)
-@Tag(name = "System administration", description = "Manage users, roles, and system permissions")
+@Tag(name = "Quản trị hệ thống", description = "Quản lý người dùng, vai trò và quyền hệ thống")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SystemAdministrationController {
@@ -67,7 +67,7 @@ public class SystemAdministrationController {
 
     @GetMapping(USERS)
     @PreAuthorize("hasAuthority('" + USER_READ + "')")
-    @Operation(summary = "Search and page system users")
+    @Operation(summary = "Tìm kiếm và phân trang người dùng hệ thống")
     ApiResponse<SystemUserPageResponse> searchUsers(@Valid @ModelAttribute UserSearchRequest request) {
         return ApiResponse.<SystemUserPageResponse>builder()
                 .result(userAdministrationService.search(request))
@@ -76,7 +76,7 @@ public class SystemAdministrationController {
 
     @GetMapping(USER_BY_ID)
     @PreAuthorize("hasAuthority('" + USER_READ + "')")
-    @Operation(summary = "Get a system user")
+    @Operation(summary = "Xem chi tiết người dùng hệ thống")
     ApiResponse<SystemUserResponse> getUser(@PathVariable UUID userId) {
         return ApiResponse.<SystemUserResponse>builder()
                 .result(userAdministrationService.getById(userId))
@@ -85,7 +85,7 @@ public class SystemAdministrationController {
 
     @PatchMapping(USER_STATUS)
     @PreAuthorize("hasAuthority('" + USER_STATUS_UPDATE + "')")
-    @Operation(summary = "Change user account status and revoke active sessions")
+    @Operation(summary = "Đổi trạng thái tài khoản và thu hồi các phiên đang hoạt động")
     ApiResponse<SystemUserResponse> updateUserStatus(
             Principal principal, @PathVariable UUID userId, @Valid @RequestBody UpdateUserStatusRequest request) {
         return ApiResponse.<SystemUserResponse>builder()
@@ -95,7 +95,7 @@ public class SystemAdministrationController {
 
     @PutMapping(USER_ROLES)
     @PreAuthorize("hasAuthority('" + USER_ROLE_ASSIGN + "')")
-    @Operation(summary = "Replace user roles and revoke active sessions")
+    @Operation(summary = "Thay thế vai trò người dùng và thu hồi các phiên đang hoạt động")
     ApiResponse<SystemUserResponse> replaceUserRoles(
             Principal principal, @PathVariable UUID userId, @Valid @RequestBody ReplaceUserRolesRequest request) {
         return ApiResponse.<SystemUserResponse>builder()
@@ -105,7 +105,7 @@ public class SystemAdministrationController {
 
     @GetMapping(ROLES)
     @PreAuthorize("hasAuthority('" + ROLE_READ + "')")
-    @Operation(summary = "List roles and assigned permissions")
+    @Operation(summary = "Xem danh sách vai trò và các quyền đã gán")
     ApiResponse<List<RoleResponse>> getRoles() {
         return ApiResponse.<List<RoleResponse>>builder()
                 .result(roleAdministrationService.findAll())
@@ -115,7 +115,7 @@ public class SystemAdministrationController {
     @PostMapping(ROLES)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('" + ROLE_MANAGE + "')")
-    @Operation(summary = "Create a custom role")
+    @Operation(summary = "Tạo vai trò tùy chỉnh")
     ApiResponse<RoleResponse> createRole(Principal principal, @Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.<RoleResponse>builder()
                 .result(roleAdministrationService.create(principal.getName(), request))
@@ -124,7 +124,7 @@ public class SystemAdministrationController {
 
     @PutMapping(ROLE_BY_CODE)
     @PreAuthorize("hasAuthority('" + ROLE_MANAGE + "')")
-    @Operation(summary = "Update a custom role")
+    @Operation(summary = "Cập nhật vai trò tùy chỉnh")
     ApiResponse<RoleResponse> updateRole(
             Principal principal, @PathVariable String roleCode, @Valid @RequestBody UpdateRoleRequest request) {
         return ApiResponse.<RoleResponse>builder()
@@ -134,7 +134,7 @@ public class SystemAdministrationController {
 
     @DeleteMapping(ROLE_BY_CODE)
     @PreAuthorize("hasAuthority('" + ROLE_MANAGE + "')")
-    @Operation(summary = "Delete an unused custom role")
+    @Operation(summary = "Xóa vai trò tùy chỉnh chưa được sử dụng")
     ApiResponse<Void> deleteRole(Principal principal, @PathVariable String roleCode) {
         roleAdministrationService.delete(principal.getName(), roleCode);
         return ApiResponse.<Void>builder().build();
@@ -142,7 +142,7 @@ public class SystemAdministrationController {
 
     @GetMapping(PERMISSIONS)
     @PreAuthorize("hasAuthority('" + PERMISSION_READ + "')")
-    @Operation(summary = "List code-owned system permissions")
+    @Operation(summary = "Xem danh sách quyền do hệ thống định nghĩa")
     ApiResponse<List<PermissionResponse>> getPermissions() {
         return ApiResponse.<List<PermissionResponse>>builder()
                 .result(permissionQueryService.findAll())

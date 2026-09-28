@@ -30,13 +30,13 @@ class IdentitySchemaMigrationTests {
                 .containsExactly("challenge-issuance");
 
         List<String> roles = jdbcTemplate.queryForList("SELECT code FROM xac_thuc_vai_tro ORDER BY code", String.class);
-        assertThat(roles).containsExactly("ADMIN", "SUPER_ADMIN", "USER");
+        assertThat(roles).containsExactly("ADMIN", "STAFF", "USER");
         assertThat(jdbcTemplate.queryForList(
                         "SELECT code FROM xac_thuc_vai_tro WHERE system_role = TRUE ORDER BY code", String.class))
-                .containsExactly("ADMIN", "SUPER_ADMIN", "USER");
+                .containsExactly("ADMIN", "STAFF", "USER");
         assertThat(jdbcTemplate.queryForList(
                         "SELECT permission_code FROM xac_thuc_vai_tro_quyen_han "
-                                + "WHERE role_code = 'SUPER_ADMIN' ORDER BY permission_code",
+                                + "WHERE role_code = 'ADMIN' ORDER BY permission_code",
                         String.class))
                 .containsExactly(
                         "SYSTEM_PERMISSION_READ",
@@ -45,6 +45,9 @@ class IdentitySchemaMigrationTests {
                         "SYSTEM_USER_READ",
                         "SYSTEM_USER_ROLE_ASSIGN",
                         "SYSTEM_USER_STATUS_UPDATE");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT description FROM xac_thuc_vai_tro WHERE code = 'STAFF'", String.class))
+                .isEqualTo("Nhân viên quản trị");
     }
 
     private long rowCount(String table) {
