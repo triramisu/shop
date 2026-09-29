@@ -10,7 +10,7 @@ final class CatalogDomainRules {
 
     private static final Pattern CODE_PATTERN = Pattern.compile("[A-Z0-9][A-Z0-9_-]*");
     private static final Pattern SKU_PATTERN = Pattern.compile("[A-Z0-9][A-Z0-9._-]{2,99}");
-    private static final Pattern SLUG_PATTERN = Pattern.compile("[a-z0-9]+(?:-[a-z0-9]+)*");
+    private static final Pattern SLUG_PATTERN = Pattern.compile("[a-z0-9]++(?:-[a-z0-9]++)*+");
 
     private CatalogDomainRules() {}
 

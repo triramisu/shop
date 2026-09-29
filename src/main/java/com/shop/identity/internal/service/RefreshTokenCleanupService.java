@@ -23,7 +23,7 @@ public class RefreshTokenCleanupService {
             initialDelayString = "${jwt.cleanup-initial-delay:3600000}")
     @Transactional
     public void cleanupExpiredTokens() {
-        int deletedCount = deleteExpiredTokens(Instant.now());
+        int deletedCount = refreshTokenRepository.deleteExpiredTokens(Instant.now());
         if (deletedCount > 0) {
             log.info("Deleted {} expired refresh tokens", deletedCount);
         }

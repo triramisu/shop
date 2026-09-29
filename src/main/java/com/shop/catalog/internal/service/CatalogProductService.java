@@ -84,7 +84,6 @@ public class CatalogProductService {
         Category category = categoryService.getActiveCategory(request.getCategoryId());
 
         return saveProduct(
-                product,
                 () -> {
                     product.updateDetails(category, request.getName(), request.getSlug(), request.getDescription());
                     return product;
@@ -145,7 +144,7 @@ public class CatalogProductService {
     public ProductResponse publish(UUID productId, VersionedCatalogRequest request) {
         Product product = getProduct(productId);
         requireVersion(request.getVersion(), product.getVersion());
-        return saveProduct(product, () -> {
+        return saveProduct(() -> {
             product.publish();
             return product;
         });
@@ -155,17 +154,17 @@ public class CatalogProductService {
     public ProductResponse hide(UUID productId, VersionedCatalogRequest request) {
         Product product = getProduct(productId);
         requireVersion(request.getVersion(), product.getVersion());
-        return saveProduct(product, () -> {
+        return saveProduct(() -> {
             product.hide();
             return product;
         });
     }
 
-    private ProductResponse saveProduct(Product product, Supplier<Product> operation) {
-        return saveProduct(product, operation, ErrorCode.CATALOG_CONFLICT);
+    private ProductResponse saveProduct(Supplier<Product> operation) {
+        return saveProduct(operation, ErrorCode.CATALOG_CONFLICT);
     }
 
-    private ProductResponse saveProduct(Product product, Supplier<Product> operation, ErrorCode conflictCode) {
+    private ProductResponse saveProduct(Supplier<Product> operation, ErrorCode conflictCode) {
         Product changed = executeDomainOperation(operation);
         try {
             return mapper.toProductResponse(productRepository.saveAndFlush(changed));

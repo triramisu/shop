@@ -57,7 +57,7 @@ class CatalogLayerArchitectureTests {
         List<Class<?>> repositories =
                 List.of(CategoryRepository.class, ProductRepository.class, ProductVariantRepository.class);
 
-        assertThat(repositories).allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
+        assertThat(repositories).isNotEmpty().allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
                         .map(Method::getName)
                         .filter(methodName -> methodName.startsWith("delete")))
                 .isEmpty());
