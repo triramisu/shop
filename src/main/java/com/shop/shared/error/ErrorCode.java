@@ -93,6 +93,15 @@ public enum ErrorCode {
     CATALOG_DESCRIPTION_INVALID(1125, "error.catalog.description.invalid", HttpStatus.BAD_REQUEST),
     CATALOG_STATUS_REQUIRED(1126, "error.catalog.status.required", HttpStatus.BAD_REQUEST),
     CATALOG_SORT_INVALID(1127, "error.catalog.sort.invalid", HttpStatus.BAD_REQUEST),
+    PRODUCT_IMAGE_FILES_REQUIRED(1128, "error.catalog.image.files-required", HttpStatus.BAD_REQUEST),
+    PRODUCT_IMAGE_COUNT_INVALID(1129, "error.catalog.image.count-invalid", HttpStatus.BAD_REQUEST),
+    PRODUCT_IMAGE_TOO_LARGE(1130, "error.catalog.image.too-large", HttpStatus.PAYLOAD_TOO_LARGE),
+    PRODUCT_IMAGE_TYPE_INVALID(1131, "error.catalog.image.type-invalid", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    PRODUCT_IMAGE_CONTENT_INVALID(1132, "error.catalog.image.content-invalid", HttpStatus.BAD_REQUEST),
+    PRODUCT_IMAGE_LIMIT_EXCEEDED(1133, "error.catalog.image.limit-exceeded", HttpStatus.CONFLICT),
+    PRODUCT_IMAGE_NOT_FOUND(1134, "error.catalog.image.not-found", HttpStatus.NOT_FOUND),
+    PRODUCT_IMAGE_ARRANGEMENT_INVALID(1135, "error.catalog.image.arrangement-invalid", HttpStatus.CONFLICT),
+    OBJECT_STORAGE_UNAVAILABLE(1136, "error.catalog.image.storage-unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +18,10 @@ public interface ProductRepository extends Repository<Product, UUID> {
     <S extends Product> S saveAndFlush(S product);
 
     Optional<Product> findById(UUID id);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select product from Product product where product.id = :id and product.deletedAt is null")
+    Optional<Product> findByIdForUpdate(@Param("id") UUID id);
 
     @EntityGraph(attributePaths = {"category", "variants"})
     @Query("select product from Product product where product.id = :id and product.deletedAt is null")

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 class GlobalExceptionHandlerTests {
 
@@ -37,6 +38,16 @@ class GlobalExceptionHandlerTests {
         assertThat(response.getBody().getMessage())
                 .isEqualTo(messageResolver.resolve(ErrorCode.UNCATEGORIZED_EXCEPTION));
         assertThat(response.getBody().getMessage()).doesNotContain("sensitive internal detail");
+    }
+
+    @Test
+    void mapsMultipartLimitToTheCatalogImageError() {
+        var response = handler.handleMaxUploadSizeExceeded(new MaxUploadSizeExceededException(5));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo(1130);
+        assertThat(response.getBody().getMessage()).isEqualTo("Kích thước ảnh vượt quá giới hạn cho phép");
     }
 
     private static ErrorMessageResolver createMessageResolver() {

@@ -13,6 +13,9 @@ public final class CatalogApiPaths {
     public static final String PRODUCT_VARIANTS = PRODUCT_BY_ID + "/variants";
     public static final String PRODUCT_VARIANT_BY_ID = PRODUCT_VARIANTS + "/{variantId}";
     public static final String PRODUCT_VARIANT_STATUS = PRODUCT_VARIANT_BY_ID + "/status";
+    public static final String PRODUCT_IMAGES = PRODUCT_BY_ID + "/images";
+    public static final String PRODUCT_IMAGE_BY_ID = PRODUCT_IMAGES + "/{imageId}";
+    public static final String PRODUCT_IMAGE_ARRANGEMENT = PRODUCT_IMAGES + "/arrangement";
 
     private CatalogApiPaths() {}
 }

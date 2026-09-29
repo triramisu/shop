@@ -21,6 +21,10 @@ jwt:
   audience: shop-api-test
 
 app:
+  catalog:
+    images:
+      storage:
+        type: memory
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
   security:
