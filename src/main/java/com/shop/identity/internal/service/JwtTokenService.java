@@ -188,9 +188,7 @@ public class JwtTokenService {
             return signedJwt;
         } catch (AppException exception) {
             throw exception;
-        } catch (ParseException | JOSEException exception) {
-            throw new AppException(ErrorCode.INVALID_TOKEN);
-        } catch (RuntimeException exception) {
+        } catch (ParseException | JOSEException | RuntimeException exception) {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
     }

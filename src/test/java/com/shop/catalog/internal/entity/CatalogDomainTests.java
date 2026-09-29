@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CatalogDomainTests {
@@ -29,7 +30,8 @@ class CatalogDomainTests {
         assertThat(variant.getCurrency()).isEqualTo("USD");
         assertThat(product.getStatus()).isEqualTo(ProductStatus.PUBLISHED);
         assertThat(product.getVariants()).containsExactly(variant);
-        assertThatThrownBy(() -> product.getVariants().clear()).isInstanceOf(UnsupportedOperationException.class);
+        List<ProductVariant> variants = product.getVariants();
+        assertThatThrownBy(variants::clear).isInstanceOf(UnsupportedOperationException.class);
 
         product.hide();
         assertThat(product.getStatus()).isEqualTo(ProductStatus.HIDDEN);
@@ -49,15 +51,17 @@ class CatalogDomainTests {
 
         Category category = Category.create("COMPUTERS", "Computers", "computers");
         Product product = Product.create(category, "Laptop", "laptop", null);
+        BigDecimal negativePrice = new BigDecimal("-0.01");
+        BigDecimal overPrecisionPrice = new BigDecimal("1.001");
         product.addVariant("LAPTOP-BASE", "Base", BigDecimal.ZERO, "VND");
 
         assertThatThrownBy(() -> product.addVariant("laptop-base", "Duplicate", BigDecimal.ONE, "VND"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SKU");
-        assertThatThrownBy(() -> product.addVariant("NEGATIVE", "Invalid", new BigDecimal("-0.01"), "VND"))
+        assertThatThrownBy(() -> product.addVariant("NEGATIVE", "Invalid", negativePrice, "VND"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("negative");
-        assertThatThrownBy(() -> product.addVariant("PRECISION", "Invalid", new BigDecimal("1.001"), "VND"))
+        assertThatThrownBy(() -> product.addVariant("PRECISION", "Invalid", overPrecisionPrice, "VND"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("decimal");
         assertThatThrownBy(() -> product.addVariant("CURRENCY", "Invalid", BigDecimal.ONE, "INVALID"))

@@ -74,10 +74,10 @@ class CaptchaImageGenerator {
             try {
                 characterGraphics.setFont(font);
                 characterGraphics.setColor(randomDarkColor());
-                double rotation = Math.toRadians(secureRandom.nextInt(31) - 15);
+                double rotation = Math.toRadians(secureRandom.nextInt(31) - 15.0);
                 int x = 18 + index * 26;
                 int y = 43 + secureRandom.nextInt(9) - 4;
-                characterGraphics.transform(AffineTransform.getRotateInstance(rotation, x + 10, y - 12));
+                characterGraphics.transform(AffineTransform.getRotateInstance(rotation, x + 10.0, y - 12.0));
                 characterGraphics.drawString(String.valueOf(answer.charAt(index)), x, y);
             } finally {
                 characterGraphics.dispose();

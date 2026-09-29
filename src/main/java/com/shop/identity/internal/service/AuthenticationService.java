@@ -107,7 +107,9 @@ public class AuthenticationService {
         return toResponse(tokenPair);
     }
 
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(
+            isolation = Isolation.READ_COMMITTED,
+            rollbackFor = {ParseException.class, JOSEException.class})
     public void logout(LogoutRequest request) throws ParseException, JOSEException {
         SignedJWT signedJwt = jwtTokenService.verifyRefreshToken(request.getToken());
         String jti = signedJwt.getJWTClaimsSet().getJWTID();
