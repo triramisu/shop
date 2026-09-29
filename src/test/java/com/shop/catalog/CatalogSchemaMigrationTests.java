@@ -26,10 +26,12 @@ class CatalogSchemaMigrationTests {
                  ORDER BY table_name
                 """, String.class);
 
-        assertThat(catalogTables).containsExactly("san_pham_bien_the", "san_pham_danh_muc", "san_pham_san_pham");
+        assertThat(catalogTables)
+                .containsExactly("san_pham_bien_the", "san_pham_danh_muc", "san_pham_hinh_anh", "san_pham_san_pham");
         assertThat(rowCount("san_pham_danh_muc")).isZero();
         assertThat(rowCount("san_pham_san_pham")).isZero();
         assertThat(rowCount("san_pham_bien_the")).isZero();
+        assertThat(rowCount("san_pham_hinh_anh")).isZero();
     }
 
     private long rowCount(String table) {

@@ -21,6 +21,10 @@ spring:
     enabled: true
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  servlet:
+    multipart:
+      max-file-size: ${CATALOG_IMAGE_MAX_FILE_SIZE:5MB}
+      max-request-size: ${CATALOG_IMAGE_MAX_REQUEST_SIZE:30MB}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -48,6 +52,15 @@ springdoc:
     tags-sorter: alpha
 
 app:
+  catalog:
+    images:
+      max-files-per-upload: ${CATALOG_IMAGE_MAX_FILES_PER_UPLOAD:5}
+      max-files-per-product: ${CATALOG_IMAGE_MAX_FILES_PER_PRODUCT:10}
+      max-file-size: ${CATALOG_IMAGE_MAX_FILE_SIZE:5MB}
+      max-pixels: ${CATALOG_IMAGE_MAX_PIXELS:40000000}
+      storage:
+        type: ${OBJECT_STORAGE_TYPE:filesystem}
+        filesystem-root: ${OBJECT_STORAGE_ROOT:./data/object-storage}
   identity:
     admin:
       bootstrap-enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}

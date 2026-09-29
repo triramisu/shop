@@ -42,10 +42,10 @@ class CatalogMigrationUpgradeTests {
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = 'public' AND table_name LIKE 'san_pham_%'",
                         Integer.class))
-                .isEqualTo(3);
+                .isEqualTo(4);
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history " + "WHERE success = TRUE AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(9);
+                .isEqualTo(10);
     }
 }

@@ -11,6 +11,9 @@ import com.shop.catalog.internal.dto.request.ProductSortField;
 import com.shop.catalog.internal.dto.response.CategoryResponse;
 import com.shop.catalog.internal.dto.response.ProductPageResponse;
 import com.shop.catalog.internal.dto.response.ProductResponse;
+import com.shop.catalog.internal.image.dto.request.UploadProductImagesRequest;
+import com.shop.catalog.internal.image.dto.response.ProductImageResponse;
+import com.shop.catalog.internal.image.service.ProductImageService;
 import com.shop.catalog.internal.service.CatalogCategoryService;
 import com.shop.catalog.internal.service.CatalogProductService;
 import com.shop.identity.internal.captcha.service.AdaptiveCaptchaService;
@@ -32,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -82,6 +87,9 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private CatalogProductService catalogProductService;
 
+    @Autowired
+    private ProductImageService productImageService;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -100,7 +108,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(9);
+        assertThat(migrationCount).isEqualTo(10);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -108,7 +116,7 @@ class MySqlCompatibilityIntegrationTests {
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'san_pham_%'",
                         Integer.class))
-                .isEqualTo(3);
+                .isEqualTo(4);
     }
 
     @Test
@@ -145,12 +153,27 @@ class MySqlCompatibilityIntegrationTests {
                 .sortBy(ProductSortField.NAME)
                 .direction(CatalogSortDirection.ASC)
                 .build());
+        List<ProductImageResponse> images = productImageService.upload(
+                beta.getId(), uploadRequest(new MockMultipartFile("files", "mysql.png", "image/png", validPngBytes())));
 
         assertThat(page.getContent()).extracting(ProductResponse::getName).containsExactly("MySQL Alpha");
         assertThat(page.getTotalElements()).isEqualTo(2);
         assertThat(page.getTotalPages()).isEqualTo(2);
         assertThat(page.isFirst()).isTrue();
         assertThat(page.isLast()).isFalse();
+        assertThat(images).singleElement().satisfies(image -> {
+            assertThat(image.isPrimary()).isTrue();
+            assertThat(image.getObjectKey()).startsWith("catalog/products/" + beta.getId() + "/");
+        });
+        Map<String, Object> storedImage = jdbcTemplate.queryForMap(
+                "SELECT content_type, size_bytes, CAST(primary_image AS UNSIGNED) AS primary_image, display_order "
+                        + "FROM san_pham_hinh_anh WHERE HEX(product_id) = REPLACE(UPPER(?), '-', '')",
+                beta.getId().toString());
+        assertThat(storedImage)
+                .containsEntry("content_type", "image/png")
+                .containsEntry("size_bytes", (long) validPngBytes().length)
+                .containsEntry("display_order", 0);
+        assertThat(((Number) storedImage.get("primary_image")).intValue()).isEqualTo(1);
     }
 
     @Test
@@ -325,6 +348,27 @@ class MySqlCompatibilityIntegrationTests {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while waiting to start concurrent MySQL writes", exception);
+        }
+    }
+
+    private UploadProductImagesRequest uploadRequest(MockMultipartFile file) {
+        UploadProductImagesRequest request = new UploadProductImagesRequest();
+        request.setFiles(List.of(file));
+        return request;
+    }
+
+    private byte[] validPngBytes() {
+        try {
+            java.awt.image.BufferedImage image =
+                    new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            try (java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+                if (!javax.imageio.ImageIO.write(image, "png", output)) {
+                    throw new IllegalStateException("PNG writer is unavailable");
+                }
+                return output.toByteArray();
+            }
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Could not create test PNG", exception);
         }
     }
 

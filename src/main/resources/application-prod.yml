@@ -22,5 +22,10 @@ jwt:
   signerKey: ${JWT_SIGNER_KEY}
 
 app:
+  catalog:
+    images:
+      storage:
+        type: ${OBJECT_STORAGE_TYPE:filesystem}
+        filesystem-root: ${OBJECT_STORAGE_ROOT}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}

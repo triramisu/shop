@@ -44,7 +44,7 @@ class CatalogLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.catalog.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(3)
+                .hasSize(4)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -53,7 +53,7 @@ class CatalogLayerArchitectureTests {
     }
 
     @Test
-    void catalogRepositoriesDoNotExposePhysicalDeleteOperations() {
+    void catalogAggregateRepositoriesDoNotExposePhysicalDeleteOperations() {
         List<Class<?>> repositories =
                 List.of(CategoryRepository.class, ProductRepository.class, ProductVariantRepository.class);
 
@@ -67,7 +67,7 @@ class CatalogLayerArchitectureTests {
     void catalogControllersDoNotAccessEntitiesOrRepositoriesDirectly() {
         noClasses()
                 .that()
-                .resideInAPackage("..catalog.internal.controller..")
+                .resideInAPackage("..catalog.internal..controller..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..catalog.internal.entity..", "..catalog.internal.repository..")
@@ -78,10 +78,10 @@ class CatalogLayerArchitectureTests {
     void catalogRepositoriesAreOnlyAccessedByCatalogServices() {
         classes()
                 .that()
-                .resideInAPackage("..catalog.internal.repository..")
+                .resideInAPackage("..catalog.internal..repository..")
                 .should()
                 .onlyBeAccessed()
-                .byAnyPackage("..catalog.internal.repository..", "..catalog.internal.service..")
+                .byAnyPackage("..catalog.internal..repository..", "..catalog.internal..service..")
                 .check(applicationClasses);
     }
 
@@ -89,7 +89,7 @@ class CatalogLayerArchitectureTests {
     void catalogDtosDoNotExposePersistenceEntities() {
         noClasses()
                 .that()
-                .resideInAPackage("..catalog.internal.dto..")
+                .resideInAPackage("..catalog.internal..dto..")
                 .should()
                 .dependOnClassesThat()
                 .areAnnotatedWith(Entity.class)
