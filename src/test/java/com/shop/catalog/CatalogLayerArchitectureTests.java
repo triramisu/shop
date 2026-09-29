@@ -1,5 +1,6 @@
 package com.shop.catalog;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,7 +31,7 @@ class CatalogLayerArchitectureTests {
     void catalogDoesNotDependOnOtherBusinessModules() {
         noClasses()
                 .that()
-                .resideInAPackage("..catalog..")
+                .resideInAPackage("com.shop.catalog.internal..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..identity..", "..inventory..", "..order..", "..payment..")
@@ -60,5 +61,38 @@ class CatalogLayerArchitectureTests {
                         .map(Method::getName)
                         .filter(methodName -> methodName.startsWith("delete")))
                 .isEmpty());
+    }
+
+    @Test
+    void catalogControllersDoNotAccessEntitiesOrRepositoriesDirectly() {
+        noClasses()
+                .that()
+                .resideInAPackage("..catalog.internal.controller..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..catalog.internal.entity..", "..catalog.internal.repository..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void catalogRepositoriesAreOnlyAccessedByCatalogServices() {
+        classes()
+                .that()
+                .resideInAPackage("..catalog.internal.repository..")
+                .should()
+                .onlyBeAccessed()
+                .byAnyPackage("..catalog.internal.repository..", "..catalog.internal.service..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void catalogDtosDoNotExposePersistenceEntities() {
+        noClasses()
+                .that()
+                .resideInAPackage("..catalog.internal.dto..")
+                .should()
+                .dependOnClassesThat()
+                .areAnnotatedWith(Entity.class)
+                .check(applicationClasses);
     }
 }

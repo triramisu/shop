@@ -109,6 +109,36 @@ public class Product {
         }
         ProductVariant variant = ProductVariant.create(this, normalizedSku, name, price, currency);
         variants.add(variant);
+        markChanged();
+        return variant;
+    }
+
+    public ProductVariant updateVariant(UUID variantId, String name, BigDecimal price, String currency) {
+        requireNotArchived();
+        ProductVariant variant = getRequiredVariant(variantId);
+        variant.updateDetails(name, price, currency);
+        return variant;
+    }
+
+    public ProductVariant changeVariantStatus(UUID variantId, ProductVariantStatus newStatus) {
+        requireNotArchived();
+        ProductVariant variant = getRequiredVariant(variantId);
+        ProductVariantStatus requiredStatus = Objects.requireNonNull(newStatus, "variant status is required");
+        if (requiredStatus == ProductVariantStatus.ARCHIVED) {
+            throw new IllegalArgumentException("Variant cannot be archived through a status change");
+        }
+        if (requiredStatus == ProductVariantStatus.INACTIVE
+                && status == ProductStatus.PUBLISHED
+                && variant.isSellable()
+                && variants.stream().filter(ProductVariant::isSellable).count() == 1) {
+            throw new IllegalStateException("A published product must keep at least one active variant");
+        }
+        if (requiredStatus == ProductVariantStatus.ACTIVE) {
+            variant.activate();
+        } else {
+            variant.deactivate();
+        }
+        markChanged();
         return variant;
     }
 
@@ -169,5 +199,16 @@ public class Product {
         if (status == ProductStatus.ARCHIVED || deletedAt != null) {
             throw new IllegalStateException("Archived products cannot be changed");
         }
+    }
+
+    private ProductVariant getRequiredVariant(UUID variantId) {
+        return variants.stream()
+                .filter(variant -> variant.getId().equals(variantId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Variant does not belong to this product"));
+    }
+
+    private void markChanged() {
+        updatedAt = Instant.now();
     }
 }

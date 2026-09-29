@@ -55,6 +55,13 @@ class OpenApiIntegrationTests {
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/system-administration/permissions'].get")
                         .exists())
+                .andExpect(jsonPath("$.paths['/api/catalog/categories'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/catalog/products'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/catalog/products'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/catalog/products/{productId}'].put")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/catalog/products/{productId}/variants'].post")
+                        .exists())
                 .andExpect(jsonPath("$.paths['/api/auth/token'].post.security").doesNotExist())
                 .andExpect(
                         jsonPath("$.paths['/api/auth/register'].post.security").doesNotExist())
@@ -63,6 +70,8 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/auth/my-info'].get.security[0].bearerAuth")
                         .isArray())
                 .andExpect(jsonPath("$.paths['/api/system-administration/users'].get.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/catalog/products'].get.security[0].bearerAuth")
                         .isArray());
     }
 

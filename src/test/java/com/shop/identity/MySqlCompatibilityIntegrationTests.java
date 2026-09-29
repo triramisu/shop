@@ -2,6 +2,17 @@ package com.shop.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.shop.catalog.internal.dto.request.CatalogSortDirection;
+import com.shop.catalog.internal.dto.request.CreateCategoryRequest;
+import com.shop.catalog.internal.dto.request.CreateProductRequest;
+import com.shop.catalog.internal.dto.request.CreateProductVariantRequest;
+import com.shop.catalog.internal.dto.request.ProductSearchRequest;
+import com.shop.catalog.internal.dto.request.ProductSortField;
+import com.shop.catalog.internal.dto.response.CategoryResponse;
+import com.shop.catalog.internal.dto.response.ProductPageResponse;
+import com.shop.catalog.internal.dto.response.ProductResponse;
+import com.shop.catalog.internal.service.CatalogCategoryService;
+import com.shop.catalog.internal.service.CatalogProductService;
 import com.shop.identity.internal.captcha.service.AdaptiveCaptchaService;
 import com.shop.identity.internal.dto.request.AuthenticationRequest;
 import com.shop.identity.internal.dto.request.ChangePasswordRequest;
@@ -65,6 +76,12 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private UserProfileService userProfileService;
 
+    @Autowired
+    private CatalogCategoryService catalogCategoryService;
+
+    @Autowired
+    private CatalogProductService catalogProductService;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -92,6 +109,48 @@ class MySqlCompatibilityIntegrationTests {
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'san_pham_%'",
                         Integer.class))
                 .isEqualTo(3);
+    }
+
+    @Test
+    void executesCatalogAggregateAndStablePaginationOnMySql() {
+        CategoryResponse category = catalogCategoryService.create(CreateCategoryRequest.builder()
+                .code("MYSQL_CATALOG")
+                .name("MySQL Catalog")
+                .slug("mysql-catalog")
+                .build());
+        ProductResponse beta = catalogProductService.create(CreateProductRequest.builder()
+                .categoryId(category.getId())
+                .name("MySQL Beta")
+                .slug("mysql-beta")
+                .build());
+        catalogProductService.addVariant(
+                beta.getId(),
+                CreateProductVariantRequest.builder()
+                        .sku("MYSQL-BETA-01")
+                        .name("Default")
+                        .price(new java.math.BigDecimal("19.90"))
+                        .currency("USD")
+                        .productVersion(beta.getVersion())
+                        .build());
+        catalogProductService.create(CreateProductRequest.builder()
+                .categoryId(category.getId())
+                .name("MySQL Alpha")
+                .slug("mysql-alpha")
+                .build());
+
+        ProductPageResponse page = catalogProductService.search(ProductSearchRequest.builder()
+                .categoryId(category.getId())
+                .page(0)
+                .size(1)
+                .sortBy(ProductSortField.NAME)
+                .direction(CatalogSortDirection.ASC)
+                .build());
+
+        assertThat(page.getContent()).extracting(ProductResponse::getName).containsExactly("MySQL Alpha");
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+        assertThat(page.isFirst()).isTrue();
+        assertThat(page.isLast()).isFalse();
     }
 
     @Test
