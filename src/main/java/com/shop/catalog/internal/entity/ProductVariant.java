@@ -87,19 +87,19 @@ public class ProductVariant {
                 .build();
     }
 
-    public void updateDetails(String name, BigDecimal price, String currency) {
+    void updateDetails(String name, BigDecimal price, String currency) {
         requireNotArchived();
         this.name = CatalogDomainRules.requiredText(name, "variant name", 200);
         this.price = CatalogDomainRules.price(price);
         this.currency = CatalogDomainRules.currency(currency);
     }
 
-    public void activate() {
+    void activate() {
         requireNotArchived();
         status = ProductVariantStatus.ACTIVE;
     }
 
-    public void deactivate() {
+    void deactivate() {
         requireNotArchived();
         status = ProductVariantStatus.INACTIVE;
     }
