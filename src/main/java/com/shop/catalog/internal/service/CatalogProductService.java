@@ -17,10 +17,11 @@ import com.shop.catalog.internal.entity.ProductVariant;
 import com.shop.catalog.internal.entity.ProductVariantStatus;
 import com.shop.catalog.internal.mapper.CatalogMapper;
 import com.shop.catalog.internal.repository.ProductRepository;
+import com.shop.catalog.internal.repository.ProductSearchCriteria;
+import com.shop.catalog.internal.repository.ProductSearchQuery;
 import com.shop.catalog.internal.repository.ProductVariantRepository;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.AccessLevel;
@@ -40,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CatalogProductService {
 
     ProductRepository productRepository;
+    ProductSearchQuery productSearchQuery;
     ProductVariantRepository productVariantRepository;
     CatalogCategoryService categoryService;
     CatalogMapper mapper;
@@ -48,8 +50,13 @@ public class CatalogProductService {
     public ProductPageResponse search(ProductSearchRequest request) {
         PageRequest pageRequest = PageRequest.of(
                 request.getPage(), request.getSize(), createSort(request.getSortBy(), request.getDirection()));
-        Page<Product> products = productRepository.search(
-                toLikePattern(request.getKeyword()), request.getCategoryId(), request.getStatus(), pageRequest);
+        ProductSearchCriteria criteria = ProductSearchCriteria.of(
+                request.getKeyword(),
+                request.getCategoryId(),
+                request.getStatus(),
+                request.getSortBy(),
+                request.getDirection());
+        Page<Product> products = productSearchQuery.search(criteria, pageRequest);
         return mapper.toProductPageResponse(products);
     }
 
@@ -206,18 +213,6 @@ public class CatalogProductService {
             requestedOrder = requestedOrder.ignoreCase();
         }
         return Sort.by(requestedOrder, Sort.Order.asc("id"));
-    }
-
-    private String toLikePattern(String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return null;
-        }
-        String escaped = keyword.strip()
-                .toLowerCase(Locale.ROOT)
-                .replace("!", "!!")
-                .replace("%", "!%")
-                .replace("_", "!_");
-        return "%" + escaped + "%";
     }
 
     private void requireVersion(long expectedVersion, long actualVersion) {

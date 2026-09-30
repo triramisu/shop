@@ -1,6 +1,8 @@
 package com.shop.catalog.internal.repository;
 
 import com.shop.catalog.internal.entity.Product;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -36,7 +38,14 @@ public interface ProductRepository extends Repository<Product, UUID> {
                        and (:status is null or product.status = :status)
                        and (:keyword is null
                             or lower(product.name) like :keyword escape '!'
-                            or lower(product.slug) like :keyword escape '!')
+                            or lower(product.slug) like :keyword escape '!'
+                            or exists (
+                                select variant.id
+                                  from ProductVariant variant
+                                 where variant.product = product
+                                   and variant.deletedAt is null
+                                   and lower(variant.sku) like :keyword escape '!'
+                            ))
                     """, countQuery = """
                     select count(product)
                       from Product product
@@ -45,13 +54,24 @@ public interface ProductRepository extends Repository<Product, UUID> {
                        and (:status is null or product.status = :status)
                        and (:keyword is null
                             or lower(product.name) like :keyword escape '!'
-                            or lower(product.slug) like :keyword escape '!')
+                            or lower(product.slug) like :keyword escape '!'
+                            or exists (
+                                select variant.id
+                                  from ProductVariant variant
+                                 where variant.product = product
+                                   and variant.deletedAt is null
+                                   and lower(variant.sku) like :keyword escape '!'
+                            ))
                     """)
-    Page<Product> search(
+    Page<Product> searchLike(
             @Param("keyword") String keyword,
             @Param("categoryId") UUID categoryId,
             @Param("status") com.shop.catalog.internal.entity.ProductStatus status,
             Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "variants"})
+    @Query("select distinct product from Product product where product.id in :ids and product.deletedAt is null")
+    List<Product> findAllDetailedByIdIn(@Param("ids") Collection<UUID> ids);
 
     boolean existsBySlugIgnoreCase(String slug);
 

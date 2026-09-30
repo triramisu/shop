@@ -34,6 +34,25 @@ class CatalogSchemaMigrationTests {
         assertThat(rowCount("san_pham_hinh_anh")).isZero();
     }
 
+    @Test
+    void createsCatalogSearchIndexesForFilteringAndStableSorting() {
+        List<String> searchIndexes = jdbcTemplate.queryForList("""
+                SELECT index_name
+                  FROM information_schema.indexes
+                 WHERE table_schema = 'public'
+                   AND table_name = 'san_pham_san_pham'
+                   AND index_name LIKE 'idx_san_pham_san_pham_%'
+                 ORDER BY index_name
+                """, String.class);
+
+        assertThat(searchIndexes)
+                .contains(
+                        "idx_san_pham_san_pham_danh_muc_trang_thai_tao",
+                        "idx_san_pham_san_pham_hien_hanh_cap_nhat",
+                        "idx_san_pham_san_pham_hien_hanh_tao",
+                        "idx_san_pham_san_pham_hien_hanh_ten");
+    }
+
     private long rowCount(String table) {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
         return count == null ? 0 : count;
