@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CatalogAdministrationIntegrationTests {
 
-    private static final String BASE = "/api/catalog";
+    private static final String BASE = "/api/admin/catalog";
 
     @Autowired
     private MockMvc mockMvc;

@@ -54,6 +54,10 @@ class IdentityRepositoryIntegrationTests {
         assertThat(detailed.getRoles().iterator().next().getPermissions())
                 .extracting(Permission::getCode)
                 .containsExactlyInAnyOrder(
+                        "CATALOG_IMAGE_MANAGE",
+                        "CATALOG_PUBLISH",
+                        "CATALOG_READ",
+                        "CATALOG_WRITE",
                         "SYSTEM_USER_READ",
                         "SYSTEM_USER_STATUS_UPDATE",
                         "SYSTEM_USER_ROLE_ASSIGN",

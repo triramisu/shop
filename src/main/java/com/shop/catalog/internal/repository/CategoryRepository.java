@@ -1,6 +1,7 @@
 package com.shop.catalog.internal.repository;
 
 import com.shop.catalog.internal.entity.Category;
+import com.shop.catalog.internal.entity.CategoryStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,8 @@ public interface CategoryRepository extends Repository<Category, UUID> {
     Optional<Category> findByIdAndDeletedAtIsNull(UUID id);
 
     List<Category> findAllByDeletedAtIsNullOrderByNameAscIdAsc();
+
+    List<Category> findAllByStatusAndDeletedAtIsNullOrderByNameAscIdAsc(CategoryStatus status);
 
     Optional<Category> findByCodeIgnoreCase(String code);
 

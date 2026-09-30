@@ -1,6 +1,7 @@
 package com.shop.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -113,8 +114,19 @@ class SystemAdministrationIntegrationTests {
 
         mockMvc.perform(get(BASE + "/permissions").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(6))
-                .andExpect(jsonPath("$.result[0].code").value("SYSTEM_PERMISSION_READ"));
+                .andExpect(jsonPath("$.result.length()").value(10))
+                .andExpect(jsonPath("$.result[*].code")
+                        .value(contains(
+                                "CATALOG_IMAGE_MANAGE",
+                                "CATALOG_PUBLISH",
+                                "CATALOG_READ",
+                                "CATALOG_WRITE",
+                                "SYSTEM_PERMISSION_READ",
+                                "SYSTEM_ROLE_MANAGE",
+                                "SYSTEM_ROLE_READ",
+                                "SYSTEM_USER_READ",
+                                "SYSTEM_USER_ROLE_ASSIGN",
+                                "SYSTEM_USER_STATUS_UPDATE")));
 
         mockMvc.perform(get(BASE + "/roles").header(HttpHeaders.AUTHORIZATION, bearer(customer.accessToken())))
                 .andExpect(status().isForbidden())

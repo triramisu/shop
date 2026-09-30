@@ -49,6 +49,7 @@ public class SecurityConfiguration {
     private static final String[] PUBLIC_DOCUMENTATION_ENDPOINTS = {
         "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**"
     };
+    private static final String PUBLIC_CATALOG_PATTERN = "/api/catalog/**";
 
     CustomJwtDecoder customJwtDecoder;
     JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
@@ -60,6 +61,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS)
                         .permitAll()
                         .requestMatchers(PUBLIC_DOCUMENTATION_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_CATALOG_PATTERN)
                         .permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**")
                         .permitAll()

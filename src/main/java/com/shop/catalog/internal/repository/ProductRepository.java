@@ -1,6 +1,8 @@
 package com.shop.catalog.internal.repository;
 
+import com.shop.catalog.internal.entity.CategoryStatus;
 import com.shop.catalog.internal.entity.Product;
+import com.shop.catalog.internal.entity.ProductStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,22 @@ public interface ProductRepository extends Repository<Product, UUID> {
     @EntityGraph(attributePaths = {"category", "variants"})
     @Query("select product from Product product where product.id = :id and product.deletedAt is null")
     Optional<Product> findDetailedById(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = {"category", "variants"})
+    @Query("""
+            select product
+              from Product product
+              join product.category category
+             where product.id = :id
+               and product.status = :productStatus
+               and product.deletedAt is null
+               and category.status = :categoryStatus
+               and category.deletedAt is null
+            """)
+    Optional<Product> findStorefrontById(
+            @Param("id") UUID id,
+            @Param("productStatus") ProductStatus productStatus,
+            @Param("categoryStatus") CategoryStatus categoryStatus);
 
     @Query(value = """
                     select product

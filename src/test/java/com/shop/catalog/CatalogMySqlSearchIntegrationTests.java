@@ -15,6 +15,9 @@ import com.shop.catalog.internal.dto.response.ProductResponse;
 import com.shop.catalog.internal.entity.ProductStatus;
 import com.shop.catalog.internal.service.CatalogCategoryService;
 import com.shop.catalog.internal.service.CatalogProductService;
+import com.shop.catalog.internal.storefront.dto.request.StorefrontProductSearchRequest;
+import com.shop.catalog.internal.storefront.dto.response.StorefrontProductResponse;
+import com.shop.catalog.internal.storefront.service.StorefrontCatalogService;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -47,6 +50,9 @@ class CatalogMySqlSearchIntegrationTests {
 
     @Autowired
     private CatalogProductService productService;
+
+    @Autowired
+    private StorefrontCatalogService storefrontService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -89,8 +95,19 @@ class CatalogMySqlSearchIntegrationTests {
 
         ProductPageResponse draftOnly = search("wireless", category, ProductStatus.DRAFT);
         ProductPageResponse punctuation = search("%_!", category, null);
+        var storefrontPage = storefrontService.search(StorefrontProductSearchRequest.builder()
+                .categoryId(category.getId())
+                .sortBy(ProductSortField.NAME)
+                .direction(CatalogSortDirection.ASC)
+                .page(0)
+                .size(20)
+                .build());
         assertThat(draftOnly.getTotalElements()).isZero();
         assertThat(punctuation.getTotalElements()).isZero();
+        assertThat(storefrontPage.getTotalElements()).isEqualTo(1);
+        assertThat(storefrontPage.getContent())
+                .extracting(StorefrontProductResponse::getName)
+                .containsExactly("Wireless Mechanical Keyboard");
     }
 
     @Test
@@ -108,10 +125,10 @@ class CatalogMySqlSearchIntegrationTests {
                  WHERE v.sku LIKE 'KEYBOARD-WIRELESS%' ESCAPE '!'
                 """);
 
-        assertThat(fullTextPlan.get("type")).isEqualTo("fulltext");
-        assertThat(fullTextPlan.get("key")).isEqualTo("ft_san_pham_san_pham_tim_kiem");
-        assertThat(skuPlan.get("type")).isEqualTo("range");
-        assertThat(skuPlan.get("key")).isEqualTo("uk_san_pham_bien_the_sku");
+        assertThat(fullTextPlan)
+                .containsEntry("type", "fulltext")
+                .containsEntry("key", "ft_san_pham_san_pham_tim_kiem");
+        assertThat(skuPlan).containsEntry("type", "range").containsEntry("key", "uk_san_pham_bien_the_sku");
     }
 
     private ProductResponse createProduct(CategoryResponse category, String name, String slug) {

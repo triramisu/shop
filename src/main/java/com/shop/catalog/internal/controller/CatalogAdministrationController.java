@@ -1,6 +1,6 @@
 package com.shop.catalog.internal.controller;
 
-import static com.shop.catalog.internal.constant.CatalogApiPaths.BASE;
+import static com.shop.catalog.internal.constant.CatalogApiPaths.ADMIN_BASE;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.CATEGORIES;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.CATEGORY_BY_ID;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.CATEGORY_STATUS;
@@ -11,6 +11,9 @@ import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_PUBLISH
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_VARIANTS;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_VARIANT_BY_ID;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_VARIANT_STATUS;
+import static com.shop.catalog.internal.constant.CatalogAuthority.PUBLISH;
+import static com.shop.catalog.internal.constant.CatalogAuthority.READ;
+import static com.shop.catalog.internal.constant.CatalogAuthority.WRITE;
 
 import com.shop.catalog.internal.dto.request.CreateCategoryRequest;
 import com.shop.catalog.internal.dto.request.CreateProductRequest;
@@ -52,8 +55,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(BASE)
-@PreAuthorize("hasRole('ADMIN')")
+@RequestMapping(ADMIN_BASE)
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH_SCHEME)
 @Tag(name = "Quản trị Catalog", description = "Quản lý danh mục, sản phẩm và biến thể bán hàng")
 @RequiredArgsConstructor
@@ -64,6 +66,7 @@ public class CatalogAdministrationController {
     CatalogProductService productService;
 
     @GetMapping(CATEGORIES)
+    @PreAuthorize("hasAuthority('" + READ + "')")
     @Operation(summary = "Xem danh sách danh mục đang tồn tại")
     ApiResponse<List<CategoryResponse>> getCategories() {
         return ApiResponse.<List<CategoryResponse>>builder()
@@ -72,6 +75,7 @@ public class CatalogAdministrationController {
     }
 
     @PostMapping(CATEGORIES)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Tạo danh mục")
     ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
@@ -81,6 +85,7 @@ public class CatalogAdministrationController {
     }
 
     @PutMapping(CATEGORY_BY_ID)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @Operation(summary = "Cập nhật danh mục với optimistic locking")
     ApiResponse<CategoryResponse> updateCategory(
             @PathVariable UUID categoryId, @Valid @RequestBody UpdateCategoryRequest request) {
@@ -90,6 +95,7 @@ public class CatalogAdministrationController {
     }
 
     @PatchMapping(CATEGORY_STATUS)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @Operation(summary = "Bật hoặc tắt danh mục")
     ApiResponse<CategoryResponse> updateCategoryStatus(
             @PathVariable UUID categoryId, @Valid @RequestBody UpdateCategoryStatusRequest request) {
@@ -99,6 +105,7 @@ public class CatalogAdministrationController {
     }
 
     @GetMapping(PRODUCTS)
+    @PreAuthorize("hasAuthority('" + READ + "')")
     @Operation(summary = "Tìm kiếm, sắp xếp và phân trang sản phẩm")
     ApiResponse<ProductPageResponse> searchProducts(@Valid @ModelAttribute ProductSearchRequest request) {
         return ApiResponse.<ProductPageResponse>builder()
@@ -107,6 +114,7 @@ public class CatalogAdministrationController {
     }
 
     @GetMapping(PRODUCT_BY_ID)
+    @PreAuthorize("hasAuthority('" + READ + "')")
     @Operation(summary = "Xem chi tiết sản phẩm và biến thể")
     ApiResponse<ProductResponse> getProduct(@PathVariable UUID productId) {
         return ApiResponse.<ProductResponse>builder()
@@ -115,6 +123,7 @@ public class CatalogAdministrationController {
     }
 
     @PostMapping(PRODUCTS)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Tạo sản phẩm nháp")
     ApiResponse<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request) {
@@ -124,6 +133,7 @@ public class CatalogAdministrationController {
     }
 
     @PutMapping(PRODUCT_BY_ID)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @Operation(summary = "Cập nhật sản phẩm với optimistic locking")
     ApiResponse<ProductResponse> updateProduct(
             @PathVariable UUID productId, @Valid @RequestBody UpdateProductRequest request) {
@@ -133,6 +143,7 @@ public class CatalogAdministrationController {
     }
 
     @PatchMapping(PRODUCT_PUBLISH)
+    @PreAuthorize("hasAuthority('" + PUBLISH + "')")
     @Operation(summary = "Công bố sản phẩm có ít nhất một biến thể hoạt động")
     ApiResponse<ProductResponse> publishProduct(
             @PathVariable UUID productId, @Valid @RequestBody VersionedCatalogRequest request) {
@@ -142,6 +153,7 @@ public class CatalogAdministrationController {
     }
 
     @PatchMapping(PRODUCT_HIDE)
+    @PreAuthorize("hasAuthority('" + PUBLISH + "')")
     @Operation(summary = "Ẩn sản phẩm đã công bố")
     ApiResponse<ProductResponse> hideProduct(
             @PathVariable UUID productId, @Valid @RequestBody VersionedCatalogRequest request) {
@@ -151,6 +163,7 @@ public class CatalogAdministrationController {
     }
 
     @PostMapping(PRODUCT_VARIANTS)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Thêm biến thể SKU vào sản phẩm")
     ApiResponse<ProductResponse> addVariant(
@@ -161,6 +174,7 @@ public class CatalogAdministrationController {
     }
 
     @PutMapping(PRODUCT_VARIANT_BY_ID)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @Operation(summary = "Cập nhật tên và giá của biến thể")
     ApiResponse<ProductResponse> updateVariant(
             @PathVariable UUID productId,
@@ -172,6 +186,7 @@ public class CatalogAdministrationController {
     }
 
     @PatchMapping(PRODUCT_VARIANT_STATUS)
+    @PreAuthorize("hasAuthority('" + WRITE + "')")
     @Operation(summary = "Bật hoặc tắt biến thể")
     ApiResponse<ProductResponse> updateVariantStatus(
             @PathVariable UUID productId,

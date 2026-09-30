@@ -2,7 +2,7 @@
 
 ## Phạm vi và contract
 
-`GET /api/catalog/products` giữ nguyên request/response đã công bố. `keyword` tìm theo tên/slug sản phẩm và SKU; `categoryId`, `status`, `page`, `size`, `sortBy`, `direction` là các filter/phân trang độc lập. Sort chỉ nhận `CREATED_AT`, `UPDATED_AT`, `NAME` và luôn thêm `id ASC` làm tie-breaker.
+`GET /api/admin/catalog/products` hỗ trợ `keyword`, `categoryId`, `status`, `page`, `size`, `sortBy`, `direction`. `GET /api/catalog/products` dùng cùng query engine nhưng không công bố filter `status` và luôn cưỡng chế `PUBLISHED`. Sort chỉ nhận `CREATED_AT`, `UPDATED_AT`, `NAME` và luôn thêm `id ASC` làm tie-breaker.
 
 Keyword được chuẩn hóa Unicode NFKC, trim, gộp khoảng trắng và lowercase. `%`, `_`, `!` luôn được escape trước biểu thức `LIKE`; toán tử Boolean Full-Text không được lấy trực tiếp từ client. Các token chữ/số dài từ ba ký tự được chuyển thành dạng bắt buộc và prefix, ví dụ `Điện thoại` thành `+điện* +thoại*`.
 
