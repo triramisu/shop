@@ -95,7 +95,7 @@ public enum ErrorCode {
     CATALOG_SORT_INVALID(1127, "error.catalog.sort.invalid", HttpStatus.BAD_REQUEST),
     PRODUCT_IMAGE_FILES_REQUIRED(1128, "error.catalog.image.files-required", HttpStatus.BAD_REQUEST),
     PRODUCT_IMAGE_COUNT_INVALID(1129, "error.catalog.image.count-invalid", HttpStatus.BAD_REQUEST),
-    PRODUCT_IMAGE_TOO_LARGE(1130, "error.catalog.image.too-large", HttpStatus.PAYLOAD_TOO_LARGE),
+    PRODUCT_IMAGE_TOO_LARGE(1130, "error.catalog.image.too-large", HttpStatus.CONTENT_TOO_LARGE),
     PRODUCT_IMAGE_TYPE_INVALID(1131, "error.catalog.image.type-invalid", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
     PRODUCT_IMAGE_CONTENT_INVALID(1132, "error.catalog.image.content-invalid", HttpStatus.BAD_REQUEST),
     PRODUCT_IMAGE_LIMIT_EXCEEDED(1133, "error.catalog.image.limit-exceeded", HttpStatus.CONFLICT),

@@ -44,7 +44,7 @@ class GlobalExceptionHandlerTests {
     void mapsMultipartLimitToTheCatalogImageError() {
         var response = handler.handleMaxUploadSizeExceeded(new MaxUploadSizeExceededException(5));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo(1130);
         assertThat(response.getBody().getMessage()).isEqualTo("Kích thước ảnh vượt quá giới hạn cho phép");
