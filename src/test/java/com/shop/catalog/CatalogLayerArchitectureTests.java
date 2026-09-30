@@ -43,7 +43,8 @@ class CatalogLayerArchitectureTests {
                 .resideInAPackage("com.shop.catalog.internal..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..identity..", "..inventory..", "..order..", "..payment..")
+                .resideInAnyPackage(
+                        "com.shop.identity..", "com.shop.inventory..", "com.shop.order..", "com.shop.payment..")
                 .check(applicationClasses);
     }
 

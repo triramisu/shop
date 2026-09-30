@@ -58,6 +58,8 @@ class IdentityRepositoryIntegrationTests {
                         "CATALOG_PUBLISH",
                         "CATALOG_READ",
                         "CATALOG_WRITE",
+                        "INVENTORY_READ",
+                        "INVENTORY_WRITE",
                         "SYSTEM_USER_READ",
                         "SYSTEM_USER_STATUS_UPDATE",
                         "SYSTEM_USER_ROLE_ASSIGN",

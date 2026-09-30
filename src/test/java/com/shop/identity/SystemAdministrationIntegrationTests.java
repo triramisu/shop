@@ -114,13 +114,15 @@ class SystemAdministrationIntegrationTests {
 
         mockMvc.perform(get(BASE + "/permissions").header(HttpHeaders.AUTHORIZATION, bearer(staff.accessToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.length()").value(10))
+                .andExpect(jsonPath("$.result.length()").value(12))
                 .andExpect(jsonPath("$.result[*].code")
                         .value(contains(
                                 "CATALOG_IMAGE_MANAGE",
                                 "CATALOG_PUBLISH",
                                 "CATALOG_READ",
                                 "CATALOG_WRITE",
+                                "INVENTORY_READ",
+                                "INVENTORY_WRITE",
                                 "SYSTEM_PERMISSION_READ",
                                 "SYSTEM_ROLE_MANAGE",
                                 "SYSTEM_ROLE_READ",
