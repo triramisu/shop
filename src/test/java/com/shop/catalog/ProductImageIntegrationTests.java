@@ -180,7 +180,7 @@ class ProductImageIntegrationTests {
         mockMvc.perform(multipart(BASE + "/products/{productId}/images", context.productId())
                         .file(new MockMultipartFile("files", "large.png", "image/png", new byte[5 * 1024 * 1024 + 1]))
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.token())))
-                .andExpect(status().isPayloadTooLarge())
+                .andExpect(status().isContentTooLarge())
                 .andExpect(jsonPath("$.code").value(1130));
 
         MockMultipartHttpServletRequestBuilder tooMany =

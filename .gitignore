@@ -30,3 +30,6 @@ Thumbs.db
 
 # Local project progress and planning
 /README.md
+
+# Local runtime data
+/data/

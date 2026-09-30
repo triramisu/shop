@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 public class ArrangeProductImagesRequest {
 
     @NotEmpty(message = "PRODUCT_IMAGE_ARRANGEMENT_INVALID")
+    @Builder.Default
     List<@NotNull(message = "PRODUCT_IMAGE_ARRANGEMENT_INVALID") UUID> imageIds = new ArrayList<>();
 
     @NotNull(message = "PRODUCT_IMAGE_ARRANGEMENT_INVALID")
