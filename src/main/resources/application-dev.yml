@@ -9,6 +9,17 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:shop-local-password}
 
 app:
+  catalog:
+    images:
+      storage:
+        type: ${OBJECT_STORAGE_TYPE:minio}
+        minio:
+          endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+          access-key: ${MINIO_ACCESS_KEY:shop-local-access}
+          secret-key: ${MINIO_SECRET_KEY:shop-local-secret-change-me}
+          bucket: ${MINIO_BUCKET:shop-product-images}
+          auto-create-bucket: ${MINIO_AUTO_CREATE_BUCKET:true}
+          presigned-url-ttl: ${MINIO_PRESIGNED_URL_TTL:15m}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 

@@ -49,7 +49,7 @@ public class ProductImageService {
     @Transactional(readOnly = true)
     public List<ProductImageResponse> findAll(UUID productId) {
         requireProduct(productId);
-        return mapper.toResponses(imageRepository.findAllByProductIdOrderByDisplayOrderAsc(productId));
+        return toResponses(imageRepository.findAllByProductIdOrderByDisplayOrderAsc(productId));
     }
 
     @Transactional
@@ -95,7 +95,7 @@ public class ProductImageService {
 
         List<ProductImage> allImages = new ArrayList<>(existingImages);
         allImages.addAll(newImages);
-        return mapper.toResponses(allImages);
+        return toResponses(allImages);
     }
 
     @Transactional
@@ -111,7 +111,7 @@ public class ProductImageService {
         }
         try {
             List<ProductImage> savedImages = imageRepository.saveAllAndFlush(images);
-            return mapper.toResponses(savedImages.stream()
+            return toResponses(savedImages.stream()
                     .sorted(Comparator.comparingInt(ProductImage::getDisplayOrder))
                     .toList());
         } catch (DataIntegrityViolationException exception) {
@@ -133,7 +133,7 @@ public class ProductImageService {
         arrangeAfterDeletion(images, image.isPrimaryImage());
         imageRepository.flush();
         registerAfterCommitDeletion(image.getObjectKey());
-        return mapper.toResponses(images);
+        return toResponses(images);
     }
 
     private List<ValidatedProductImage> validateUpload(UploadProductImagesRequest request) {
@@ -243,5 +243,19 @@ public class ProductImageService {
         } catch (ObjectStorageException exception) {
             log.error("Could not delete catalog object {}", objectKey, exception);
         }
+    }
+
+    private List<ProductImageResponse> toResponses(List<ProductImage> images) {
+        try {
+            return images.stream().map(this::toResponse).toList();
+        } catch (ObjectStorageException exception) {
+            throw new AppException(ErrorCode.OBJECT_STORAGE_UNAVAILABLE);
+        }
+    }
+
+    private ProductImageResponse toResponse(ProductImage image) {
+        ProductImageResponse response = mapper.toResponse(image);
+        objectStorage.createReadUrl(image.getObjectKey()).ifPresent(response::setUrl);
+        return response;
     }
 }

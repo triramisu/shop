@@ -11,6 +11,7 @@ import org.mapstruct.ReportingPolicy;
 public interface ProductImageMapper {
 
     @Mapping(target = "primary", source = "primaryImage")
+    @Mapping(target = "url", ignore = true)
     ProductImageResponse toResponse(ProductImage image);
 
     List<ProductImageResponse> toResponses(List<ProductImage> images);

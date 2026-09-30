@@ -3,7 +3,9 @@ package com.shop.catalog.internal.image.storage.memory;
 import com.shop.catalog.internal.image.storage.ObjectStorage;
 import com.shop.catalog.internal.image.storage.ObjectStorageException;
 import com.shop.catalog.internal.image.storage.ObjectStorageUpload;
+import java.net.URI;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,6 +37,14 @@ public class InMemoryObjectStorage implements ObjectStorage {
     @Override
     public void delete(String objectKey) {
         objects.remove(objectKey);
+    }
+
+    @Override
+    public Optional<URI> createReadUrl(String objectKey) {
+        if (!objects.containsKey(objectKey)) {
+            throw new ObjectStorageException("Object does not exist");
+        }
+        return Optional.empty();
     }
 
     public boolean contains(String objectKey) {
