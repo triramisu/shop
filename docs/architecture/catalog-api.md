@@ -1,8 +1,8 @@
 # API quản trị Catalog
 
-## Phạm vi M2.2
+## Phạm vi M2.2–M2.5
 
-M2.2 cung cấp API quản trị category, product và variant trên nền domain M2.1. API dùng request/response DTO riêng, MapStruct mapper và không trả JPA entity ra ngoài module.
+M2.2 cung cấp API quản trị category, product và variant trên nền domain M2.1. M2.5 hoàn thiện tìm kiếm theo tên, slug và SKU bằng query/index đã benchmark. API dùng request/response DTO riêng, MapStruct mapper và không trả JPA entity ra ngoài module.
 
 Base path là `/api/catalog`. Trong giai đoạn này toàn bộ endpoint yêu cầu access token có `ROLE_ADMIN` để mặc định đóng quyền. M2.6 sẽ thay điều kiện tạm này bằng permission Catalog chi tiết và bổ sung API đọc công khai chỉ trả product đã `PUBLISHED`.
 
@@ -44,5 +44,5 @@ Các mutation variant trả lại toàn bộ `ProductResponse`, nhờ đó clien
 - `direction` chỉ nhận `ASC`, `DESC`.
 - Mọi sort đều thêm `id ASC` làm tie-breaker để kết quả ổn định giữa các trang.
 - Ký tự `!`, `%`, `_` trong keyword được escape trước khi tạo biểu thức `LIKE`; client không thể biến input thành wildcard ngoài ý muốn.
-
-Tìm kiếm toàn văn, search theo SKU và tối ưu index theo benchmark thuộc M2.5, không được nhồi sớm vào M2.2.
+- MySQL dùng FULLTEXT cho tên/slug và B-tree prefix cho tên/slug/SKU; H2 trong test dùng fallback `LIKE` tương thích.
+- Chi tiết query plan, index và cách benchmark nằm trong [catalog-search.md](catalog-search.md).

@@ -19,6 +19,7 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/mysql}
   lifecycle:
     timeout-per-shutdown-phase: 20s
   servlet:
@@ -53,6 +54,8 @@ springdoc:
 
 app:
   catalog:
+    search:
+      strategy: ${CATALOG_SEARCH_STRATEGY:mysql-fulltext}
     images:
       max-files-per-upload: ${CATALOG_IMAGE_MAX_FILES_PER_UPLOAD:5}
       max-files-per-product: ${CATALOG_IMAGE_MAX_FILES_PER_PRODUCT:10}

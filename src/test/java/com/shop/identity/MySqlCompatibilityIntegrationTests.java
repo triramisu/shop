@@ -98,6 +98,8 @@ class MySqlCompatibilityIntegrationTests {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration,classpath:db/mysql");
+        registry.add("app.catalog.search.strategy", () -> "mysql-fulltext");
         registry.add("app.security.captcha.enabled", () -> "true");
     }
 
@@ -110,7 +112,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(10);
+        assertThat(migrationCount).isEqualTo(11);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);

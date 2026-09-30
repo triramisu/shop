@@ -264,7 +264,8 @@ class CatalogAdministrationIntegrationTests {
         String adminToken = accountWithRole("catalog-page-admin", RoleCode.ADMIN);
         CategoryResult category = createCategory(adminToken, "OFFICE", "Office", "office");
         createProduct(adminToken, category.id(), "Beta", "beta", null);
-        createProduct(adminToken, category.id(), "Alpha", "alpha", null);
+        ProductResult alpha = createProduct(adminToken, category.id(), "Alpha", "alpha", null);
+        addVariant(adminToken, alpha.id(), "OFFICE-ALPHA-01", "Default", "15.00", "USD", alpha.version());
         createProduct(adminToken, category.id(), "Gamma", "gamma", null);
 
         mockMvc.perform(get(BASE + "/products")
@@ -286,6 +287,14 @@ class CatalogAdministrationIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalElements").value(0));
+
+        mockMvc.perform(get(BASE + "/products")
+                        .param("keyword", "  office-alpha-01  ")
+                        .param("categoryId", category.id().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalElements").value(1))
+                .andExpect(jsonPath("$.result.content[0].name").value("Alpha"));
     }
 
     private String accountWithRole(String username, RoleCode roleCode) throws Exception {
