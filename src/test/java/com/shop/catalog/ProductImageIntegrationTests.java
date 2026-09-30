@@ -40,7 +40,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 @ActiveProfiles("test")
 class ProductImageIntegrationTests {
 
-    private static final String BASE = "/api/catalog";
+    private static final String BASE = "/api/admin/catalog";
 
     @Autowired
     private MockMvc mockMvc;

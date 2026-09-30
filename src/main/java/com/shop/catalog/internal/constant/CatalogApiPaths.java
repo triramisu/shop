@@ -2,7 +2,8 @@ package com.shop.catalog.internal.constant;
 
 public final class CatalogApiPaths {
 
-    public static final String BASE = "/api/catalog";
+    public static final String PUBLIC_BASE = "/api/catalog";
+    public static final String ADMIN_BASE = "/api/admin/catalog";
     public static final String CATEGORIES = "/categories";
     public static final String CATEGORY_BY_ID = CATEGORIES + "/{categoryId}";
     public static final String CATEGORY_STATUS = CATEGORY_BY_ID + "/status";

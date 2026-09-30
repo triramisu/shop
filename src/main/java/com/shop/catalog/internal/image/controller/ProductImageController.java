@@ -1,9 +1,11 @@
 package com.shop.catalog.internal.image.controller;
 
-import static com.shop.catalog.internal.constant.CatalogApiPaths.BASE;
+import static com.shop.catalog.internal.constant.CatalogApiPaths.ADMIN_BASE;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_IMAGES;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_IMAGE_ARRANGEMENT;
 import static com.shop.catalog.internal.constant.CatalogApiPaths.PRODUCT_IMAGE_BY_ID;
+import static com.shop.catalog.internal.constant.CatalogAuthority.IMAGE_MANAGE;
+import static com.shop.catalog.internal.constant.CatalogAuthority.READ;
 
 import com.shop.catalog.internal.image.dto.request.ArrangeProductImagesRequest;
 import com.shop.catalog.internal.image.dto.request.UploadProductImagesRequest;
@@ -35,8 +37,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(BASE)
-@PreAuthorize("hasRole('ADMIN')")
+@RequestMapping(ADMIN_BASE)
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH_SCHEME)
 @Tag(name = "Quản trị ảnh sản phẩm", description = "Tải lên, sắp xếp và xóa ảnh của sản phẩm")
 @RequiredArgsConstructor
@@ -46,6 +47,7 @@ public class ProductImageController {
     ProductImageService imageService;
 
     @GetMapping(PRODUCT_IMAGES)
+    @PreAuthorize("hasAuthority('" + READ + "')")
     @Operation(summary = "Xem danh sách ảnh của sản phẩm")
     ApiResponse<List<ProductImageResponse>> getImages(@PathVariable UUID productId) {
         return ApiResponse.<List<ProductImageResponse>>builder()
@@ -54,6 +56,7 @@ public class ProductImageController {
     }
 
     @PostMapping(value = PRODUCT_IMAGES, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('" + IMAGE_MANAGE + "')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Tải nhiều ảnh JPEG hoặc PNG cho sản phẩm")
     ApiResponse<List<ProductImageResponse>> uploadImages(
@@ -64,6 +67,7 @@ public class ProductImageController {
     }
 
     @PutMapping(PRODUCT_IMAGE_ARRANGEMENT)
+    @PreAuthorize("hasAuthority('" + IMAGE_MANAGE + "')")
     @Operation(summary = "Sắp xếp ảnh và chọn ảnh đại diện")
     ApiResponse<List<ProductImageResponse>> arrangeImages(
             @PathVariable UUID productId, @Valid @RequestBody ArrangeProductImagesRequest request) {
@@ -73,6 +77,7 @@ public class ProductImageController {
     }
 
     @DeleteMapping(PRODUCT_IMAGE_BY_ID)
+    @PreAuthorize("hasAuthority('" + IMAGE_MANAGE + "')")
     @Operation(summary = "Xóa ảnh và sắp xếp lại các ảnh còn lại")
     ApiResponse<List<ProductImageResponse>> deleteImage(@PathVariable UUID productId, @PathVariable UUID imageId) {
         return ApiResponse.<List<ProductImageResponse>>builder()
