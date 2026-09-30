@@ -19,5 +19,26 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  minio:
+    image: pgsty/silo:RELEASE.2026-08-06T00-00-00Z
+    container_name: shop-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shop-local-access}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-shop-local-secret-change-me}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - shop-minio-data:/data
+    healthcheck:
+      test: ["CMD", "silo", "healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
 volumes:
   shop-mysql-data:
+  shop-minio-data:

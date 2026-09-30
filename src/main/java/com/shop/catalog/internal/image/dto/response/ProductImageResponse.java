@@ -1,5 +1,6 @@
 package com.shop.catalog.internal.image.dto.response;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -17,6 +18,7 @@ import lombok.experimental.FieldDefaults;
 public class ProductImageResponse {
     UUID id;
     String objectKey;
+    URI url;
     String originalFilename;
     String contentType;
     long sizeBytes;

@@ -46,6 +46,7 @@ class ObjectStorageValueTests {
         storage.store(first);
 
         assertThat(storage.contains("first")).isTrue();
+        assertThat(storage.createReadUrl("first")).isEmpty();
         assertThat(storage.size()).isEqualTo(1);
         assertThatThrownBy(() -> storage.store(first)).isInstanceOf(ObjectStorageException.class);
         assertThatThrownBy(() -> storage.failAfterSuccessfulStores(-1)).isInstanceOf(IllegalArgumentException.class);
@@ -56,5 +57,6 @@ class ObjectStorageValueTests {
         storage.delete("first");
         storage.clear();
         assertThat(storage.size()).isZero();
+        assertThatThrownBy(() -> storage.createReadUrl("missing")).isInstanceOf(ObjectStorageException.class);
     }
 }

@@ -6,11 +6,13 @@ import com.shop.catalog.internal.image.storage.ObjectStorageException;
 import com.shop.catalog.internal.image.storage.ObjectStorageUpload;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -70,6 +72,12 @@ public class FileSystemObjectStorage implements ObjectStorage {
         } catch (IOException exception) {
             throw new ObjectStorageException("Cannot delete object " + objectKey, exception);
         }
+    }
+
+    @Override
+    public Optional<URI> createReadUrl(String objectKey) {
+        resolveSafely(objectKey);
+        return Optional.empty();
     }
 
     private Path resolveSafely(String objectKey) {
