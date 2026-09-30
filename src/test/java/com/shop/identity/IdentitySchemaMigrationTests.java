@@ -19,9 +19,9 @@ class IdentitySchemaMigrationTests {
     @Test
     void createsIdentityTablesAndSeedsSystemAdministrationRbac() {
         assertThat(rowCount("xac_thuc_nguoi_dung")).isZero();
-        assertThat(rowCount("xac_thuc_quyen_han")).isEqualTo(10);
+        assertThat(rowCount("xac_thuc_quyen_han")).isEqualTo(12);
         assertThat(rowCount("xac_thuc_nguoi_dung_vai_tro")).isZero();
-        assertThat(rowCount("xac_thuc_vai_tro_quyen_han")).isEqualTo(19);
+        assertThat(rowCount("xac_thuc_vai_tro_quyen_han")).isEqualTo(23);
         assertThat(rowCount("xac_thuc_phien_lam_moi")).isZero();
         assertThat(rowCount("xac_thuc_dang_nhap_that_bai")).isZero();
         assertThat(rowCount("xac_thuc_thu_thach_captcha")).isZero();
@@ -43,6 +43,8 @@ class IdentitySchemaMigrationTests {
                         "CATALOG_PUBLISH",
                         "CATALOG_READ",
                         "CATALOG_WRITE",
+                        "INVENTORY_READ",
+                        "INVENTORY_WRITE",
                         "SYSTEM_PERMISSION_READ",
                         "SYSTEM_ROLE_MANAGE",
                         "SYSTEM_ROLE_READ",

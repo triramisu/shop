@@ -29,6 +29,10 @@ import com.shop.identity.internal.dto.response.UserResponse;
 import com.shop.identity.internal.service.AuthenticationService;
 import com.shop.identity.internal.service.RegistrationService;
 import com.shop.identity.internal.service.UserProfileService;
+import com.shop.inventory.internal.dto.request.CreateStockItemRequest;
+import com.shop.inventory.internal.dto.request.StockAdjustmentRequest;
+import com.shop.inventory.internal.dto.response.StockItemResponse;
+import com.shop.inventory.internal.service.StockInventoryService;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -92,6 +96,9 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private ProductImageService productImageService;
 
+    @Autowired
+    private StockInventoryService stockInventoryService;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -112,7 +119,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(12);
+        assertThat(migrationCount).isEqualTo(13);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -121,6 +128,59 @@ class MySqlCompatibilityIntegrationTests {
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'san_pham_%'",
                         Integer.class))
                 .isEqualTo(4);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                                + "WHERE table_schema = DATABASE() AND table_name LIKE 'ton_kho_%'",
+                        Integer.class))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void persistsBalancedInventoryLedgerOnMySql() {
+        CategoryResponse category = catalogCategoryService.create(CreateCategoryRequest.builder()
+                .code("MYSQL_INVENTORY")
+                .name("MySQL Inventory")
+                .slug("mysql-inventory")
+                .build());
+        ProductResponse product = catalogProductService.create(CreateProductRequest.builder()
+                .categoryId(category.getId())
+                .name("MySQL Inventory Product")
+                .slug("mysql-inventory-product")
+                .build());
+        catalogProductService.addVariant(
+                product.getId(),
+                CreateProductVariantRequest.builder()
+                        .sku("MYSQL-INVENTORY-01")
+                        .name("Default")
+                        .price(new java.math.BigDecimal("29.90"))
+                        .currency("USD")
+                        .productVersion(product.getVersion())
+                        .build());
+
+        StockItemResponse created = stockInventoryService.create(CreateStockItemRequest.builder()
+                .sku("MYSQL-INVENTORY-01")
+                .locationCode("WAREHOUSE_MYSQL")
+                .initialQuantity(12L)
+                .reason("Tồn đầu kỳ")
+                .referenceId("MYSQL-RECEIPT-001")
+                .build());
+        StockItemResponse adjusted = stockInventoryService.adjust(
+                created.getId(),
+                StockAdjustmentRequest.builder()
+                        .quantityDelta(-2L)
+                        .reason("Kiểm kê")
+                        .referenceId("MYSQL-COUNT-001")
+                        .version(created.getVersion())
+                        .build());
+
+        assertThat(adjusted.getOnHand()).isEqualTo(10);
+        assertThat(adjusted.getReserved()).isZero();
+        assertThat(adjusted.getAvailable()).isEqualTo(10);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ton_kho_bien_dong WHERE stock_item_id = UNHEX(REPLACE(?, '-', ''))",
+                        Integer.class,
+                        created.getId().toString()))
+                .isEqualTo(2);
     }
 
     @Test
