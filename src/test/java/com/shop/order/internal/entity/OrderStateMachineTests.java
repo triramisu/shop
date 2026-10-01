@@ -20,6 +20,11 @@ class OrderStateMachineTests {
                     OrderTransitionActor.SYSTEM),
             rule(
                     OrderStatus.PENDING,
+                    OrderTransitionEvent.INVENTORY_RESERVATION_FAILED,
+                    OrderStatus.CANCELLED,
+                    OrderTransitionActor.SYSTEM),
+            rule(
+                    OrderStatus.PENDING,
                     OrderTransitionEvent.CANCELLED_BEFORE_PAYMENT,
                     OrderStatus.CANCELLED,
                     OrderTransitionActor.CUSTOMER,

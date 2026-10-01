@@ -10,11 +10,11 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-class OrderLifecycleEventPublisher {
+public class OrderLifecycleEventPublisher {
 
     ApplicationEventPublisher eventPublisher;
 
-    void publish(OrderStatusChangedEvent event) {
+    public void publish(OrderStatusChangedEvent event) {
         eventPublisher.publishEvent(event);
     }
 }

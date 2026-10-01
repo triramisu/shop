@@ -27,6 +27,8 @@ public interface StockItemRepository extends Repository<StockItem, UUID> {
 
     boolean existsByProductVariantIdAndLocationCodeIgnoreCase(UUID productVariantId, String locationCode);
 
+    Optional<StockItem> findByProductVariantIdAndLocationCodeIgnoreCase(UUID productVariantId, String locationCode);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update StockItem stockItem

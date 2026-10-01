@@ -58,6 +58,9 @@ app:
       pricing:
         discount-rate: ${CHECKOUT_DISCOUNT_RATE:0}
         tax-rate: ${CHECKOUT_TAX_RATE:0}
+      inventory:
+        location-code: ${CHECKOUT_INVENTORY_LOCATION_CODE:MAIN}
+        reservation-duration: ${CHECKOUT_INVENTORY_RESERVATION_DURATION:15m}
   inventory:
     reservation:
       max-duration: ${INVENTORY_RESERVATION_MAX_DURATION:30m}

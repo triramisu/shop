@@ -28,7 +28,12 @@ class OrderSchemaMigrationTests {
 
         assertThat(tables)
                 .containsExactly(
-                        "don_hang_don_dat_hang", "don_hang_gio_hang", "don_hang_muc_don_hang", "don_hang_muc_gio_hang");
+                        "don_hang_dieu_phoi_ton_kho",
+                        "don_hang_don_dat_hang",
+                        "don_hang_dong_giu_ton_kho",
+                        "don_hang_gio_hang",
+                        "don_hang_muc_don_hang",
+                        "don_hang_muc_gio_hang");
     }
 
     @Test
@@ -76,6 +81,27 @@ class OrderSchemaMigrationTests {
                  WHERE table_schema = 'public'
                    AND table_name = 'don_hang_muc_don_hang'
                 """, String.class)).contains("idx_don_hang_muc_don_hang_variant");
+    }
+
+    @Test
+    void protectsInventoryOrchestrationIdentityStateAndInternalOwnership() {
+        assertThat(constraints("don_hang_dieu_phoi_ton_kho"))
+                .contains(
+                        "uk_don_hang_dieu_phoi_ton_kho_order",
+                        "uk_don_hang_dieu_phoi_ton_kho_event",
+                        "uk_don_hang_dieu_phoi_ton_kho_correlation",
+                        "fk_don_hang_dieu_phoi_ton_kho_order",
+                        "ck_don_hang_dieu_phoi_ton_kho_status",
+                        "ck_don_hang_dieu_phoi_ton_kho_expiration");
+        assertThat(constraints("don_hang_dong_giu_ton_kho"))
+                .contains(
+                        "uk_don_hang_dong_giu_ton_kho_item",
+                        "uk_don_hang_dong_giu_ton_kho_line",
+                        "fk_don_hang_dong_giu_ton_kho_orchestration",
+                        "fk_don_hang_dong_giu_ton_kho_item",
+                        "ck_don_hang_dong_giu_ton_kho_quantity",
+                        "ck_don_hang_dong_giu_ton_kho_line",
+                        "ck_don_hang_dong_giu_ton_kho_status");
     }
 
     private List<String> constraints(String table) {
