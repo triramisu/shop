@@ -1,6 +1,7 @@
 package com.shop.inventory.internal.entity;
 
 import com.shop.inventory.internal.constant.InventoryTableNames;
+import com.shop.inventory.reservation.StockReservationStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

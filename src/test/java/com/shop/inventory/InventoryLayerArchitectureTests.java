@@ -105,6 +105,17 @@ class InventoryLayerArchitectureTests {
     }
 
     @Test
+    void publicReservationContractDoesNotExposeInventoryInternals() {
+        noClasses()
+                .that()
+                .resideInAPackage("com.shop.inventory.reservation..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("com.shop.inventory.internal..")
+                .check(applicationClasses);
+    }
+
+    @Test
     void inventoryAdministrationEndpointsAuthorizeByPermission() {
         List<Method> endpoints = Arrays.stream(InventoryAdministrationController.class.getDeclaredMethods())
                 .filter(InventoryLayerArchitectureTests::isEndpoint)

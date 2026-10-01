@@ -53,6 +53,12 @@ springdoc:
     tags-sorter: alpha
 
 app:
+  inventory:
+    reservation:
+      max-duration: ${INVENTORY_RESERVATION_MAX_DURATION:30m}
+      transaction-timeout: ${INVENTORY_RESERVATION_TRANSACTION_TIMEOUT:3s}
+      max-attempts: ${INVENTORY_RESERVATION_MAX_ATTEMPTS:3}
+      retry-backoff: ${INVENTORY_RESERVATION_RETRY_BACKOFF:25ms}
   catalog:
     search:
       strategy: ${CATALOG_SEARCH_STRATEGY:mysql-fulltext}

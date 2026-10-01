@@ -7,7 +7,7 @@ import com.shop.inventory.event.StockMovementType;
 import com.shop.inventory.internal.entity.StockItem;
 import com.shop.inventory.internal.entity.StockMovement;
 import com.shop.inventory.internal.entity.StockReservation;
-import com.shop.inventory.internal.entity.StockReservationStatus;
+import com.shop.inventory.reservation.StockReservationStatus;
 import jakarta.persistence.EntityManager;
 import java.sql.SQLException;
 import java.time.Instant;
