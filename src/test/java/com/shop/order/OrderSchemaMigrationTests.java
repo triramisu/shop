@@ -17,7 +17,7 @@ class OrderSchemaMigrationTests {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void createsCartTablesWithVietnameseModulePrefixes() {
+    void createsOrderTablesWithVietnameseModulePrefixes() {
         List<String> tables = jdbcTemplate.queryForList("""
                 SELECT table_name
                   FROM information_schema.tables
@@ -26,7 +26,7 @@ class OrderSchemaMigrationTests {
                  ORDER BY table_name
                 """, String.class);
 
-        assertThat(tables).containsExactly("don_hang_gio_hang", "don_hang_muc_gio_hang");
+        assertThat(tables).containsExactly("don_hang_don_dat_hang", "don_hang_gio_hang", "don_hang_muc_gio_hang");
     }
 
     @Test
@@ -41,6 +41,18 @@ class OrderSchemaMigrationTests {
                         "uk_don_hang_muc_gio_hang_variant",
                         "uk_don_hang_muc_gio_hang_sku",
                         "ck_don_hang_muc_gio_hang_quantity");
+    }
+
+    @Test
+    void protectsTheOrderStatusAndProvidesLifecycleLookupIndexes() {
+        assertThat(constraints("don_hang_don_dat_hang")).contains("ck_don_hang_don_dat_hang_status");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT LOWER(index_name)
+                  FROM information_schema.indexes
+                 WHERE table_schema = 'public'
+                   AND table_name = 'don_hang_don_dat_hang'
+                """, String.class))
+                .contains("idx_don_hang_don_dat_hang_owner_created", "idx_don_hang_don_dat_hang_status_updated");
     }
 
     private List<String> constraints(String table) {
