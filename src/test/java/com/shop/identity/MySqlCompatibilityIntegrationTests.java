@@ -38,6 +38,7 @@ import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.checkout.dto.response.CheckoutQuoteResponse;
 import com.shop.order.internal.checkout.service.CheckoutPricingService;
 import com.shop.order.internal.checkout.service.OrderCreationService;
+import com.shop.order.internal.checkout.service.OrderInventoryOrchestrationQueryService;
 import com.shop.order.internal.checkout.service.OrderSnapshotQueryService;
 import com.shop.order.internal.dto.request.AddCartItemRequest;
 import com.shop.order.internal.dto.response.CartResponse;
@@ -118,6 +119,9 @@ class MySqlCompatibilityIntegrationTests {
     private OrderCreationService orderCreationService;
 
     @Autowired
+    private OrderInventoryOrchestrationQueryService orderInventoryOrchestrationQueryService;
+
+    @Autowired
     private OrderSnapshotQueryService orderSnapshotQueryService;
 
     @DynamicPropertySource
@@ -140,7 +144,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(17);
+        assertThat(migrationCount).isEqualTo(18);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -158,7 +162,7 @@ class MySqlCompatibilityIntegrationTests {
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'don_hang_%'",
                         Integer.class))
-                .isEqualTo(4);
+                .isEqualTo(6);
     }
 
     @Test
@@ -233,6 +237,12 @@ class MySqlCompatibilityIntegrationTests {
         catalogProductService.publish(
                 product.getId(),
                 VersionedCatalogRequest.builder().version(product.getVersion()).build());
+        stockInventoryService.create(CreateStockItemRequest.builder()
+                .sku("MYSQL-CHECKOUT-01")
+                .locationCode("MAIN")
+                .initialQuantity(5L)
+                .reason("Tồn kho checkout MySQL")
+                .build());
 
         String owner = "mysql-checkout-owner";
         cartService.getCart(owner);
@@ -256,6 +266,8 @@ class MySqlCompatibilityIntegrationTests {
         });
         assertThat(quote.getGrandTotal()).isEqualByComparingTo("59.80");
         java.util.UUID orderId = orderCreationService.createFromCart(owner, cart.getVersion());
+        assertThat(orderInventoryOrchestrationQueryService.getByOrderId(orderId).status())
+                .isEqualTo(com.shop.order.internal.checkout.orchestration.InventoryOrchestrationStatus.RESERVED);
         assertThat(orderSnapshotQueryService.getOwnedOrder(owner, orderId).getItems())
                 .singleElement()
                 .satisfies(item -> {

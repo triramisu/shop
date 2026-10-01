@@ -9,6 +9,7 @@ import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.entity.OrderItemSnapshot;
 import com.shop.order.internal.repository.CartRepository;
 import com.shop.order.internal.repository.CustomerOrderRepository;
+import com.shop.order.internal.repository.OrderInventoryOrchestrationRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import jakarta.persistence.Entity;
@@ -41,12 +42,23 @@ class OrderLayerArchitectureTests {
     }
 
     @Test
+    void orderOnlyUsesThePublishedInventoryContract() {
+        noClasses()
+                .that()
+                .resideInAPackage("com.shop.order.internal..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("com.shop.inventory.internal..")
+                .check(applicationClasses);
+    }
+
+    @Test
     void orderEntitiesUseExplicitVietnameseModulePrefixedTableNames() {
         assertThat(applicationClasses.stream()
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.order.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(4)
+                .hasSize(6)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -89,7 +101,10 @@ class OrderLayerArchitectureTests {
 
     @Test
     void orderRepositoriesDoNotExposeAggregateDeletion() {
-        assertThat(List.of(CartRepository.class, CustomerOrderRepository.class))
+        assertThat(List.of(
+                        CartRepository.class,
+                        CustomerOrderRepository.class,
+                        OrderInventoryOrchestrationRepository.class))
                 .allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
                                 .map(Method::getName)
                                 .filter(methodName -> methodName.startsWith("delete")))
