@@ -37,6 +37,8 @@ import com.shop.inventory.internal.service.StockInventoryService;
 import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.checkout.dto.response.CheckoutQuoteResponse;
 import com.shop.order.internal.checkout.service.CheckoutPricingService;
+import com.shop.order.internal.checkout.service.OrderCreationService;
+import com.shop.order.internal.checkout.service.OrderSnapshotQueryService;
 import com.shop.order.internal.dto.request.AddCartItemRequest;
 import com.shop.order.internal.dto.response.CartResponse;
 import com.shop.order.internal.service.CartService;
@@ -112,6 +114,12 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private CheckoutPricingService checkoutPricingService;
 
+    @Autowired
+    private OrderCreationService orderCreationService;
+
+    @Autowired
+    private OrderSnapshotQueryService orderSnapshotQueryService;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -132,7 +140,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(16);
+        assertThat(migrationCount).isEqualTo(17);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -150,7 +158,7 @@ class MySqlCompatibilityIntegrationTests {
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'don_hang_%'",
                         Integer.class))
-                .isEqualTo(3);
+                .isEqualTo(4);
     }
 
     @Test
@@ -247,6 +255,15 @@ class MySqlCompatibilityIntegrationTests {
             assertThat(line.getTotal()).isEqualByComparingTo("59.80");
         });
         assertThat(quote.getGrandTotal()).isEqualByComparingTo("59.80");
+        java.util.UUID orderId = orderCreationService.createFromCart(owner, cart.getVersion());
+        assertThat(orderSnapshotQueryService.getOwnedOrder(owner, orderId).getItems())
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.getSku()).isEqualTo("MYSQL-CHECKOUT-01");
+                    assertThat(item.getQuantity()).isEqualTo(2);
+                    assertThat(item.getUnitPrice()).isEqualByComparingTo("29.9000");
+                    assertThat(item.getTotal()).isEqualByComparingTo("59.8000");
+                });
     }
 
     @Test

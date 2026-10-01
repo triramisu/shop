@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
 import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
+import com.shop.order.internal.entity.OrderItemSnapshot;
 import com.shop.order.internal.repository.CartRepository;
 import com.shop.order.internal.repository.CustomerOrderRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -15,6 +16,7 @@ import jakarta.persistence.Table;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import org.hibernate.annotations.Immutable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +46,7 @@ class OrderLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.order.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(3)
+                .hasSize(4)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -100,5 +102,15 @@ class OrderLayerArchitectureTests {
                         .filter(field -> !field.isSynthetic())
                         .map(java.lang.reflect.Field::getName))
                 .containsExactly("expectedCartVersion");
+    }
+
+    @Test
+    void persistedOrderItemSnapshotsAreMarkedImmutable() {
+        assertThat(OrderItemSnapshot.class).hasAnnotation(Immutable.class);
+        assertThat(Arrays.stream(OrderItemSnapshot.class.getDeclaredFields())
+                        .filter(field -> field.isAnnotationPresent(jakarta.persistence.Column.class))
+                        .map(field -> field.getAnnotation(jakarta.persistence.Column.class))
+                        .map(jakarta.persistence.Column::updatable))
+                .containsOnly(false);
     }
 }

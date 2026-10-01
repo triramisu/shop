@@ -1,5 +1,6 @@
 package com.shop.order.internal.service;
 
+import static com.shop.order.support.OrderTestFixtures.pendingOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -35,8 +36,7 @@ class OrderStateTransitionServiceTests {
 
     @Test
     void mapsAStaleWriteToTheOrderConcurrencyContractWithoutPublishingAnEvent() {
-        CustomerOrder order =
-                CustomerOrder.createPending("buyer-01", Instant.now().minusSeconds(10));
+        CustomerOrder order = pendingOrder("buyer-01", Instant.now().minusSeconds(10));
         when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
         when(orderRepository.saveAndFlush(order))
                 .thenThrow(new ObjectOptimisticLockingFailureException(CustomerOrder.class, order.getId()));
@@ -59,8 +59,7 @@ class OrderStateTransitionServiceTests {
                 .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.ORDER_NOT_FOUND));
 
-        CustomerOrder order =
-                CustomerOrder.createPending("buyer-01", Instant.now().minusSeconds(10));
+        CustomerOrder order = pendingOrder("buyer-01", Instant.now().minusSeconds(10));
         when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
         assertThatThrownBy(() -> service.transition(
                         order.getId(), OrderTransitionEvent.PAYMENT_CONFIRMED, OrderTransitionActor.CUSTOMER))
