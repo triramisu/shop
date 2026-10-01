@@ -10,4 +10,8 @@ public interface StockReservationRepository extends Repository<StockReservation,
     <S extends StockReservation> S saveAndFlush(S reservation);
 
     Optional<StockReservation> findById(UUID id);
+
+    boolean existsById(UUID id);
+
+    long countByStockItemId(UUID stockItemId);
 }

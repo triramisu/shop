@@ -2,7 +2,6 @@ package com.shop.inventory.internal.service;
 
 import com.shop.catalog.inventory.CatalogSkuLookup;
 import com.shop.catalog.inventory.CatalogSkuReference;
-import com.shop.inventory.event.StockBalanceChangedEvent;
 import com.shop.inventory.event.StockMovementType;
 import com.shop.inventory.internal.dto.request.CreateStockItemRequest;
 import com.shop.inventory.internal.dto.request.InventorySortDirection;
@@ -14,7 +13,6 @@ import com.shop.inventory.internal.dto.response.StockItemPageResponse;
 import com.shop.inventory.internal.dto.response.StockItemResponse;
 import com.shop.inventory.internal.dto.response.StockMovementPageResponse;
 import com.shop.inventory.internal.entity.StockItem;
-import com.shop.inventory.internal.entity.StockMovement;
 import com.shop.inventory.internal.mapper.InventoryMapper;
 import com.shop.inventory.internal.repository.StockItemRepository;
 import com.shop.inventory.internal.repository.StockMovementRepository;
@@ -26,7 +24,6 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
@@ -46,7 +43,7 @@ public class StockInventoryService {
     StockMovementRepository stockMovementRepository;
     CatalogSkuLookup catalogSkuLookup;
     InventoryMapper mapper;
-    ApplicationEventPublisher eventPublisher;
+    StockMovementRecorder movementRecorder;
 
     @Transactional(readOnly = true)
     public StockItemPageResponse search(StockItemSearchRequest request) {
@@ -86,13 +83,14 @@ public class StockInventoryService {
                     skuReference.productVariantId(), skuReference.sku(), locationCode, request.getInitialQuantity());
             StockItem saved = stockItemRepository.saveAndFlush(stockItem);
             if (request.getInitialQuantity() > 0) {
-                recordMovement(
+                movementRecorder.record(
                         saved,
                         StockMovementType.INITIAL,
                         request.getInitialQuantity(),
                         0,
                         defaultInitialReason(request.getReason()),
-                        request.getReferenceId());
+                        request.getReferenceId(),
+                        Instant.now());
             }
             return mapper.toStockItemResponse(saved);
         } catch (DataIntegrityViolationException exception) {
@@ -111,13 +109,14 @@ public class StockInventoryService {
         try {
             stockItem.adjustOnHand(request.getQuantityDelta());
             StockItem saved = stockItemRepository.saveAndFlush(stockItem);
-            recordMovement(
+            movementRecorder.record(
                     saved,
                     StockMovementType.ADJUSTMENT,
                     request.getQuantityDelta(),
                     0,
                     request.getReason(),
-                    request.getReferenceId());
+                    request.getReferenceId(),
+                    Instant.now());
             return mapper.toStockItemResponse(saved);
         } catch (OptimisticLockingFailureException exception) {
             throw new AppException(ErrorCode.INVENTORY_CONFLICT);
@@ -126,30 +125,6 @@ public class StockInventoryService {
         } catch (IllegalArgumentException exception) {
             throw new AppException(ErrorCode.INVENTORY_QUANTITY_INVALID);
         }
-    }
-
-    private void recordMovement(
-            StockItem stockItem,
-            StockMovementType type,
-            long onHandDelta,
-            long reservedDelta,
-            String reason,
-            String referenceId) {
-        Instant occurredAt = Instant.now();
-        StockMovement movement =
-                StockMovement.record(stockItem, type, onHandDelta, reservedDelta, reason, referenceId, occurredAt);
-        stockMovementRepository.saveAndFlush(movement);
-        eventPublisher.publishEvent(new StockBalanceChangedEvent(
-                stockItem.getId(),
-                stockItem.getProductVariantId(),
-                stockItem.getSku(),
-                stockItem.getLocationCode(),
-                stockItem.getOnHand(),
-                stockItem.getReserved(),
-                stockItem.getAvailable(),
-                type,
-                movement.getReferenceId(),
-                occurredAt));
     }
 
     private StockItem getStockItem(UUID stockItemId) {

@@ -1,4 +1,4 @@
-package com.shop.inventory.internal.entity;
+package com.shop.inventory.reservation;
 
 public enum StockReservationStatus {
     RESERVED,
