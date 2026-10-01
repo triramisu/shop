@@ -1,5 +1,6 @@
 package com.shop.order.internal.service;
 
+import static com.shop.order.support.OrderTestFixtures.pendingOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -104,7 +105,7 @@ class OrderStateTransitionIntegrationTests {
 
     private CustomerOrder savePendingOrder(String ownerSubject) {
         return orderRepository.saveAndFlush(
-                CustomerOrder.createPending(ownerSubject, Instant.now().minusSeconds(10)));
+                pendingOrder(ownerSubject, Instant.now().minusSeconds(10)));
     }
 
     @Component

@@ -26,7 +26,9 @@ class OrderSchemaMigrationTests {
                  ORDER BY table_name
                 """, String.class);
 
-        assertThat(tables).containsExactly("don_hang_don_dat_hang", "don_hang_gio_hang", "don_hang_muc_gio_hang");
+        assertThat(tables)
+                .containsExactly(
+                        "don_hang_don_dat_hang", "don_hang_gio_hang", "don_hang_muc_don_hang", "don_hang_muc_gio_hang");
     }
 
     @Test
@@ -53,6 +55,27 @@ class OrderSchemaMigrationTests {
                    AND table_name = 'don_hang_don_dat_hang'
                 """, String.class))
                 .contains("idx_don_hang_don_dat_hang_owner_created", "idx_don_hang_don_dat_hang_status_updated");
+    }
+
+    @Test
+    void protectsOrderItemSnapshotAmountsAndInternalOwnership() {
+        assertThat(constraints("don_hang_muc_don_hang"))
+                .contains(
+                        "fk_don_hang_muc_don_hang_order",
+                        "uk_don_hang_muc_don_hang_line",
+                        "ck_don_hang_muc_don_hang_line",
+                        "ck_don_hang_muc_don_hang_quantity",
+                        "ck_don_hang_muc_don_hang_unit_price",
+                        "ck_don_hang_muc_don_hang_subtotal",
+                        "ck_don_hang_muc_don_hang_discount",
+                        "ck_don_hang_muc_don_hang_tax",
+                        "ck_don_hang_muc_don_hang_total");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT LOWER(index_name)
+                  FROM information_schema.indexes
+                 WHERE table_schema = 'public'
+                   AND table_name = 'don_hang_muc_don_hang'
+                """, String.class)).contains("idx_don_hang_muc_don_hang_variant");
     }
 
     private List<String> constraints(String table) {

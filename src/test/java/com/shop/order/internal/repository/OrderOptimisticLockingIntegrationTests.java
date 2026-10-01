@@ -1,5 +1,6 @@
 package com.shop.order.internal.repository;
 
+import static com.shop.order.support.OrderTestFixtures.pendingOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -46,7 +47,7 @@ class OrderOptimisticLockingIntegrationTests {
     @Test
     void rejectsAStaleDetachedAggregateInsteadOfOverwritingTheCommittedState() {
         CustomerOrder created = orderRepository.saveAndFlush(
-                CustomerOrder.createPending("concurrent-owner", Instant.now().minusSeconds(10)));
+                pendingOrder("concurrent-owner", Instant.now().minusSeconds(10)));
         CustomerOrder firstWriter = loadInIndependentTransaction(created.getId());
         CustomerOrder staleWriter = loadInIndependentTransaction(created.getId());
         Instant now = Instant.now();

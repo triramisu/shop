@@ -5,16 +5,23 @@ import com.shop.order.event.OrderStatusChangedEvent;
 import com.shop.order.event.OrderTransitionActor;
 import com.shop.order.event.OrderTransitionEvent;
 import com.shop.order.internal.constant.OrderTableNames;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -53,24 +60,56 @@ public class CustomerOrder {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    @OrderBy("lineNumber ASC")
+    @Getter(AccessLevel.NONE)
+    private List<OrderItemSnapshot> items = new ArrayList<>();
+
     protected CustomerOrder() {}
 
     @Builder(access = AccessLevel.PRIVATE)
-    private CustomerOrder(UUID id, String ownerSubject, Instant createdAt) {
+    private CustomerOrder(UUID id, String ownerSubject, List<OrderItemSnapshotDraft> itemDrafts, Instant createdAt) {
         this.id = Objects.requireNonNull(id, "order id is required");
         this.ownerSubject = normalizeOwnerSubject(ownerSubject);
         this.createdAt = Objects.requireNonNull(createdAt, "creation time is required");
+        addSnapshots(itemDrafts, createdAt);
         status = OrderStatus.PENDING;
         statusChangedAt = createdAt;
         updatedAt = createdAt;
     }
 
-    public static CustomerOrder createPending(String ownerSubject, Instant createdAt) {
+    public static CustomerOrder createPending(
+            String ownerSubject, List<OrderItemSnapshotDraft> itemDrafts, Instant createdAt) {
         return CustomerOrder.builder()
                 .id(UUID.randomUUID())
                 .ownerSubject(ownerSubject)
+                .itemDrafts(itemDrafts)
                 .createdAt(createdAt)
                 .build();
+    }
+
+    public List<OrderItemSnapshot> getItems() {
+        return Collections.unmodifiableList(items);
+    }
+
+    public String getCurrency() {
+        return items.isEmpty() ? null : items.getFirst().getCurrency();
+    }
+
+    public BigDecimal getSubtotal() {
+        return sum(OrderItemSnapshot::getSubtotal);
+    }
+
+    public BigDecimal getDiscount() {
+        return sum(OrderItemSnapshot::getDiscount);
+    }
+
+    public BigDecimal getTax() {
+        return sum(OrderItemSnapshot::getTax);
+    }
+
+    public BigDecimal getGrandTotal() {
+        return sum(OrderItemSnapshot::getTotal);
     }
 
     public OrderStatusChangedEvent transition(
@@ -115,5 +154,24 @@ public class CustomerOrder {
             throw new IllegalArgumentException("owner subject is too long");
         }
         return normalized;
+    }
+
+    private void addSnapshots(List<OrderItemSnapshotDraft> itemDrafts, Instant snapshotTime) {
+        if (itemDrafts == null || itemDrafts.isEmpty()) {
+            throw new IllegalArgumentException("order items are required");
+        }
+        List<OrderItemSnapshotDraft> immutableDrafts = List.copyOf(itemDrafts);
+        String currency = immutableDrafts.getFirst().currency();
+        for (int index = 0; index < immutableDrafts.size(); index++) {
+            OrderItemSnapshotDraft draft = immutableDrafts.get(index);
+            if (!currency.equals(draft.currency())) {
+                throw new IllegalArgumentException("order items must use one currency");
+            }
+            items.add(new OrderItemSnapshot(this, index + 1, draft, snapshotTime));
+        }
+    }
+
+    private BigDecimal sum(java.util.function.Function<OrderItemSnapshot, BigDecimal> amountExtractor) {
+        return items.stream().map(amountExtractor).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

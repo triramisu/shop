@@ -9,6 +9,7 @@ import com.shop.order.internal.checkout.pricing.CheckoutLineInput;
 import com.shop.order.internal.checkout.pricing.CheckoutPricingBreakdown;
 import com.shop.order.internal.checkout.pricing.CheckoutPricingCalculator;
 import com.shop.order.internal.checkout.pricing.CheckoutPricingException;
+import com.shop.order.internal.checkout.pricing.CheckoutPricingResult;
 import com.shop.order.internal.entity.Cart;
 import com.shop.order.internal.repository.CartRepository;
 import com.shop.shared.error.AppException;
@@ -38,13 +39,17 @@ public class CheckoutPricingService {
 
     @Transactional(readOnly = true)
     public CheckoutQuoteResponse quote(String ownerSubject, CheckoutQuoteRequest request) {
-        String owner = normalizeOwner(ownerSubject);
         requireValidRequest(request);
+        return quoteMapper.toResponse(price(ownerSubject, request.getExpectedCartVersion()));
+    }
+
+    CheckoutPricingResult price(String ownerSubject, long expectedCartVersion) {
+        String owner = normalizeOwner(ownerSubject);
         Cart cart = cartRepository
                 .findDetailedByOwnerSubject(owner)
                 .filter(current -> !current.getItems().isEmpty())
                 .orElseThrow(() -> new AppException(ErrorCode.CHECKOUT_CART_EMPTY));
-        if (cart.getVersion() != request.getExpectedCartVersion()) {
+        if (cart.getVersion() != expectedCartVersion) {
             throw new AppException(ErrorCode.CHECKOUT_CART_CHANGED);
         }
 
@@ -78,7 +83,7 @@ public class CheckoutPricingService {
 
         try {
             CheckoutPricingBreakdown pricing = pricingCalculator.calculate(lineInputs);
-            return quoteMapper.toResponse(cart, pricing, Instant.now());
+            return new CheckoutPricingResult(cart.getId(), cart.getVersion(), Instant.now(), pricing);
         } catch (CheckoutPricingException exception) {
             throw new AppException(ErrorCode.CHECKOUT_CURRENCY_MISMATCH);
         }

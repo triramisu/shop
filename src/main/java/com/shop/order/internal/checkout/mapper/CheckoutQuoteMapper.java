@@ -3,19 +3,19 @@ package com.shop.order.internal.checkout.mapper;
 import com.shop.order.internal.checkout.dto.response.CheckoutQuoteLineResponse;
 import com.shop.order.internal.checkout.dto.response.CheckoutQuoteResponse;
 import com.shop.order.internal.checkout.pricing.CheckoutPricingBreakdown;
+import com.shop.order.internal.checkout.pricing.CheckoutPricingResult;
 import com.shop.order.internal.checkout.pricing.PricedCheckoutLine;
-import com.shop.order.internal.entity.Cart;
-import java.time.Instant;
 import org.springframework.stereotype.Component;
 
 @Component
 public class CheckoutQuoteMapper {
 
-    public CheckoutQuoteResponse toResponse(Cart cart, CheckoutPricingBreakdown pricing, Instant pricedAt) {
+    public CheckoutQuoteResponse toResponse(CheckoutPricingResult result) {
+        CheckoutPricingBreakdown pricing = result.breakdown();
         return CheckoutQuoteResponse.builder()
-                .cartId(cart.getId())
-                .cartVersion(cart.getVersion())
-                .pricedAt(pricedAt)
+                .cartId(result.cartId())
+                .cartVersion(result.cartVersion())
+                .pricedAt(result.pricedAt())
                 .currency(pricing.grandTotal().currencyCode())
                 .discountRate(pricing.discountRate())
                 .taxRate(pricing.taxRate())
