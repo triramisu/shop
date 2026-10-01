@@ -26,10 +26,13 @@ class InventorySchemaMigrationTests {
                  ORDER BY table_name
                 """, String.class);
 
-        assertThat(tables).containsExactly("ton_kho_bien_dong", "ton_kho_giu_hang", "ton_kho_mat_hang");
+        assertThat(tables)
+                .containsExactly(
+                        "ton_kho_bien_dong", "ton_kho_giu_hang", "ton_kho_mat_hang", "ton_kho_yeu_cau_luy_dang");
         assertThat(rowCount("ton_kho_mat_hang")).isZero();
         assertThat(rowCount("ton_kho_bien_dong")).isZero();
         assertThat(rowCount("ton_kho_giu_hang")).isZero();
+        assertThat(rowCount("ton_kho_yeu_cau_luy_dang")).isZero();
     }
 
     @Test
@@ -49,6 +52,26 @@ class InventorySchemaMigrationTests {
                         "ADMIN:INVENTORY_WRITE",
                         "STAFF:INVENTORY_READ",
                         "STAFF:INVENTORY_WRITE");
+    }
+
+    @Test
+    void protectsReservationReplayRecordsWithDatabaseConstraints() {
+        List<String> constraints = jdbcTemplate.queryForList("""
+                SELECT LOWER(constraint_name)
+                  FROM information_schema.table_constraints
+                 WHERE table_schema = 'public'
+                   AND table_name = 'ton_kho_yeu_cau_luy_dang'
+                """, String.class);
+
+        assertThat(constraints)
+                .contains(
+                        "uk_ton_kho_luy_dang_reservation_operation",
+                        "fk_ton_kho_luy_dang_reservation",
+                        "fk_ton_kho_luy_dang_mat_hang",
+                        "ck_ton_kho_luy_dang_operation",
+                        "ck_ton_kho_luy_dang_processing",
+                        "ck_ton_kho_luy_dang_fingerprint",
+                        "ck_ton_kho_luy_dang_balance");
     }
 
     private long rowCount(String table) {

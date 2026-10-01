@@ -114,13 +114,35 @@ class StockReservationServiceTests {
     }
 
     @Test
-    void rejectsExpirationOutsideConfiguredWindowBeforeStartingTransaction() {
+    void resolvesAConcurrentInsertCollisionThroughTheCommittedReplayRecord() {
+        ReserveStockCommand command = command(Duration.ofMinutes(5));
+        StockReservationResult expected = result(command);
+        when(transactionService.reserve(eq(command), any(Instant.class)))
+                .thenThrow(new AppException(ErrorCode.STOCK_RESERVATION_ALREADY_EXISTS));
+        when(transactionService.replayExisting(command)).thenReturn(expected);
+
+        assertThat(service.reserve(command)).isEqualTo(expected);
+
+        verify(transactionService).replayExisting(command);
+        assertThat(meterRegistry
+                        .get(StockReservationService.OUTCOME_METRIC)
+                        .tag("operation", "reserve")
+                        .tag("outcome", "replayed")
+                        .counter()
+                        .count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void reportsExpirationRejectedByTheTransactionalPolicy() {
         ReserveStockCommand command = command(Duration.ofHours(1));
+        when(transactionService.reserve(eq(command), any(Instant.class)))
+                .thenThrow(new AppException(ErrorCode.INVENTORY_RESERVATION_EXPIRATION_INVALID));
 
         assertThatThrownBy(() -> service.reserve(command))
                 .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.INVENTORY_RESERVATION_EXPIRATION_INVALID));
-        verify(transactionService, never()).reserve(any(), any());
+        verify(transactionService).reserve(eq(command), any(Instant.class));
     }
 
     @Test

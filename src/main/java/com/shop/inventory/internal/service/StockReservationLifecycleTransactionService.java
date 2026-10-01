@@ -4,6 +4,7 @@ import com.shop.inventory.event.StockMovementType;
 import com.shop.inventory.internal.configuration.InventoryReservationProperties;
 import com.shop.inventory.internal.entity.StockItem;
 import com.shop.inventory.internal.entity.StockReservation;
+import com.shop.inventory.internal.entity.StockReservationOperation;
 import com.shop.inventory.internal.repository.StockItemRepository;
 import com.shop.inventory.internal.repository.StockReservationRepository;
 import com.shop.inventory.reservation.ConfirmStockReservationCommand;
@@ -37,6 +38,8 @@ public class StockReservationLifecycleTransactionService {
     StockReservationRepository stockReservationRepository;
     StockMovementRecorder movementRecorder;
     StockReservationLifecycleEventPublisher lifecycleEventPublisher;
+    StockReservationIdempotencyStore idempotencyStore;
+    StockReservationCommandFingerprint commandFingerprint;
     PlatformTransactionManager transactionManager;
     InventoryReservationProperties properties;
 
@@ -55,13 +58,35 @@ public class StockReservationLifecycleTransactionService {
     private StockReservationLifecycleExecution confirmInTransaction(
             ConfirmStockReservationCommand command, Instant confirmedAt) {
         StockReservation reservation = getReservationForUpdate(command.reservationId());
+        String fingerprint = commandFingerprint.confirm(command);
+        var replay =
+                idempotencyStore.findReplay(command.reservationId(), StockReservationOperation.CONFIRM, fingerprint);
+        if (replay.isPresent()) {
+            return confirmationExecution(replay.get());
+        }
+        if (reservation.getStatus() == StockReservationStatus.CONFIRMED) {
+            return confirmationExecution(idempotencyStore.recoverLegacy(
+                    reservation,
+                    StockReservationOperation.CONFIRM,
+                    fingerprint,
+                    StockMovementType.CONFIRMATION,
+                    StockReservationStatus.CONFIRMED));
+        }
+        if (reservation.getStatus() == StockReservationStatus.EXPIRED) {
+            return confirmationExecution(idempotencyStore.recoverLegacy(
+                    reservation,
+                    StockReservationOperation.CONFIRM,
+                    fingerprint,
+                    StockMovementType.EXPIRATION,
+                    StockReservationStatus.EXPIRED));
+        }
         requireReserved(reservation);
         StockItem stockItem = getStockItemForUpdate(reservation);
         if (reservation.isExpiredAt(confirmedAt)) {
             applyExpiration(reservation, stockItem, confirmedAt);
-            return new StockReservationLifecycleExecution(
-                    toResult(reservation, stockItem),
-                    StockReservationLifecycleExecution.Outcome.EXPIRED_DURING_CONFIRM);
+            StockReservationResult result = toResult(reservation, stockItem);
+            idempotencyStore.remember(StockReservationOperation.CONFIRM, fingerprint, result, confirmedAt);
+            return confirmationExecution(result);
         }
 
         stockItem.confirm(reservation.getQuantity());
@@ -74,12 +99,27 @@ public class StockReservationLifecycleTransactionService {
                 -reservation.getQuantity(),
                 CONFIRMATION_REASON,
                 confirmedAt);
-        return new StockReservationLifecycleExecution(
-                toResult(reservation, stockItem), StockReservationLifecycleExecution.Outcome.CONFIRMED);
+        StockReservationResult result = toResult(reservation, stockItem);
+        idempotencyStore.remember(StockReservationOperation.CONFIRM, fingerprint, result, confirmedAt);
+        return confirmationExecution(result);
     }
 
     private StockReservationResult releaseInTransaction(ReleaseStockReservationCommand command, Instant releasedAt) {
         StockReservation reservation = getReservationForUpdate(command.reservationId());
+        String fingerprint = commandFingerprint.release(command);
+        var replay =
+                idempotencyStore.findReplay(command.reservationId(), StockReservationOperation.RELEASE, fingerprint);
+        if (replay.isPresent()) {
+            return replay.get();
+        }
+        if (reservation.getStatus() == StockReservationStatus.RELEASED) {
+            return idempotencyStore.recoverLegacy(
+                    reservation,
+                    StockReservationOperation.RELEASE,
+                    fingerprint,
+                    StockMovementType.RELEASE,
+                    StockReservationStatus.RELEASED);
+        }
         requireReserved(reservation);
         StockItem stockItem = getStockItemForUpdate(reservation);
 
@@ -93,7 +133,9 @@ public class StockReservationLifecycleTransactionService {
                 -reservation.getQuantity(),
                 RELEASE_REASON,
                 releasedAt);
-        return toResult(reservation, stockItem);
+        StockReservationResult result = toResult(reservation, stockItem);
+        idempotencyStore.remember(StockReservationOperation.RELEASE, fingerprint, result, releasedAt);
+        return result;
     }
 
     private boolean expireIfDueInTransaction(UUID reservationId, Instant expiredAt) {
@@ -173,6 +215,13 @@ public class StockReservationLifecycleTransactionService {
                 stockItem.getOnHand(),
                 stockItem.getReserved(),
                 stockItem.getAvailable());
+    }
+
+    private StockReservationLifecycleExecution confirmationExecution(StockReservationResult result) {
+        StockReservationLifecycleExecution.Outcome outcome = result.status() == StockReservationStatus.EXPIRED
+                ? StockReservationLifecycleExecution.Outcome.EXPIRED_DURING_CONFIRM
+                : StockReservationLifecycleExecution.Outcome.CONFIRMED;
+        return new StockReservationLifecycleExecution(result, outcome);
     }
 
     private <T> T inNewTransaction(Supplier<T> action) {
