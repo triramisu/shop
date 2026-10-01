@@ -146,6 +146,12 @@ public enum ErrorCode {
     ORDER_STATE_TRANSITION_INVALID(1311, "error.order.transition.invalid", HttpStatus.CONFLICT),
     ORDER_TRANSITION_ACTOR_FORBIDDEN(1312, "error.order.transition.actor-forbidden", HttpStatus.FORBIDDEN),
     ORDER_CONCURRENT_MODIFICATION(1313, "error.order.concurrent-modification", HttpStatus.CONFLICT),
+    CHECKOUT_CART_EMPTY(1314, "error.checkout.cart.empty", HttpStatus.CONFLICT),
+    CHECKOUT_CART_CHANGED(1315, "error.checkout.cart.changed", HttpStatus.CONFLICT),
+    CHECKOUT_ITEM_UNAVAILABLE(1316, "error.checkout.item.unavailable", HttpStatus.CONFLICT),
+    CHECKOUT_CURRENCY_MISMATCH(1317, "error.checkout.currency.mismatch", HttpStatus.CONFLICT),
+    CHECKOUT_CART_VERSION_REQUIRED(1318, "error.checkout.cart-version.required", HttpStatus.BAD_REQUEST),
+    CHECKOUT_CART_VERSION_INVALID(1319, "error.checkout.cart-version.invalid", HttpStatus.BAD_REQUEST),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

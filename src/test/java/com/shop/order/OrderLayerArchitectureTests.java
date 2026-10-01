@@ -5,6 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
+import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.repository.CartRepository;
 import com.shop.order.internal.repository.CustomerOrderRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -91,5 +92,13 @@ class OrderLayerArchitectureTests {
                                 .map(Method::getName)
                                 .filter(methodName -> methodName.startsWith("delete")))
                         .isEmpty());
+    }
+
+    @Test
+    void checkoutRequestNeverAcceptsClientOwnedPricingOrItems() {
+        assertThat(Arrays.stream(CheckoutQuoteRequest.class.getDeclaredFields())
+                        .filter(field -> !field.isSynthetic())
+                        .map(java.lang.reflect.Field::getName))
+                .containsExactly("expectedCartVersion");
     }
 }

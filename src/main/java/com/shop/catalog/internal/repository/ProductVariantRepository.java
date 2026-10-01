@@ -4,7 +4,9 @@ import com.shop.catalog.internal.entity.CategoryStatus;
 import com.shop.catalog.internal.entity.ProductStatus;
 import com.shop.catalog.internal.entity.ProductVariant;
 import com.shop.catalog.internal.entity.ProductVariantStatus;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -41,6 +43,25 @@ public interface ProductVariantRepository extends Repository<ProductVariant, UUI
             """)
     Optional<ProductVariant> findSellableCartReferenceBySkuIgnoreCase(
             @Param("sku") String sku,
+            @Param("variantStatus") ProductVariantStatus variantStatus,
+            @Param("productStatus") ProductStatus productStatus,
+            @Param("categoryStatus") CategoryStatus categoryStatus);
+
+    @Query("""
+            select variant
+              from ProductVariant variant
+              join fetch variant.product product
+              join fetch product.category category
+             where variant.id in :variantIds
+               and variant.status = :variantStatus
+               and variant.deletedAt is null
+               and product.status = :productStatus
+               and product.deletedAt is null
+               and category.status = :categoryStatus
+               and category.deletedAt is null
+            """)
+    List<ProductVariant> findSellableCheckoutReferencesByIdIn(
+            @Param("variantIds") Set<UUID> variantIds,
             @Param("variantStatus") ProductVariantStatus variantStatus,
             @Param("productStatus") ProductStatus productStatus,
             @Param("categoryStatus") CategoryStatus categoryStatus);
