@@ -3,11 +3,15 @@ package com.shop.inventory.internal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.inventory.internal.entity.StockItem;
+import com.shop.inventory.internal.entity.StockReservation;
 import com.shop.inventory.internal.repository.StockItemRepository;
 import com.shop.inventory.internal.repository.StockMovementRepository;
 import com.shop.inventory.internal.repository.StockReservationRepository;
+import com.shop.inventory.reservation.ConfirmStockReservationCommand;
+import com.shop.inventory.reservation.ReleaseStockReservationCommand;
 import com.shop.inventory.reservation.ReserveStockCommand;
 import com.shop.inventory.reservation.StockReservationOperations;
+import com.shop.inventory.reservation.StockReservationStatus;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.time.Instant;
@@ -55,6 +59,9 @@ class InventoryReservationMySqlConcurrencyTests {
     @Autowired
     private StockMovementRepository stockMovementRepository;
 
+    @Autowired
+    private StockReservationExpirationProcessor expirationProcessor;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -94,6 +101,83 @@ class InventoryReservationMySqlConcurrencyTests {
                 .hasSize(1);
     }
 
+    @Test
+    void onlyOneTerminalTransitionWinsWhenConfirmAndReleaseCompete() throws Exception {
+        StockItem stockItem = stockItemRepository.saveAndFlush(
+                StockItem.create(UUID.randomUUID(), "MYSQL-TERMINAL-RACE-01", "WAREHOUSE_MYSQL", 5));
+        UUID reservationId = UUID.randomUUID();
+        reservationOperations.reserve(new ReserveStockCommand(
+                reservationId, stockItem.getId(), 2, Instant.now().plusSeconds(300)));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        List<LifecycleAttempt> attempts;
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<LifecycleAttempt> confirmation =
+                    executor.submit(() -> confirmReservation(reservationId, ready, start));
+            Future<LifecycleAttempt> release = executor.submit(() -> releaseReservation(reservationId, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            attempts = List.of(confirmation.get(20, TimeUnit.SECONDS), release.get(20, TimeUnit.SECONDS));
+        }
+
+        assertThat(attempts).filteredOn(LifecycleAttempt::success).hasSize(1);
+        assertThat(attempts)
+                .filteredOn(attempt -> attempt.errorCode() == ErrorCode.STOCK_RESERVATION_STATE_INVALID)
+                .hasSize(1);
+        StockReservation reservation =
+                stockReservationRepository.findById(reservationId).orElseThrow();
+        assertThat(reservation.getStatus()).isIn(StockReservationStatus.CONFIRMED, StockReservationStatus.RELEASED);
+        StockItem reloaded = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(reloaded.getReserved()).isZero();
+        if (reservation.getStatus() == StockReservationStatus.CONFIRMED) {
+            assertThat(reloaded.getOnHand()).isEqualTo(3);
+        } else {
+            assertThat(reloaded.getOnHand()).isEqualTo(5);
+        }
+        assertThat(stockMovementRepository.findByStockItemId(stockItem.getId(), PageRequest.of(0, 10)))
+                .hasSize(2);
+    }
+
+    @Test
+    void concurrentExpirationBatchesReleaseDueReservationOnlyOnce() throws Exception {
+        Instant cutoff = Instant.now();
+        StockItem stockItem = StockItem.create(UUID.randomUUID(), "MYSQL-EXPIRATION-RACE-01", "WAREHOUSE_MYSQL", 4);
+        stockItem.reserve(2);
+        stockItem = stockItemRepository.saveAndFlush(stockItem);
+        UUID reservationId = UUID.randomUUID();
+        stockReservationRepository.saveAndFlush(
+                StockReservation.issue(reservationId, stockItem, 2, cutoff.minusSeconds(1), cutoff.minusSeconds(60)));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        List<StockReservationExpirationProcessor.ExpirationBatchResult> results;
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<StockReservationExpirationProcessor.ExpirationBatchResult> first =
+                    executor.submit(() -> expireBatch(cutoff, ready, start));
+            Future<StockReservationExpirationProcessor.ExpirationBatchResult> second =
+                    executor.submit(() -> expireBatch(cutoff, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            results = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+        }
+
+        assertThat(results.stream()
+                        .mapToInt(StockReservationExpirationProcessor.ExpirationBatchResult::expired)
+                        .sum())
+                .isEqualTo(1);
+        assertThat(stockReservationRepository
+                        .findById(reservationId)
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(StockReservationStatus.EXPIRED);
+        StockItem reloaded = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(reloaded.getOnHand()).isEqualTo(4);
+        assertThat(reloaded.getReserved()).isZero();
+        assertThat(stockMovementRepository.findByStockItemId(stockItem.getId(), PageRequest.of(0, 10)))
+                .hasSize(1);
+    }
+
     private ReservationAttempt reserveLastUnit(UUID stockItemId, CountDownLatch ready, CountDownLatch start) {
         ready.countDown();
         await(start);
@@ -104,6 +188,34 @@ class InventoryReservationMySqlConcurrencyTests {
         } catch (AppException exception) {
             return new ReservationAttempt(false, exception.getErrorCode());
         }
+    }
+
+    private LifecycleAttempt confirmReservation(UUID reservationId, CountDownLatch ready, CountDownLatch start) {
+        return runLifecycleAttempt(
+                () -> reservationOperations.confirm(new ConfirmStockReservationCommand(reservationId)), ready, start);
+    }
+
+    private LifecycleAttempt releaseReservation(UUID reservationId, CountDownLatch ready, CountDownLatch start) {
+        return runLifecycleAttempt(
+                () -> reservationOperations.release(new ReleaseStockReservationCommand(reservationId)), ready, start);
+    }
+
+    private LifecycleAttempt runLifecycleAttempt(Runnable action, CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        try {
+            action.run();
+            return new LifecycleAttempt(true, null);
+        } catch (AppException exception) {
+            return new LifecycleAttempt(false, exception.getErrorCode());
+        }
+    }
+
+    private StockReservationExpirationProcessor.ExpirationBatchResult expireBatch(
+            Instant cutoff, CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        return expirationProcessor.expireBatch(cutoff);
     }
 
     private void await(CountDownLatch latch) {
@@ -118,4 +230,6 @@ class InventoryReservationMySqlConcurrencyTests {
     }
 
     private record ReservationAttempt(boolean success, ErrorCode errorCode) {}
+
+    private record LifecycleAttempt(boolean success, ErrorCode errorCode) {}
 }

@@ -81,6 +81,37 @@ public class StockReservation {
                 .build();
     }
 
+    public boolean isExpiredAt(Instant instant) {
+        return !expiresAt.isAfter(Objects.requireNonNull(instant, "instant is required"));
+    }
+
+    public void confirm(Instant confirmedAt) {
+        requireReserved();
+        if (isExpiredAt(confirmedAt)) {
+            throw new IllegalStateException("expired reservation cannot be confirmed");
+        }
+        status = StockReservationStatus.CONFIRMED;
+    }
+
+    public void release() {
+        requireReserved();
+        status = StockReservationStatus.RELEASED;
+    }
+
+    public void expire(Instant expiredAt) {
+        requireReserved();
+        if (!isExpiredAt(expiredAt)) {
+            throw new IllegalStateException("reservation has not expired");
+        }
+        status = StockReservationStatus.EXPIRED;
+    }
+
+    private void requireReserved() {
+        if (status != StockReservationStatus.RESERVED) {
+            throw new IllegalStateException("reservation is not reserved");
+        }
+    }
+
     @PrePersist
     void beforeInsert() {
         if (createdAt == null) {

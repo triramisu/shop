@@ -91,6 +91,30 @@ class InventoryDomainTests {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void enforcesReservationStateMachineAndExpirationBoundary() {
+        Instant issuedAt = Instant.parse("2026-09-30T10:15:30Z");
+        StockReservation confirmed =
+                StockReservation.issue(UUID.randomUUID(), stockItem(5), 1, issuedAt.plusSeconds(60), issuedAt);
+        StockReservation released =
+                StockReservation.issue(UUID.randomUUID(), stockItem(5), 1, issuedAt.plusSeconds(60), issuedAt);
+        StockReservation expired =
+                StockReservation.issue(UUID.randomUUID(), stockItem(5), 1, issuedAt.plusSeconds(60), issuedAt);
+
+        confirmed.confirm(issuedAt.plusSeconds(30));
+        released.release();
+        expired.expire(issuedAt.plusSeconds(60));
+
+        assertThat(confirmed.getStatus()).isEqualTo(StockReservationStatus.CONFIRMED);
+        assertThat(released.getStatus()).isEqualTo(StockReservationStatus.RELEASED);
+        assertThat(expired.getStatus()).isEqualTo(StockReservationStatus.EXPIRED);
+        assertThatThrownBy(confirmed::release).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> StockReservation.issue(
+                                UUID.randomUUID(), stockItem(5), 1, issuedAt.plusSeconds(60), issuedAt)
+                        .confirm(issuedAt.plusSeconds(60)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     private StockItem stockItem(long quantity) {
         return StockItem.create(UUID.randomUUID(), "DOMAIN-SKU-01", "WAREHOUSE_01", quantity);
     }

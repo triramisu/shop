@@ -125,6 +125,9 @@ public enum ErrorCode {
     INVENTORY_RESERVATION_EXPIRATION_INVALID(
             1220, "error.inventory.reservation.expiration-invalid", HttpStatus.BAD_REQUEST),
     INVENTORY_RESERVATION_UNAVAILABLE(1221, "error.inventory.reservation.unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    STOCK_RESERVATION_NOT_FOUND(1222, "error.inventory.reservation.not-found", HttpStatus.NOT_FOUND),
+    STOCK_RESERVATION_STATE_INVALID(1223, "error.inventory.reservation.state-invalid", HttpStatus.CONFLICT),
+    STOCK_RESERVATION_EXPIRED(1224, "error.inventory.reservation.expired", HttpStatus.CONFLICT),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

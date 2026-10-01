@@ -20,6 +20,7 @@ public class InventoryReservationProperties {
     Duration transactionTimeout = Duration.ofSeconds(3);
     int maxAttempts = 3;
     Duration retryBackoff = Duration.ofMillis(25);
+    Expiration expiration = new Expiration();
 
     @PostConstruct
     void validate() {
@@ -34,6 +35,33 @@ public class InventoryReservationProperties {
         }
         if (retryBackoff == null || retryBackoff.isNegative()) {
             throw new IllegalStateException("Inventory reservation retry-backoff must not be negative");
+        }
+        if (expiration == null) {
+            throw new IllegalStateException("Inventory reservation expiration configuration is required");
+        }
+        expiration.validate();
+    }
+
+    @Getter
+    @Setter
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class Expiration {
+
+        boolean enabled = true;
+        Duration fixedDelay = Duration.ofSeconds(30);
+        Duration initialDelay = Duration.ofSeconds(30);
+        int batchSize = 100;
+
+        void validate() {
+            if (fixedDelay == null || fixedDelay.isZero() || fixedDelay.isNegative()) {
+                throw new IllegalStateException("Inventory expiration fixed-delay must be positive");
+            }
+            if (initialDelay == null || initialDelay.isNegative()) {
+                throw new IllegalStateException("Inventory expiration initial-delay must not be negative");
+            }
+            if (batchSize < 1 || batchSize > 1_000) {
+                throw new IllegalStateException("Inventory expiration batch-size must be between 1 and 1000");
+            }
         }
     }
 }

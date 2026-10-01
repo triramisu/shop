@@ -1,11 +1,13 @@
 package com.shop.inventory.internal.repository;
 
 import com.shop.inventory.internal.entity.StockItem;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -16,6 +18,10 @@ public interface StockItemRepository extends Repository<StockItem, UUID> {
     <S extends StockItem> S saveAndFlush(S stockItem);
 
     Optional<StockItem> findById(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select stockItem from StockItem stockItem where stockItem.id = :stockItemId")
+    Optional<StockItem> findByIdForUpdate(@Param("stockItemId") UUID stockItemId);
 
     boolean existsById(UUID id);
 
