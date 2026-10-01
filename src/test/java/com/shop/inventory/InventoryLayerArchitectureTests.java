@@ -8,6 +8,7 @@ import com.shop.ShopApplication;
 import com.shop.inventory.internal.controller.InventoryAdministrationController;
 import com.shop.inventory.internal.repository.StockItemRepository;
 import com.shop.inventory.internal.repository.StockMovementRepository;
+import com.shop.inventory.internal.repository.StockReservationIdempotencyRepository;
 import com.shop.inventory.internal.repository.StockReservationRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -52,7 +53,7 @@ class InventoryLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.inventory.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(3)
+                .hasSize(4)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -62,8 +63,11 @@ class InventoryLayerArchitectureTests {
 
     @Test
     void inventoryRepositoriesDoNotExposePhysicalDeleteOperations() {
-        List<Class<?>> repositories =
-                List.of(StockItemRepository.class, StockMovementRepository.class, StockReservationRepository.class);
+        List<Class<?>> repositories = List.of(
+                StockItemRepository.class,
+                StockMovementRepository.class,
+                StockReservationRepository.class,
+                StockReservationIdempotencyRepository.class);
 
         assertThat(repositories).allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
                         .map(Method::getName)

@@ -69,19 +69,27 @@ class InventoryAdministrationIntegrationTests {
         String customerToken = accountWithRole("inventory-customer", RoleCode.USER);
         String staffToken = accountWithRole("inventory-staff", RoleCode.STAFF);
 
-        mockMvc.perform(get(BASE + "/stock-items")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(BASE + "/stock-items"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1006))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
         mockMvc.perform(post(BASE + "/stock-items")
                         .header(HttpHeaders.AUTHORIZATION, bearer(customerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createStockJson(sku, "WAREHOUSE_01", 10, "Phiếu nhập đầu kỳ", "RECEIPT-001")))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value(1007));
+                .andExpect(jsonPath("$.code").value(1007))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
         MvcResult created = mockMvc.perform(post(BASE + "/stock-items")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createStockJson(sku, "warehouse_01", 10, "Phiếu nhập đầu kỳ", "RECEIPT-001")))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.sku").value(sku))
                 .andExpect(jsonPath("$.result.locationCode").value("WAREHOUSE_01"))
                 .andExpect(jsonPath("$.result.onHand").value(10))
@@ -94,6 +102,8 @@ class InventoryAdministrationIntegrationTests {
         mockMvc.perform(get(BASE + "/stock-items/{stockItemId}/movements", stockItemId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.totalElements").value(1))
                 .andExpect(jsonPath("$.result.content[0].movementType").value("INITIAL"))
                 .andExpect(jsonPath("$.result.content[0].onHandDelta").value(10))
@@ -112,6 +122,8 @@ class InventoryAdministrationIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(adjustmentJson(-4, "Kiểm kê thực tế", "COUNT-001", stock.version())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.onHand").value(6))
                 .andExpect(jsonPath("$.result.available").value(6))
                 .andExpect(jsonPath("$.result.version").value(stock.version() + 1))
@@ -123,23 +135,31 @@ class InventoryAdministrationIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(adjustmentJson(1, "Phiên bản cũ", null, stock.version())))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(1203));
+                .andExpect(jsonPath("$.code").value(1203))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
         mockMvc.perform(post(BASE + "/stock-items/{stockItemId}/adjustments", stock.id())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(adjustmentJson(-7, "Không được âm", null, adjustedVersion)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(1204));
+                .andExpect(jsonPath("$.code").value(1204))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
 
         mockMvc.perform(get(BASE + "/stock-items/{stockItemId}", stock.id())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.onHand").value(6))
                 .andExpect(jsonPath("$.result.version").value(adjustedVersion));
         mockMvc.perform(get(BASE + "/stock-items/{stockItemId}/movements", stock.id())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.totalElements").value(2))
                 .andExpect(jsonPath("$.result.content[*].movementType").value(contains("ADJUSTMENT", "INITIAL")));
     }
@@ -159,6 +179,8 @@ class InventoryAdministrationIntegrationTests {
                         .param("size", "1")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.content[0].sku").value(alphaSku))
                 .andExpect(jsonPath("$.result.totalElements").value(2))
                 .andExpect(jsonPath("$.result.totalPages").value(2));
@@ -167,6 +189,8 @@ class InventoryAdministrationIntegrationTests {
                         .param("keyword", "ALPHA_")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.result.totalElements").value(1))
                 .andExpect(jsonPath("$.result.content[0].sku").value(alphaSku));
 
@@ -175,18 +199,24 @@ class InventoryAdministrationIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createStockJson(alphaSku, "WAREHOUSE_03", 1, null, null)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(1202));
+                .andExpect(jsonPath("$.code").value(1202))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
         mockMvc.perform(post(BASE + "/stock-items")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createStockJson("UNKNOWN-SKU", "WAREHOUSE_03", 1, null, null)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(1201));
+                .andExpect(jsonPath("$.code").value(1201))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
         mockMvc.perform(get(BASE + "/stock-items")
                         .param("page", "-1")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(1048));
+                .andExpect(jsonPath("$.code").value(1048))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
         mockMvc.perform(post(BASE + "/stock-items")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staffToken))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -194,7 +224,9 @@ class InventoryAdministrationIntegrationTests {
                                 {"sku":"INVENTORY-ALPHA_01","locationCode":"WAREHOUSE_04"}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(1216));
+                .andExpect(jsonPath("$.code").value(1216))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.result").doesNotExist());
     }
 
     private String accountWithRole(String username, RoleCode roleCode) throws Exception {
@@ -239,6 +271,9 @@ class InventoryAdministrationIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createStockJson(sku, location, quantity, "Tồn đầu kỳ", null)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(1000))
+                .andExpect(jsonPath("$.message").doesNotExist())
+                .andExpect(jsonPath("$.result").exists())
                 .andReturn();
         return new StockResult(readUuid(result, "$.result.id"), readLong(result, "$.result.version"));
     }

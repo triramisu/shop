@@ -19,7 +19,9 @@ import com.shop.inventory.reservation.StockReservationStatus;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,7 @@ class StockReservationIntegrationTests {
 
     @AfterEach
     void cleanCommittedReservationData() {
+        jdbcTemplate.update("DELETE FROM ton_kho_yeu_cau_luy_dang");
         jdbcTemplate.update("DELETE FROM ton_kho_giu_hang");
         jdbcTemplate.update("DELETE FROM ton_kho_bien_dong");
         jdbcTemplate.update("DELETE FROM ton_kho_mat_hang");
@@ -116,24 +119,103 @@ class StockReservationIntegrationTests {
     }
 
     @Test
-    void rejectsDuplicateReservationWithoutChangingBalanceTwice() {
+    void rejectsANewExpiredReservationBeforeChangingStock() {
+        StockItem stockItem = stockItemRepository.saveAndFlush(
+                StockItem.create(UUID.randomUUID(), "RESERVE-EXPIRED-01", "WAREHOUSE_02", 2));
+        UUID reservationId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> reservationOperations.reserve(new ReserveStockCommand(
+                        reservationId, stockItem.getId(), 1, Instant.now().minusSeconds(1))))
+                .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.INVENTORY_RESERVATION_EXPIRATION_INVALID));
+
+        assertThat(stockItemRepository.findById(stockItem.getId()).orElseThrow().getReserved())
+                .isZero();
+        assertThat(stockReservationRepository.findById(reservationId)).isEmpty();
+        assertThat(movements(stockItem.getId())).isEmpty();
+    }
+
+    @Test
+    void replaysDuplicateReservationWithoutChangingBalanceTwice() {
         StockItem stockItem = stockItemRepository.saveAndFlush(
                 StockItem.create(UUID.randomUUID(), "RESERVE-DUPLICATE-01", "WAREHOUSE_03", 5));
         UUID reservationId = UUID.randomUUID();
         ReserveStockCommand command = new ReserveStockCommand(
                 reservationId, stockItem.getId(), 2, Instant.now().plusSeconds(300));
-        reservationOperations.reserve(command);
+        var firstResult = reservationOperations.reserve(command);
 
-        assertThatThrownBy(() -> reservationOperations.reserve(command))
-                .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
-                        .isEqualTo(ErrorCode.STOCK_RESERVATION_ALREADY_EXISTS));
+        var replayedResult = reservationOperations.reserve(command);
 
+        assertThat(replayedResult).isEqualTo(firstResult);
         assertThat(stockItemRepository.findById(stockItem.getId()).orElseThrow().getReserved())
                 .isEqualTo(2);
         assertThat(stockReservationRepository.countByStockItemId(stockItem.getId()))
                 .isEqualTo(1);
         assertThat(stockMovementRepository.findByStockItemId(stockItem.getId(), PageRequest.of(0, 10)))
                 .hasSize(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ton_kho_yeu_cau_luy_dang WHERE reservation_id = ?",
+                        Long.class,
+                        reservationId))
+                .isEqualTo(1L);
+        Map<String, Object> replayRecord = jdbcTemplate.queryForMap("""
+                SELECT operation, processing_status, result_status, result_quantity,
+                       result_on_hand, result_reserved, CHAR_LENGTH(request_fingerprint) AS fingerprint_length
+                  FROM ton_kho_yeu_cau_luy_dang
+                 WHERE reservation_id = ?
+                """, reservationId);
+        assertThat(replayRecord)
+                .containsEntry("operation", "RESERVE")
+                .containsEntry("processing_status", "COMPLETED")
+                .containsEntry("result_status", "RESERVED")
+                .containsEntry("result_quantity", 2L)
+                .containsEntry("result_on_hand", 5L)
+                .containsEntry("result_reserved", 2L)
+                .containsEntry("fingerprint_length", 64L);
+    }
+
+    @Test
+    void rejectsAReusedReservationIdWithDifferentPayload() {
+        StockItem stockItem = stockItemRepository.saveAndFlush(
+                StockItem.create(UUID.randomUUID(), "RESERVE-CONFLICT-01", "WAREHOUSE_03", 5));
+        UUID reservationId = UUID.randomUUID();
+        Instant expiresAt = Instant.now().plusSeconds(300).truncatedTo(ChronoUnit.MICROS);
+        reservationOperations.reserve(new ReserveStockCommand(reservationId, stockItem.getId(), 2, expiresAt));
+
+        assertThatThrownBy(() -> reservationOperations.reserve(
+                        new ReserveStockCommand(reservationId, stockItem.getId(), 3, expiresAt)))
+                .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.STOCK_RESERVATION_IDEMPOTENCY_CONFLICT));
+
+        assertThat(stockItemRepository.findById(stockItem.getId()).orElseThrow().getReserved())
+                .isEqualTo(2);
+        assertThat(movements(stockItem.getId())).hasSize(1);
+    }
+
+    @Test
+    void lazilyBuildsAReplayRecordForAReservationCreatedBeforeV14() {
+        Instant issuedAt = Instant.now().minusSeconds(120).truncatedTo(ChronoUnit.MICROS);
+        Instant expiresAt = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS);
+        StockItem stockItem = StockItem.create(UUID.randomUUID(), "RESERVE-LEGACY-01", "WAREHOUSE_03", 5);
+        stockItem.reserve(2);
+        stockItem = stockItemRepository.saveAndFlush(stockItem);
+        UUID reservationId = UUID.randomUUID();
+        stockReservationRepository.saveAndFlush(
+                StockReservation.issue(reservationId, stockItem, 2, expiresAt, issuedAt));
+        stockMovementRepository.saveAndFlush(StockMovement.record(
+                stockItem, StockMovementType.RESERVATION, 0, 2, "Giữ tồn kho", reservationId.toString(), issuedAt));
+        ReserveStockCommand command = new ReserveStockCommand(reservationId, stockItem.getId(), 2, expiresAt);
+
+        var replayedResult = reservationOperations.reserve(command);
+
+        assertThat(replayedResult.status()).isEqualTo(StockReservationStatus.RESERVED);
+        assertThat(replayedResult.reserved()).isEqualTo(2);
+        assertThat(movements(stockItem.getId())).hasSize(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ton_kho_yeu_cau_luy_dang WHERE reservation_id = ?",
+                        Long.class,
+                        reservationId))
+                .isEqualTo(1L);
     }
 
     @Test
@@ -144,8 +226,11 @@ class StockReservationIntegrationTests {
         reservationOperations.reserve(new ReserveStockCommand(
                 reservationId, stockItem.getId(), 4, Instant.now().plusSeconds(300)));
 
-        var result = reservationOperations.confirm(new ConfirmStockReservationCommand(reservationId));
+        ConfirmStockReservationCommand command = new ConfirmStockReservationCommand(reservationId);
+        var result = reservationOperations.confirm(command);
+        var replayedResult = reservationOperations.confirm(command);
 
+        assertThat(replayedResult).isEqualTo(result);
         assertThat(result.status()).isEqualTo(StockReservationStatus.CONFIRMED);
         assertThat(result.onHand()).isEqualTo(6);
         assertThat(result.reserved()).isZero();
@@ -181,8 +266,11 @@ class StockReservationIntegrationTests {
         reservationOperations.reserve(new ReserveStockCommand(
                 reservationId, stockItem.getId(), 3, Instant.now().plusSeconds(300)));
 
-        var result = reservationOperations.release(new ReleaseStockReservationCommand(reservationId));
+        ReleaseStockReservationCommand command = new ReleaseStockReservationCommand(reservationId);
+        var result = reservationOperations.release(command);
+        var replayedResult = reservationOperations.release(command);
 
+        assertThat(replayedResult).isEqualTo(result);
         assertThat(result.status()).isEqualTo(StockReservationStatus.RELEASED);
         assertThat(result.onHand()).isEqualTo(8);
         assertThat(result.reserved()).isZero();
@@ -202,6 +290,9 @@ class StockReservationIntegrationTests {
         stockReservationRepository.saveAndFlush(
                 StockReservation.issue(reservationId, stockItem, 2, now.minusSeconds(60), now.minusSeconds(120)));
 
+        assertThatThrownBy(() -> reservationOperations.confirm(new ConfirmStockReservationCommand(reservationId)))
+                .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.STOCK_RESERVATION_EXPIRED));
         assertThatThrownBy(() -> reservationOperations.confirm(new ConfirmStockReservationCommand(reservationId)))
                 .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.STOCK_RESERVATION_EXPIRED));
