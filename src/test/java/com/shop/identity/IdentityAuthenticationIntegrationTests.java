@@ -80,7 +80,11 @@ class IdentityAuthenticationIntegrationTests {
                         refreshJwt.getJWTClaimsSet().getExpirationTime().toInstant()))
                 .isEqualTo(36000);
 
-        List<String> hashes = jdbcTemplate.queryForList("SELECT token_hash FROM xac_thuc_phien_lam_moi", String.class);
+        List<String> hashes = jdbcTemplate.queryForList("""
+                SELECT token_hash
+                  FROM xac_thuc_phien_lam_moi
+                 WHERE user_id = (SELECT id FROM xac_thuc_nguoi_dung WHERE username = ?)
+                """, String.class, "auth-user");
         assertThat(hashes).hasSize(1);
         assertThat(hashes.getFirst()).hasSize(64).isNotEqualTo(tokens.refreshToken());
 
@@ -280,8 +284,11 @@ class IdentityAuthenticationIntegrationTests {
         int deletedCount = refreshTokenCleanupService.deleteExpiredTokens(Instant.now());
 
         assertThat(deletedCount).isEqualTo(1);
-        Integer remainingCount =
-                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM xac_thuc_phien_lam_moi", Integer.class);
+        Integer remainingCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM xac_thuc_phien_lam_moi
+                 WHERE user_id = (SELECT id FROM xac_thuc_nguoi_dung WHERE username = ?)
+                """, Integer.class, "active-token-user");
         assertThat(remainingCount).isEqualTo(1);
     }
 

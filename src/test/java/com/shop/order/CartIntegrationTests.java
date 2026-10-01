@@ -20,6 +20,8 @@ import com.shop.catalog.internal.service.CatalogCategoryService;
 import com.shop.catalog.internal.service.CatalogProductService;
 import com.shop.identity.support.IdentityApiTestClient;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,7 @@ class CartIntegrationTests {
     private CatalogProductService productService;
 
     private IdentityApiTestClient identityClient;
+    private final List<String> registeredUsernames = new ArrayList<>();
 
     @BeforeEach
     void setUpIdentityClient() {
@@ -61,9 +64,21 @@ class CartIntegrationTests {
     }
 
     @AfterEach
-    void cleanCommittedCarts() {
+    void cleanCommittedTestData() {
         jdbcTemplate.update("DELETE FROM don_hang_muc_gio_hang");
         jdbcTemplate.update("DELETE FROM don_hang_gio_hang");
+        for (String username : registeredUsernames) {
+            jdbcTemplate.update("""
+                    DELETE FROM xac_thuc_phien_lam_moi
+                     WHERE user_id = (SELECT id FROM xac_thuc_nguoi_dung WHERE username = ?)
+                    """, username);
+            jdbcTemplate.update("""
+                    DELETE FROM xac_thuc_nguoi_dung_vai_tro
+                     WHERE user_id = (SELECT id FROM xac_thuc_nguoi_dung WHERE username = ?)
+                    """, username);
+            jdbcTemplate.update("DELETE FROM xac_thuc_nguoi_dung WHERE username = ?", username);
+        }
+        registeredUsernames.clear();
     }
 
     @Test
@@ -195,6 +210,7 @@ class CartIntegrationTests {
 
     private String registerAndAuthenticate(String username) throws Exception {
         identityClient.register(username);
+        registeredUsernames.add(username);
         return identityClient.authenticate(username).accessToken();
     }
 
