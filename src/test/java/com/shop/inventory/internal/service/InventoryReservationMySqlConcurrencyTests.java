@@ -3,6 +3,7 @@ package com.shop.inventory.internal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.inventory.internal.entity.StockItem;
+import com.shop.inventory.internal.entity.StockMovement;
 import com.shop.inventory.internal.entity.StockReservation;
 import com.shop.inventory.internal.repository.StockItemRepository;
 import com.shop.inventory.internal.repository.StockMovementRepository;
@@ -16,7 +17,10 @@ import com.shop.inventory.reservation.StockReservationResult;
 import com.shop.inventory.reservation.StockReservationStatus;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -24,6 +28,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.RepetitionInfo;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +49,11 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class InventoryReservationMySqlConcurrencyTests {
+
+    private static final int OVERSELL_ROUNDS = 5;
+    private static final int OVERSELL_WORKERS = 24;
+    private static final int CONCURRENT_TIMEOUT_SECONDS = 30;
+    private static final long INITIAL_OVERSELL_STOCK = 60;
 
     @Container
     static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.0.46"))
@@ -104,6 +116,98 @@ class InventoryReservationMySqlConcurrencyTests {
                 .isEqualTo(1);
         assertThat(stockMovementRepository.findByStockItemId(stockItem.getId(), PageRequest.of(0, 10)))
                 .hasSize(1);
+    }
+
+    @RepeatedTest(
+            value = OVERSELL_ROUNDS,
+            name = "MySQL oversell invariant round {currentRepetition}/{totalRepetitions}")
+    void neverOversellsAcrossConcurrentReserveConfirmAndRelease(RepetitionInfo repetitionInfo) throws Exception {
+        int round = repetitionInfo.getCurrentRepetition();
+        StockItem stockItem = stockItemRepository.saveAndFlush(StockItem.create(
+                deterministicId(round, -1),
+                String.format("MYSQL-OVERSELL-%02d", round),
+                "WAREHOUSE_STRESS",
+                INITIAL_OVERSELL_STOCK));
+        List<ReservationRequest> requests = IntStream.range(0, OVERSELL_WORKERS)
+                .mapToObj(index -> new ReservationRequest(deterministicId(round, index), (index % 5) + 2L))
+                .toList();
+        assertThat(requests.stream().mapToLong(ReservationRequest::quantity).sum())
+                .isGreaterThan(INITIAL_OVERSELL_STOCK);
+
+        List<OversellAttempt> attempts = runConcurrentReservations(
+                requests, stockItem.getId(), Instant.now().plusSeconds(300));
+        List<OversellAttempt> successful = attempts.stream()
+                .filter(attempt -> attempt.result() != null)
+                .sorted(Comparator.comparing(attempt -> attempt.request().reservationId()))
+                .toList();
+        List<OversellAttempt> rejected =
+                attempts.stream().filter(attempt -> attempt.result() == null).toList();
+
+        assertThat(attempts).hasSize(OVERSELL_WORKERS);
+        assertThat(successful).isNotEmpty().allSatisfy(attempt -> {
+            assertThat(attempt.errorCode()).isNull();
+            assertThat(attempt.result().reservationId())
+                    .isEqualTo(attempt.request().reservationId());
+            assertThat(attempt.result().quantity()).isEqualTo(attempt.request().quantity());
+        });
+        assertThat(rejected).isNotEmpty().allSatisfy(attempt -> {
+            assertThat(attempt.result()).isNull();
+            assertThat(attempt.errorCode()).isEqualTo(ErrorCode.INVENTORY_INSUFFICIENT_STOCK);
+        });
+
+        long successfullyReserved = successful.stream()
+                .mapToLong(attempt -> attempt.request().quantity())
+                .sum();
+        StockItem afterReserve = stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(successfullyReserved).isLessThanOrEqualTo(INITIAL_OVERSELL_STOCK);
+        assertThat(afterReserve.getOnHand()).isEqualTo(INITIAL_OVERSELL_STOCK);
+        assertThat(afterReserve.getReserved()).isEqualTo(successfullyReserved);
+        assertThat(afterReserve.getAvailable()).isEqualTo(INITIAL_OVERSELL_STOCK - successfullyReserved);
+        assertThat(afterReserve.getAvailable()).isNotNegative();
+        assertThat(stockReservationRepository.countByStockItemId(stockItem.getId()))
+                .isEqualTo(successful.size());
+        assertThat(stockMovementRepository.findByStockItemId(stockItem.getId(), PageRequest.of(0, 100)))
+                .hasSize(successful.size());
+        assertThat(countIdempotencyRecords(attempts)).isEqualTo(successful.size());
+
+        List<LifecyclePlan> lifecyclePlans = IntStream.range(0, successful.size())
+                .mapToObj(index -> lifecyclePlan(index, successful.get(index)))
+                .toList();
+        List<LifecyclePlan> transitions = lifecyclePlans.stream()
+                .filter(plan -> plan.targetStatus() != StockReservationStatus.RESERVED)
+                .toList();
+        List<LifecycleResult> transitionResults = runConcurrentLifecycleTransitions(transitions);
+
+        assertThat(transitionResults).hasSameSizeAs(transitions).allSatisfy(result -> assertThat(result.actualStatus())
+                .isEqualTo(result.plan().targetStatus()));
+        lifecyclePlans.forEach(plan -> assertThat(stockReservationRepository
+                        .findById(plan.reservationId())
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(plan.targetStatus()));
+
+        long confirmed = quantityByStatus(lifecyclePlans, StockReservationStatus.CONFIRMED);
+        long stillReserved = quantityByStatus(lifecyclePlans, StockReservationStatus.RESERVED);
+        long released = quantityByStatus(lifecyclePlans, StockReservationStatus.RELEASED);
+        StockItem afterLifecycle =
+                stockItemRepository.findById(stockItem.getId()).orElseThrow();
+        assertThat(confirmed + stillReserved + released).isEqualTo(successfullyReserved);
+        assertThat(confirmed + stillReserved).isLessThanOrEqualTo(INITIAL_OVERSELL_STOCK);
+        assertThat(afterLifecycle.getOnHand()).isEqualTo(INITIAL_OVERSELL_STOCK - confirmed);
+        assertThat(afterLifecycle.getReserved()).isEqualTo(stillReserved);
+        assertThat(afterLifecycle.getAvailable())
+                .isEqualTo(INITIAL_OVERSELL_STOCK - confirmed - stillReserved)
+                .isNotNegative();
+
+        List<StockMovement> movements = stockMovementRepository
+                .findByStockItemId(stockItem.getId(), PageRequest.of(0, 100))
+                .getContent();
+        assertThat(movements).hasSize(successful.size() + transitions.size());
+        assertThat(movements.stream().mapToLong(StockMovement::getOnHandDelta).sum())
+                .isEqualTo(-confirmed);
+        assertThat(movements.stream().mapToLong(StockMovement::getReservedDelta).sum())
+                .isEqualTo(stillReserved);
+        assertThat(countIdempotencyRecords(successful)).isEqualTo(successful.size() + transitions.size());
     }
 
     @Test
@@ -292,6 +396,105 @@ class InventoryReservationMySqlConcurrencyTests {
         }
     }
 
+    private List<OversellAttempt> runConcurrentReservations(
+            List<ReservationRequest> requests, UUID stockItemId, Instant expiresAt) throws Exception {
+        CountDownLatch ready = new CountDownLatch(requests.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(requests.size())) {
+            List<Future<OversellAttempt>> futures = new ArrayList<>();
+            for (ReservationRequest request : requests) {
+                futures.add(executor.submit(() -> reserveUnderLoad(request, stockItemId, expiresAt, ready, start)));
+            }
+            assertThat(ready.await(CONCURRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isTrue();
+            start.countDown();
+            List<OversellAttempt> attempts = new ArrayList<>();
+            for (Future<OversellAttempt> future : futures) {
+                attempts.add(future.get(CONCURRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+            return List.copyOf(attempts);
+        }
+    }
+
+    private OversellAttempt reserveUnderLoad(
+            ReservationRequest request,
+            UUID stockItemId,
+            Instant expiresAt,
+            CountDownLatch ready,
+            CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        try {
+            StockReservationResult result = reservationOperations.reserve(
+                    new ReserveStockCommand(request.reservationId(), stockItemId, request.quantity(), expiresAt));
+            return new OversellAttempt(request, result, null);
+        } catch (AppException exception) {
+            return new OversellAttempt(request, null, exception.getErrorCode());
+        }
+    }
+
+    private List<LifecycleResult> runConcurrentLifecycleTransitions(List<LifecyclePlan> plans) throws Exception {
+        CountDownLatch ready = new CountDownLatch(plans.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(plans.size())) {
+            List<Future<LifecycleResult>> futures = new ArrayList<>();
+            for (LifecyclePlan plan : plans) {
+                futures.add(executor.submit(() -> executeLifecycleTransition(plan, ready, start)));
+            }
+            assertThat(ready.await(CONCURRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isTrue();
+            start.countDown();
+            List<LifecycleResult> results = new ArrayList<>();
+            for (Future<LifecycleResult> future : futures) {
+                results.add(future.get(CONCURRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+            return List.copyOf(results);
+        }
+    }
+
+    private LifecycleResult executeLifecycleTransition(LifecyclePlan plan, CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        StockReservationResult result =
+                switch (plan.targetStatus()) {
+                    case CONFIRMED ->
+                        reservationOperations.confirm(new ConfirmStockReservationCommand(plan.reservationId()));
+                    case RELEASED ->
+                        reservationOperations.release(new ReleaseStockReservationCommand(plan.reservationId()));
+                    default -> throw new IllegalArgumentException("unsupported concurrent lifecycle target");
+                };
+        return new LifecycleResult(plan, result.status());
+    }
+
+    private LifecyclePlan lifecyclePlan(int index, OversellAttempt attempt) {
+        StockReservationStatus targetStatus =
+                switch (index % 3) {
+                    case 0 -> StockReservationStatus.CONFIRMED;
+                    case 1 -> StockReservationStatus.RELEASED;
+                    default -> StockReservationStatus.RESERVED;
+                };
+        return new LifecyclePlan(
+                attempt.request().reservationId(), attempt.request().quantity(), targetStatus);
+    }
+
+    private long quantityByStatus(List<LifecyclePlan> plans, StockReservationStatus status) {
+        return plans.stream()
+                .filter(plan -> plan.targetStatus() == status)
+                .mapToLong(LifecyclePlan::quantity)
+                .sum();
+    }
+
+    private long countIdempotencyRecords(List<OversellAttempt> attempts) {
+        return attempts.stream()
+                .map(OversellAttempt::request)
+                .mapToLong(request -> idempotencyRepository.countByReservationId(request.reservationId()))
+                .sum();
+    }
+
+    private UUID deterministicId(int round, int index) {
+        return UUID.nameUUIDFromBytes(("m3.5-oversell-" + round + "-" + index).getBytes(StandardCharsets.UTF_8));
+    }
+
     private IdempotentAttempt reserve(ReserveStockCommand command, CountDownLatch ready, CountDownLatch start) {
         return runIdempotentAttempt(() -> reservationOperations.reserve(command), ready, start);
     }
@@ -358,4 +561,12 @@ class InventoryReservationMySqlConcurrencyTests {
     private record LifecycleAttempt(boolean success, ErrorCode errorCode) {}
 
     private record IdempotentAttempt(StockReservationResult result, ErrorCode errorCode) {}
+
+    private record ReservationRequest(UUID reservationId, long quantity) {}
+
+    private record OversellAttempt(ReservationRequest request, StockReservationResult result, ErrorCode errorCode) {}
+
+    private record LifecyclePlan(UUID reservationId, long quantity, StockReservationStatus targetStatus) {}
+
+    private record LifecycleResult(LifecyclePlan plan, StockReservationStatus actualStatus) {}
 }
