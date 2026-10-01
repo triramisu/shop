@@ -31,7 +31,7 @@ class StockReservationIdempotencyStore {
             UUID reservationId, StockReservationOperation operation, String fingerprint) {
         return idempotencyRepository
                 .findByReservationIdAndOperation(reservationId, operation)
-                .map(record -> validateAndMap(record, fingerprint));
+                .map(storedRecord -> validateAndMap(storedRecord, fingerprint));
     }
 
     StockReservationResult recoverLegacy(
@@ -68,10 +68,10 @@ class StockReservationIdempotencyStore {
                 result.reservationId(), operation, fingerprint, result, completedAt));
     }
 
-    private StockReservationResult validateAndMap(StockReservationIdempotencyRecord record, String fingerprint) {
-        if (!record.hasFingerprint(fingerprint)) {
+    private StockReservationResult validateAndMap(StockReservationIdempotencyRecord storedRecord, String fingerprint) {
+        if (!storedRecord.hasFingerprint(fingerprint)) {
             throw new AppException(ErrorCode.STOCK_RESERVATION_IDEMPOTENCY_CONFLICT);
         }
-        return record.toResult();
+        return storedRecord.toResult();
     }
 }
