@@ -22,6 +22,10 @@ jwt:
   audience: shop-api-test
 
 app:
+  inventory:
+    reservation:
+      expiration:
+        enabled: false
   catalog:
     search:
       strategy: like

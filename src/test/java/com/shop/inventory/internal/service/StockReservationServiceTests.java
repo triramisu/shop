@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.shop.inventory.internal.configuration.InventoryReservationProperties;
+import com.shop.inventory.reservation.ConfirmStockReservationCommand;
+import com.shop.inventory.reservation.ReleaseStockReservationCommand;
 import com.shop.inventory.reservation.ReserveStockCommand;
 import com.shop.inventory.reservation.StockReservationResult;
 import com.shop.inventory.reservation.StockReservationStatus;
@@ -31,6 +33,9 @@ class StockReservationServiceTests {
     @Mock
     private StockReservationTransactionService transactionService;
 
+    @Mock
+    private StockReservationLifecycleTransactionService lifecycleTransactionService;
+
     private InventoryReservationProperties properties;
     private SimpleMeterRegistry meterRegistry;
     private StockReservationService service;
@@ -42,7 +47,8 @@ class StockReservationServiceTests {
         properties.setMaxDuration(Duration.ofMinutes(30));
         properties.setRetryBackoff(Duration.ZERO);
         meterRegistry = new SimpleMeterRegistry();
-        service = new StockReservationService(transactionService, properties, meterRegistry);
+        service =
+                new StockReservationService(transactionService, lifecycleTransactionService, properties, meterRegistry);
     }
 
     @Test
@@ -57,11 +63,13 @@ class StockReservationServiceTests {
         verify(transactionService, org.mockito.Mockito.times(2)).reserve(eq(command), any(Instant.class));
         assertThat(meterRegistry
                         .get(StockReservationService.RETRY_METRIC)
+                        .tag("operation", "reserve")
                         .counter()
                         .count())
                 .isEqualTo(1);
         assertThat(meterRegistry
                         .get(StockReservationService.OUTCOME_METRIC)
+                        .tag("operation", "reserve")
                         .tag("outcome", "success")
                         .counter()
                         .count())
@@ -80,11 +88,13 @@ class StockReservationServiceTests {
         verify(transactionService, org.mockito.Mockito.times(3)).reserve(eq(command), any(Instant.class));
         assertThat(meterRegistry
                         .get(StockReservationService.RETRY_METRIC)
+                        .tag("operation", "reserve")
                         .counter()
                         .count())
                 .isEqualTo(2);
         assertThat(meterRegistry
                         .get(StockReservationService.OUTCOME_METRIC)
+                        .tag("operation", "reserve")
                         .tag("outcome", "lock_retry_exhausted")
                         .counter()
                         .count())
@@ -113,20 +123,74 @@ class StockReservationServiceTests {
         verify(transactionService, never()).reserve(any(), any());
     }
 
+    @Test
+    void confirmsReservationAndRecordsOperationOutcome() {
+        ConfirmStockReservationCommand command = new ConfirmStockReservationCommand(UUID.randomUUID());
+        StockReservationResult expected = result(command.reservationId(), StockReservationStatus.CONFIRMED, 0, 0);
+        when(lifecycleTransactionService.confirm(eq(command), any(Instant.class)))
+                .thenReturn(new StockReservationLifecycleExecution(
+                        expected, StockReservationLifecycleExecution.Outcome.CONFIRMED));
+
+        assertThat(service.confirm(command)).isEqualTo(expected);
+        assertThat(meterRegistry
+                        .get(StockReservationService.OUTCOME_METRIC)
+                        .tag("operation", "confirm")
+                        .tag("outcome", "success")
+                        .counter()
+                        .count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void commitsExpirationThenRejectsLateConfirmation() {
+        ConfirmStockReservationCommand command = new ConfirmStockReservationCommand(UUID.randomUUID());
+        StockReservationResult expired = result(command.reservationId(), StockReservationStatus.EXPIRED, 1, 0);
+        when(lifecycleTransactionService.confirm(eq(command), any(Instant.class)))
+                .thenReturn(new StockReservationLifecycleExecution(
+                        expired, StockReservationLifecycleExecution.Outcome.EXPIRED_DURING_CONFIRM));
+
+        assertThatThrownBy(() -> service.confirm(command))
+                .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.STOCK_RESERVATION_EXPIRED));
+        assertThat(meterRegistry
+                        .get(StockReservationService.OUTCOME_METRIC)
+                        .tag("operation", "confirm")
+                        .tag("outcome", "expired")
+                        .counter()
+                        .count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void releasesReservationWithoutUsingReserveTransactionService() {
+        ReleaseStockReservationCommand command = new ReleaseStockReservationCommand(UUID.randomUUID());
+        StockReservationResult expected = result(command.reservationId(), StockReservationStatus.RELEASED, 1, 0);
+        when(lifecycleTransactionService.release(eq(command), any(Instant.class)))
+                .thenReturn(expected);
+
+        assertThat(service.release(command)).isEqualTo(expected);
+        verify(transactionService, never()).reserve(any(), any());
+    }
+
     private ReserveStockCommand command(Duration ttl) {
         return new ReserveStockCommand(
                 UUID.randomUUID(), UUID.randomUUID(), 1, Instant.now().plus(ttl));
     }
 
     private StockReservationResult result(ReserveStockCommand command) {
+        return result(command.reservationId(), StockReservationStatus.RESERVED, 1, 1);
+    }
+
+    private StockReservationResult result(
+            UUID reservationId, StockReservationStatus status, long onHand, long reserved) {
         return new StockReservationResult(
-                command.reservationId(),
-                command.stockItemId(),
-                command.quantity(),
-                StockReservationStatus.RESERVED,
-                command.expiresAt(),
+                reservationId,
+                UUID.randomUUID(),
                 1,
-                1,
-                0);
+                status,
+                Instant.now().plusSeconds(60),
+                onHand,
+                reserved,
+                onHand - reserved);
     }
 }

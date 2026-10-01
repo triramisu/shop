@@ -30,4 +30,14 @@ class InventoryReservationContractTests {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("reservation result contains invalid quantities");
     }
+
+    @Test
+    void rejectsLifecycleCommandsWithoutReservationId() {
+        assertThatThrownBy(() -> new ConfirmStockReservationCommand(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("reservation id is required");
+        assertThatThrownBy(() -> new ReleaseStockReservationCommand(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("reservation id is required");
+    }
 }

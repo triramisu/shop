@@ -34,7 +34,7 @@ Chỉ `PessimisticLockingFailureException`, gồm deadlock/lock-acquisition fail
 - `app.inventory.reservation.transaction-timeout`: timeout mỗi transaction, mặc định `3s`, giới hạn `1s..30s`.
 - `app.inventory.reservation.retry-backoff`: khoảng nghỉ cố định giữa attempt, mặc định `25ms`.
 - `app.inventory.reservation.max-duration`: TTL tối đa caller được yêu cầu, mặc định `30m`.
-- `shop.inventory.reservation.operations{outcome=...}`: kết quả command.
-- `shop.inventory.reservation.lock.retries`: số lần retry do lock.
+- `shop.inventory.reservation.operations{operation=...,outcome=...}`: kết quả theo từng command.
+- `shop.inventory.reservation.lock.retries{operation=...}`: số lần retry do lock theo từng command.
 
-Khi cạn retry, service trả lỗi tạm thời `1221`/HTTP 503 và không retry vô hạn. M3.3 sẽ bổ sung confirm/release/expiration; M3.5 sẽ mở rộng stress test nhiều thread sau khi toàn bộ state transition hoàn chỉnh.
+Khi cạn retry, service trả lỗi tạm thời `1221`/HTTP 503 và không retry vô hạn. Vòng đời sau khi giữ hàng được mô tả tại [inventory-reservation-lifecycle.md](inventory-reservation-lifecycle.md). M3.5 sẽ mở rộng stress test nhiều thread sau khi toàn bộ state transition hoàn chỉnh.
