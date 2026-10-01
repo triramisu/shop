@@ -132,6 +132,16 @@ public enum ErrorCode {
             1225, "error.inventory.reservation.idempotency-conflict", HttpStatus.CONFLICT),
     STOCK_RESERVATION_REPLAY_UNAVAILABLE(
             1226, "error.inventory.reservation.replay-unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    CART_SKU_NOT_FOUND(1300, "error.cart.sku.not-found", HttpStatus.NOT_FOUND),
+    CART_ITEM_NOT_FOUND(1301, "error.cart.item.not-found", HttpStatus.NOT_FOUND),
+    CART_SKU_REQUIRED(1302, "error.cart.sku.required", HttpStatus.BAD_REQUEST),
+    CART_SKU_INVALID(1303, "error.cart.sku.invalid", HttpStatus.BAD_REQUEST),
+    CART_QUANTITY_REQUIRED(1304, "error.cart.quantity.required", HttpStatus.BAD_REQUEST),
+    CART_QUANTITY_INVALID(1305, "error.cart.quantity.invalid", HttpStatus.BAD_REQUEST),
+    CART_QUANTITY_LIMIT_EXCEEDED(1306, "error.cart.quantity.limit-exceeded", HttpStatus.CONFLICT),
+    CART_ITEM_LIMIT_EXCEEDED(1307, "error.cart.item.limit-exceeded", HttpStatus.CONFLICT),
+    CART_CONFLICT(1308, "error.cart.conflict", HttpStatus.CONFLICT),
+    CART_UNAVAILABLE(1309, "error.cart.unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;
