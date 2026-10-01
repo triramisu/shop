@@ -1,0 +1,11 @@
+package com.shop.order.event;
+
+public enum OrderTransitionEvent {
+    PAYMENT_CONFIRMED,
+    CANCELLED_BEFORE_PAYMENT,
+    PAYMENT_EXPIRED,
+    FULFILLMENT_STARTED,
+    CANCELLATION_COMPENSATED,
+    SHIPMENT_DISPATCHED,
+    DELIVERY_CONFIRMED
+}

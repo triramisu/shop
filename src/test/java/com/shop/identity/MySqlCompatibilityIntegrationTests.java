@@ -119,7 +119,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(15);
+        assertThat(migrationCount).isEqualTo(16);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -133,6 +133,11 @@ class MySqlCompatibilityIntegrationTests {
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'ton_kho_%'",
                         Integer.class))
                 .isEqualTo(4);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                                + "WHERE table_schema = DATABASE() AND table_name LIKE 'don_hang_%'",
+                        Integer.class))
+                .isEqualTo(3);
     }
 
     @Test

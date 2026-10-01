@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
 import com.shop.order.internal.repository.CartRepository;
+import com.shop.order.internal.repository.CustomerOrderRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +43,7 @@ class OrderLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.order.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(2)
+                .hasSize(3)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -83,10 +85,11 @@ class OrderLayerArchitectureTests {
     }
 
     @Test
-    void cartRepositoryDoesNotExposeCartDeletion() {
-        assertThat(Arrays.stream(CartRepository.class.getMethods())
-                        .map(Method::getName)
-                        .filter(methodName -> methodName.startsWith("delete")))
-                .isEmpty();
+    void orderRepositoriesDoNotExposeAggregateDeletion() {
+        assertThat(List.of(CartRepository.class, CustomerOrderRepository.class))
+                .allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
+                                .map(Method::getName)
+                                .filter(methodName -> methodName.startsWith("delete")))
+                        .isEmpty());
     }
 }

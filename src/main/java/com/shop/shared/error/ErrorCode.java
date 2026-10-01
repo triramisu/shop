@@ -142,6 +142,10 @@ public enum ErrorCode {
     CART_ITEM_LIMIT_EXCEEDED(1307, "error.cart.item.limit-exceeded", HttpStatus.CONFLICT),
     CART_CONFLICT(1308, "error.cart.conflict", HttpStatus.CONFLICT),
     CART_UNAVAILABLE(1309, "error.cart.unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    ORDER_NOT_FOUND(1310, "error.order.not-found", HttpStatus.NOT_FOUND),
+    ORDER_STATE_TRANSITION_INVALID(1311, "error.order.transition.invalid", HttpStatus.CONFLICT),
+    ORDER_TRANSITION_ACTOR_FORBIDDEN(1312, "error.order.transition.actor-forbidden", HttpStatus.FORBIDDEN),
+    ORDER_CONCURRENT_MODIFICATION(1313, "error.order.concurrent-modification", HttpStatus.CONFLICT),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;
