@@ -81,6 +81,7 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/cart/items/{itemId}'].put").exists())
                 .andExpect(
                         jsonPath("$.paths['/api/cart/items/{itemId}'].delete").exists())
+                .andExpect(jsonPath("$.paths['/api/checkout/quote'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/auth/token'].post.security").doesNotExist())
                 .andExpect(
                         jsonPath("$.paths['/api/auth/register'].post.security").doesNotExist())
@@ -97,6 +98,8 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/admin/inventory/stock-items'].get.security[0].bearerAuth")
                         .isArray())
                 .andExpect(jsonPath("$.paths['/api/cart'].get.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/checkout/quote'].post.security[0].bearerAuth")
                         .isArray());
     }
 

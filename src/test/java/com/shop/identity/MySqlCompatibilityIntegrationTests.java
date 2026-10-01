@@ -8,6 +8,7 @@ import com.shop.catalog.internal.dto.request.CreateProductRequest;
 import com.shop.catalog.internal.dto.request.CreateProductVariantRequest;
 import com.shop.catalog.internal.dto.request.ProductSearchRequest;
 import com.shop.catalog.internal.dto.request.ProductSortField;
+import com.shop.catalog.internal.dto.request.VersionedCatalogRequest;
 import com.shop.catalog.internal.dto.response.CategoryResponse;
 import com.shop.catalog.internal.dto.response.ProductPageResponse;
 import com.shop.catalog.internal.dto.response.ProductResponse;
@@ -33,6 +34,12 @@ import com.shop.inventory.internal.dto.request.CreateStockItemRequest;
 import com.shop.inventory.internal.dto.request.StockAdjustmentRequest;
 import com.shop.inventory.internal.dto.response.StockItemResponse;
 import com.shop.inventory.internal.service.StockInventoryService;
+import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
+import com.shop.order.internal.checkout.dto.response.CheckoutQuoteResponse;
+import com.shop.order.internal.checkout.service.CheckoutPricingService;
+import com.shop.order.internal.dto.request.AddCartItemRequest;
+import com.shop.order.internal.dto.response.CartResponse;
+import com.shop.order.internal.service.CartService;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -98,6 +105,12 @@ class MySqlCompatibilityIntegrationTests {
 
     @Autowired
     private StockInventoryService stockInventoryService;
+
+    @Autowired
+    private CartService cartService;
+
+    @Autowired
+    private CheckoutPricingService checkoutPricingService;
 
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
@@ -186,6 +199,54 @@ class MySqlCompatibilityIntegrationTests {
                         Integer.class,
                         created.getId().toString()))
                 .isEqualTo(2);
+    }
+
+    @Test
+    void quotesTheCurrentCatalogPriceThroughThePublishedContractOnMySql() {
+        CategoryResponse category = catalogCategoryService.create(CreateCategoryRequest.builder()
+                .code("MYSQL_CHECKOUT")
+                .name("MySQL Checkout")
+                .slug("mysql-checkout")
+                .build());
+        ProductResponse product = catalogProductService.create(CreateProductRequest.builder()
+                .categoryId(category.getId())
+                .name("MySQL Checkout Product")
+                .slug("mysql-checkout-product")
+                .build());
+        product = catalogProductService.addVariant(
+                product.getId(),
+                CreateProductVariantRequest.builder()
+                        .sku("MYSQL-CHECKOUT-01")
+                        .name("Default")
+                        .price(new java.math.BigDecimal("29.90"))
+                        .currency("USD")
+                        .productVersion(product.getVersion())
+                        .build());
+        catalogProductService.publish(
+                product.getId(),
+                VersionedCatalogRequest.builder().version(product.getVersion()).build());
+
+        String owner = "mysql-checkout-owner";
+        cartService.getCart(owner);
+        CartResponse cart = cartService.addItem(
+                owner,
+                AddCartItemRequest.builder()
+                        .sku("MYSQL-CHECKOUT-01")
+                        .quantity(2)
+                        .build());
+        CheckoutQuoteResponse quote = checkoutPricingService.quote(
+                owner,
+                CheckoutQuoteRequest.builder()
+                        .expectedCartVersion(cart.getVersion())
+                        .build());
+
+        assertThat(quote.getCurrency()).isEqualTo("USD");
+        assertThat(quote.getLines()).singleElement().satisfies(line -> {
+            assertThat(line.getQuantity()).isEqualTo(2);
+            assertThat(line.getUnitPrice()).isEqualByComparingTo("29.90");
+            assertThat(line.getTotal()).isEqualByComparingTo("59.80");
+        });
+        assertThat(quote.getGrandTotal()).isEqualByComparingTo("59.80");
     }
 
     @Test
