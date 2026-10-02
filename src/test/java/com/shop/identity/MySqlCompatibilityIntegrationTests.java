@@ -46,10 +46,15 @@ import com.shop.order.internal.checkout.service.OrderSnapshotQueryService;
 import com.shop.order.internal.dto.request.AddCartItemRequest;
 import com.shop.order.internal.dto.response.CartResponse;
 import com.shop.order.internal.service.CartService;
+import com.shop.payment.event.PaymentStatus;
+import com.shop.payment.internal.entity.PaymentAttempt;
+import com.shop.payment.internal.repository.PaymentAttemptRepository;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -132,6 +137,9 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private CheckoutIdempotencyService checkoutIdempotencyService;
 
+    @Autowired
+    private PaymentAttemptRepository paymentAttemptRepository;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -152,7 +160,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(19);
+        assertThat(migrationCount).isEqualTo(20);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -171,6 +179,38 @@ class MySqlCompatibilityIntegrationTests {
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'don_hang_%'",
                         Integer.class))
                 .isEqualTo(7);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                                + "WHERE table_schema = DATABASE() AND table_name = 'thanh_toan_lan_thu'",
+                        Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void persistsPaymentLifecycleAndImmutableTermsOnMySql() {
+        UUID orderId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-03T00:00:00Z");
+        PaymentAttempt attempt = PaymentAttempt.start(
+                UUID.randomUUID(), orderId, 1, new BigDecimal("125000.00"), "vnd", "sandbox", createdAt);
+        attempt.transition(PaymentStatus.PENDING, "mysql-payment-reference-1", null, createdAt.plusSeconds(1));
+        attempt.transition(PaymentStatus.SUCCEEDED, null, null, createdAt.plusSeconds(2));
+
+        PaymentAttempt saved = paymentAttemptRepository.saveAndFlush(attempt);
+        PaymentAttempt reloaded =
+                paymentAttemptRepository.findById(saved.getId()).orElseThrow();
+
+        assertThat(reloaded.getOrderId()).isEqualTo(orderId);
+        assertThat(reloaded.getAmount()).isEqualByComparingTo("125000.00");
+        assertThat(reloaded.getCurrency()).isEqualTo("VND");
+        assertThat(reloaded.getProviderCode()).isEqualTo("SANDBOX");
+        assertThat(reloaded.getProviderReference()).isEqualTo("mysql-payment-reference-1");
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(reloaded.getCompletedAt()).isEqualTo(createdAt.plusSeconds(2));
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM thanh_toan_lan_thu WHERE order_id = UNHEX(REPLACE(?, '-', ''))",
+                        Integer.class,
+                        orderId.toString()))
+                .isEqualTo(1);
     }
 
     @Test

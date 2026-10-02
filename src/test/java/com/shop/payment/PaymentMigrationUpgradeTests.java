@@ -1,4 +1,4 @@
-package com.shop.catalog;
+package com.shop.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,28 +11,30 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-class CatalogMigrationUpgradeTests {
+class PaymentMigrationUpgradeTests {
 
     @Test
-    void upgradesAnExistingIdentitySchemaWithoutChangingExistingUsers() {
+    void upgradesM4WithoutChangingExistingOrders() {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
-                "jdbc:h2:mem:catalog-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE", "sa", "");
+                "jdbc:h2:mem:payment-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE", "sa", "");
         Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration", "classpath:db/h2")
-                .target(MigrationVersion.fromVersion("8"))
+                .target(MigrationVersion.fromVersion("19"))
                 .load()
                 .migrate();
 
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        byte[] userId = HexFormat.of().parseHex("00112233445566778899aabbccddeeff");
-        Instant now = Instant.now();
-        jdbcTemplate.update("""
-                INSERT INTO xac_thuc_nguoi_dung
-                    (id, username, email, password_hash, status, email_verified, version, created_at, updated_at)
-                VALUES
-                    (?, 'catalog-owner', 'catalog-owner@example.com', 'hash', 'ACTIVE', FALSE, 0, ?, ?)
-                """, userId, Timestamp.from(now), Timestamp.from(now));
+        byte[] orderId = HexFormat.of().parseHex("00112233445566778899aabbccddeeff");
+        Instant now = Instant.parse("2026-10-03T00:00:00Z");
+        jdbcTemplate.update(
+                "INSERT INTO don_hang_don_dat_hang "
+                        + "(id, owner_subject, status, status_changed_at, version, created_at, updated_at) "
+                        + "VALUES (?, 'payment-owner', 'PENDING', ?, 0, ?, ?)",
+                orderId,
+                Timestamp.from(now),
+                Timestamp.from(now),
+                Timestamp.from(now));
 
         Flyway.configure()
                 .dataSource(dataSource)
@@ -41,15 +43,15 @@ class CatalogMigrationUpgradeTests {
                 .migrate();
 
         assertThat(jdbcTemplate.queryForObject(
-                        "SELECT username FROM xac_thuc_nguoi_dung WHERE id = ?", String.class, userId))
-                .isEqualTo("catalog-owner");
+                        "SELECT status FROM don_hang_don_dat_hang WHERE id = ?", String.class, orderId))
+                .isEqualTo("PENDING");
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM information_schema.tables "
-                                + "WHERE table_schema = 'public' AND table_name LIKE 'san_pham_%'",
+                                + "WHERE table_schema = 'public' AND table_name = 'thanh_toan_lan_thu'",
                         Integer.class))
-                .isEqualTo(4);
+                .isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM flyway_schema_history " + "WHERE success = TRUE AND version IS NOT NULL",
+                        "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL",
                         Integer.class))
                 .isEqualTo(20);
     }
