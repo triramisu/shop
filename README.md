@@ -14,8 +14,8 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M5 — Payment`.
-- Nhiệm vụ vừa hoàn thành: `M4.7 — Test lỗi giữa chừng và compensation`.
-- Nhiệm vụ đang thực hiện: `M5.1 — Payment aggregate và provider interface`.
+- Nhiệm vụ vừa hoàn thành: `M5.1 — Payment aggregate và provider interface`.
+- Nhiệm vụ đang thực hiện: chưa có; M5.1 đang qua bước merge cuối.
 - Nhiệm vụ kế tiếp: `M5.2 — Fake payment provider để hoàn chỉnh luồng trước`; chỉ bắt đầu sau khi M5.1 vượt quality gate và được merge.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
@@ -484,7 +484,7 @@ Tiêu chí hoàn thành M4:
 
 ### M5 — Payment
 
-- [~] M5.1 Payment aggregate và provider interface.
+- [x] M5.1 Payment aggregate và provider interface.
   - **Mục tiêu và actor:** dựng lõi Payment độc lập để hệ thống có thể lưu từng lần thử thanh toán của một Order và giao tiếp với provider qua port trung lập. Actor kỹ thuật là Order orchestration và provider adapter; M5.1 chưa mở REST API cho client và chưa thực hiện charge thật.
   - **Sở hữu dữ liệu và ranh giới module:** Payment sở hữu aggregate, repository và bảng `thanh_toan_*`; `order_id` chỉ là định danh tham chiếu, không tạo database foreign key xuyên module. Order về sau chỉ được dùng named interface/event công khai của Payment, tuyệt đối không import Payment entity/repository hoặc SDK provider.
   - **Bất biến aggregate:** mỗi attempt có UUID, `orderId`, `attemptNumber`, amount dương với scale tiền tệ hữu hạn, ISO currency ba chữ cái, provider code, provider reference tùy trạng thái, status, failure code và audit time/version. Snapshot amount/currency bất biến sau khi tạo; cặp `(orderId, attemptNumber)` và `(providerCode, providerReference)` phải duy nhất khi reference tồn tại.
@@ -494,7 +494,7 @@ Tiêu chí hoàn thành M4:
   - **Migration và triển khai:** Flyway V20 chỉ thêm bảng/index/constraint, tương thích ngược với artifact M4 và có thể roll-forward an toàn; rollback code không xóa bảng hoặc sửa migration đã áp dụng.
   - **Ngoài phạm vi:** fake provider/profile (M5.2), hosted checkout/provider thật và resilience (M5.3), webhook/dedup (M5.4), cập nhật Order/Inventory qua event (M5.5), reconciliation (M5.6), refund và API quản trị.
   - **Nghiệm thu:** domain test chứng minh amount/currency/provider data và state transition; repository/schema test chứng minh mapping, unique/check/index và không có FK xuyên module; Flyway fresh/upgrade, Spring Modulith/ArchUnit, Spotless, `git diff --check` và regression có nguy cơ ảnh hưởng đều đạt. Không đánh dấu `[x]` cho đến khi PR vượt `verify` và `dependency-review`.
-  - **Bằng chứng local:** 307 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,19%, line coverage 91,04%, branch coverage 69,84%. Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway fresh/upgrade V1–V20, H2, MySQL 8.0.46, Docker Compose và `git diff --check` đều đạt. M5.1 vẫn giữ `[~]` cho đến khi required checks của PR xanh.
+  - **Bằng chứng:** 307 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,19%, line coverage 91,04%, branch coverage 69,84%. Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway fresh/upgrade V1–V20, H2, MySQL 8.0.46, Docker Compose và `git diff --check` đều đạt. PR số `30` đã vượt `verify` và `dependency-review` trên implementation commit; commit tài liệu đóng task tiếp tục phải vượt lại hai required checks trước khi merge.
 - [ ] M5.2 Fake payment provider để hoàn chỉnh luồng trước.
   - Yêu cầu: fake provider mô phỏng success, decline, timeout, pending và duplicate callback có thể cấu hình; tuyệt đối không được bật ở production.
   - Đầu ra: adapter/profile local-test, deterministic test controls và sample flow trong OpenAPI/test.
@@ -857,7 +857,7 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng. M5.1 đã vượt toàn bộ quality gate local trên nhánh feature và đang chờ required checks của PR; chưa được coi là hoàn thành cho đến khi merge vào `main`.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.1 đang qua bước merge cuối và M5.2 chỉ bắt đầu sau khi PR số `30` được merge an toàn vào `main`.
 
 ## 8. Luồng nghiệp vụ đích
 
