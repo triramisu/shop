@@ -23,6 +23,8 @@ import lombok.Getter;
 @Table(name = OrderTableNames.INVENTORY_RESERVATION_LINES)
 public class OrderInventoryReservationLine {
 
+    private static final String OCCURRENCE_TIME_REQUIRED = "occurrence time is required";
+
     @Id
     @Column(name = "reservation_id", nullable = false, updatable = false, columnDefinition = "BINARY(16)")
     private UUID reservationId;
@@ -91,7 +93,7 @@ public class OrderInventoryReservationLine {
         stockItemId = Objects.requireNonNull(resolvedStockItemId, "stock item id is required");
         status = InventoryReservationLineStatus.RESERVED;
         failureCode = null;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     void markFailed(String code, Instant occurredAt) {
@@ -100,7 +102,7 @@ public class OrderInventoryReservationLine {
         }
         status = InventoryReservationLineStatus.FAILED;
         failureCode = requireFailureCode(code);
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     void markReleased(Instant occurredAt) {
@@ -108,7 +110,7 @@ public class OrderInventoryReservationLine {
             throw new IllegalStateException("only a reserved inventory line can be released");
         }
         status = InventoryReservationLineStatus.RELEASED;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     private String requireFailureCode(String code) {

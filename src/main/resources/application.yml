@@ -61,6 +61,12 @@ app:
       inventory:
         location-code: ${CHECKOUT_INVENTORY_LOCATION_CODE:MAIN}
         reservation-duration: ${CHECKOUT_INVENTORY_RESERVATION_DURATION:15m}
+        reconciliation:
+          enabled: ${CHECKOUT_INVENTORY_RECONCILIATION_ENABLED:true}
+          stale-after: ${CHECKOUT_INVENTORY_RECONCILIATION_STALE_AFTER:30s}
+          fixed-delay: ${CHECKOUT_INVENTORY_RECONCILIATION_FIXED_DELAY:30s}
+          initial-delay: ${CHECKOUT_INVENTORY_RECONCILIATION_INITIAL_DELAY:30s}
+          batch-size: ${CHECKOUT_INVENTORY_RECONCILIATION_BATCH_SIZE:50}
       idempotency:
         retention: ${CHECKOUT_IDEMPOTENCY_RETENTION:24h}
         cleanup:

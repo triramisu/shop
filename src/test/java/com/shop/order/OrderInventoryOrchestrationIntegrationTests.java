@@ -21,13 +21,16 @@ import com.shop.order.event.OrderStatus;
 import com.shop.order.internal.checkout.orchestration.InventoryOrchestrationStatus;
 import com.shop.order.internal.checkout.orchestration.InventoryReservationLineStatus;
 import com.shop.order.internal.checkout.orchestration.OrderInventoryReservationCoordinator;
+import com.shop.order.internal.checkout.orchestration.recovery.OrderInventoryReconciliationProcessor;
 import com.shop.order.internal.checkout.service.OrderCreationService;
+import com.shop.order.internal.checkout.service.OrderInventoryFailureInjectionFixture;
 import com.shop.order.internal.checkout.service.OrderInventoryOrchestrationQueryService;
 import com.shop.order.internal.checkout.service.OrderSnapshotQueryService;
 import com.shop.order.internal.dto.request.AddCartItemRequest;
 import com.shop.order.internal.dto.response.CartResponse;
 import com.shop.order.internal.service.CartService;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -70,6 +73,12 @@ class OrderInventoryOrchestrationIntegrationTests {
 
     @Autowired
     private OrderSnapshotQueryService orderSnapshotQueryService;
+
+    @Autowired
+    private OrderInventoryReconciliationProcessor reconciliationProcessor;
+
+    @Autowired
+    private OrderInventoryFailureInjectionFixture failureInjectionFixture;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -185,6 +194,99 @@ class OrderInventoryOrchestrationIntegrationTests {
                 .isEqualTo(OrderStatus.CANCELLED);
     }
 
+    @Test
+    void recoversAReservationRequestWhoseAfterCommitEventWasLost() {
+        ProductResponse product = createPublishedProduct("LOST", List.of("ORCH-LOST-01"));
+        StockItemResponse stock = createStock("ORCH-LOST-01", 10);
+        UUID orderId = createOrderWithoutPublishingEvent(
+                product.getVariants().getFirst().getId(), "ORCH-LOST-01", 2);
+
+        var result = reconciliationProcessor.reconcileBatch(Instant.now());
+
+        assertThat(result.selected()).isEqualTo(1);
+        assertThat(result.recovered()).isEqualTo(1);
+        assertThat(orchestrationQueryService.getByOrderId(orderId).status())
+                .isEqualTo(InventoryOrchestrationStatus.RESERVED);
+        assertThat(stockInventoryService.getById(stock.getId()).getReserved()).isEqualTo(2);
+        assertThat(reservationMovementCount(stock.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void replaysAnInventoryCommitAfterTheOrderProcessStopsBeforeRecordingIt() {
+        createPublishedProduct("REPLAY", List.of("ORCH-REPLAY-01"));
+        StockItemResponse stock = createStock("ORCH-REPLAY-01", 10);
+        CartResponse cart = addToCart("ORCH-REPLAY-01", 2);
+        UUID orderId = orderCreationService.createFromCart(OWNER, cart.getVersion());
+        var original = orchestrationQueryService.getByOrderId(orderId);
+        Instant staleAt = Instant.now().minusSeconds(60);
+        jdbcTemplate.update(
+                "UPDATE don_hang_dieu_phoi_ton_kho SET status = 'PROCESSING', failure_code = NULL, updated_at = ? "
+                        + "WHERE request_event_id = ?",
+                staleAt,
+                original.requestEventId());
+        jdbcTemplate.update(
+                "UPDATE don_hang_dong_giu_ton_kho SET status = 'PENDING', stock_item_id = NULL, "
+                        + "failure_code = NULL, updated_at = ? WHERE reservation_id = ?",
+                staleAt,
+                original.lines().getFirst().reservationId());
+
+        var result = reconciliationProcessor.reconcileBatch(Instant.now());
+
+        assertThat(result.recovered()).isEqualTo(1);
+        assertThat(orchestrationQueryService.getByOrderId(orderId).status())
+                .isEqualTo(InventoryOrchestrationStatus.RESERVED);
+        assertThat(stockInventoryService.getById(stock.getId()).getReserved()).isEqualTo(2);
+        assertThat(reservationMovementCount(stock.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void resumesCompensationWithoutReleasingStockTwice() {
+        createPublishedProduct("RECOVER-COMP", List.of("ORCH-RECOVER-COMP-01"));
+        StockItemResponse stock = createStock("ORCH-RECOVER-COMP-01", 10);
+        CartResponse cart = addToCart("ORCH-RECOVER-COMP-01", 2);
+        UUID orderId = orderCreationService.createFromCart(OWNER, cart.getVersion());
+        var original = orchestrationQueryService.getByOrderId(orderId);
+        jdbcTemplate.update(
+                "UPDATE don_hang_dieu_phoi_ton_kho SET status = 'COMPENSATION_REQUIRED', "
+                        + "failure_code = 'INJECTED_AFTER_RESERVE', updated_at = ? WHERE request_event_id = ?",
+                Instant.now().minusSeconds(60),
+                original.requestEventId());
+
+        var firstRun = reconciliationProcessor.reconcileBatch(Instant.now());
+        var secondRun = reconciliationProcessor.reconcileBatch(Instant.now());
+
+        assertThat(firstRun.recovered()).isEqualTo(1);
+        assertThat(secondRun.selected()).isZero();
+        assertThat(orchestrationQueryService.getByOrderId(orderId)).satisfies(orchestration -> {
+            assertThat(orchestration.status()).isEqualTo(InventoryOrchestrationStatus.FAILED);
+            assertThat(orchestration.lines().getFirst().status()).isEqualTo(InventoryReservationLineStatus.RELEASED);
+        });
+        assertThat(orderSnapshotQueryService.getOwnedOrder(OWNER, orderId).getStatus())
+                .isEqualTo(OrderStatus.CANCELLED);
+        assertThat(stockInventoryService.getById(stock.getId()).getReserved()).isZero();
+        assertThat(releaseMovementCount(stock.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void doesNotStealAFreshProcessingOrchestration() {
+        createPublishedProduct("FRESH", List.of("ORCH-FRESH-01"));
+        createStock("ORCH-FRESH-01", 10);
+        CartResponse cart = addToCart("ORCH-FRESH-01", 1);
+        UUID orderId = orderCreationService.createFromCart(OWNER, cart.getVersion());
+        var original = orchestrationQueryService.getByOrderId(orderId);
+        jdbcTemplate.update(
+                "UPDATE don_hang_dieu_phoi_ton_kho SET status = 'PROCESSING', updated_at = ? "
+                        + "WHERE request_event_id = ?",
+                Instant.now(),
+                original.requestEventId());
+
+        var result = reconciliationProcessor.reconcileBatch(Instant.now());
+
+        assertThat(result.selected()).isZero();
+        assertThat(orchestrationQueryService.getByOrderId(orderId).status())
+                .isEqualTo(InventoryOrchestrationStatus.PROCESSING);
+    }
+
     private ProductResponse createPublishedProduct(String suffix, List<String> skus) {
         String normalized = suffix.toLowerCase(java.util.Locale.ROOT);
         CategoryResponse category = categoryService.create(CreateCategoryRequest.builder()
@@ -233,5 +335,16 @@ class OrderInventoryOrchestrationIntegrationTests {
                 "SELECT COUNT(*) FROM ton_kho_bien_dong " + "WHERE stock_item_id = ? AND movement_type = 'RESERVATION'",
                 Integer.class,
                 stockItemId);
+    }
+
+    private int releaseMovementCount(UUID stockItemId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ton_kho_bien_dong WHERE stock_item_id = ? AND movement_type = 'RELEASE'",
+                Integer.class,
+                stockItemId);
+    }
+
+    private UUID createOrderWithoutPublishingEvent(UUID productVariantId, String sku, int quantity) {
+        return failureInjectionFixture.createWithoutPublishingEvent(OWNER, productVariantId, sku, quantity);
     }
 }

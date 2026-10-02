@@ -241,7 +241,7 @@ class StockReservationIntegrationTests {
                         .getStatus())
                 .isEqualTo(StockReservationStatus.CONFIRMED);
         assertThat(movements(stockItem.getId()))
-                .extracting(movement -> movement.getMovementType())
+                .extracting(StockMovement::getMovementType)
                 .containsExactly(StockMovementType.RESERVATION, StockMovementType.CONFIRMATION);
         assertThat(movements(stockItem.getId()).get(1)).satisfies(movement -> {
             assertThat(movement.getOnHandDelta()).isEqualTo(-4);
@@ -278,7 +278,7 @@ class StockReservationIntegrationTests {
                 .isInstanceOfSatisfying(AppException.class, exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.STOCK_RESERVATION_STATE_INVALID));
         assertThat(movements(stockItem.getId()))
-                .extracting(movement -> movement.getMovementType())
+                .extracting(StockMovement::getMovementType)
                 .containsExactly(StockMovementType.RESERVATION, StockMovementType.RELEASE);
     }
 
@@ -305,7 +305,7 @@ class StockReservationIntegrationTests {
         assertThat(stockItemRepository.findById(stockItem.getId()).orElseThrow().getReserved())
                 .isZero();
         assertThat(movements(stockItem.getId()))
-                .extracting(movement -> movement.getMovementType())
+                .extracting(StockMovement::getMovementType)
                 .containsExactly(StockMovementType.EXPIRATION);
     }
 
@@ -344,6 +344,28 @@ class StockReservationIntegrationTests {
                         .orElseThrow()
                         .getReserved())
                 .isEqualTo(1);
+    }
+
+    @Test
+    void treatsAnExpiredReservationAsAlreadyReleasedDuringCompensationRetry() {
+        Instant now = Instant.now();
+        StockItem stockItem = stockItemRepository.saveAndFlush(
+                StockItem.create(UUID.randomUUID(), "EXPIRED-RELEASE-01", "WAREHOUSE_08", 5));
+        UUID reservationId = UUID.randomUUID();
+        Instant expiresAt = now.plusSeconds(60);
+        reservationOperations.reserve(new ReserveStockCommand(reservationId, stockItem.getId(), 2, expiresAt));
+        expirationProcessor.expireBatch(expiresAt.plusSeconds(1));
+
+        var firstResult = reservationOperations.release(new ReleaseStockReservationCommand(reservationId));
+        var replayedResult = reservationOperations.release(new ReleaseStockReservationCommand(reservationId));
+
+        assertThat(firstResult.status()).isEqualTo(StockReservationStatus.EXPIRED);
+        assertThat(replayedResult).isEqualTo(firstResult);
+        assertThat(stockItemRepository.findById(stockItem.getId()).orElseThrow().getReserved())
+                .isZero();
+        assertThat(movements(stockItem.getId()))
+                .extracting(StockMovement::getMovementType)
+                .containsExactly(StockMovementType.RESERVATION, StockMovementType.EXPIRATION);
     }
 
     private StockItem createReservedStock(String sku, String locationCode, long onHand, long reserved) {

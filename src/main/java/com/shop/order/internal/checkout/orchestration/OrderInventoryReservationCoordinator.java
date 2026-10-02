@@ -13,6 +13,8 @@ import com.shop.order.event.OrderInventoryReservationFailedEvent;
 import com.shop.order.event.OrderInventoryReservationRequestedEvent;
 import com.shop.order.event.OrderInventoryReservedEvent;
 import com.shop.order.internal.checkout.configuration.CheckoutInventoryProperties;
+import com.shop.order.internal.checkout.orchestration.recovery.InventoryOrchestrationRecoveryAction;
+import com.shop.order.internal.checkout.orchestration.recovery.OrderInventoryRecoveryPlan;
 import com.shop.order.internal.checkout.service.OrderInventoryOrchestrationStateService;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
@@ -40,6 +42,14 @@ public class OrderInventoryReservationCoordinator {
 
     public void handle(OrderInventoryReservationRequestedEvent event) {
         stateService.claim(event).ifPresent(plan -> reserve(plan, event));
+    }
+
+    public void recover(OrderInventoryRecoveryPlan recoveryPlan) {
+        if (recoveryPlan.action() == InventoryOrchestrationRecoveryAction.RETRY_RESERVATION) {
+            reserve(recoveryPlan.reservationPlan(), recoveryPlan.requestedEvent());
+            return;
+        }
+        finishCompensation(recoveryPlan.requestedEvent(), recoveryPlan.failureCode(), recoveryPlan.reservationIds());
     }
 
     private void reserve(OrderInventoryReservationPlan plan, OrderInventoryReservationRequestedEvent event) {
@@ -88,13 +98,19 @@ public class OrderInventoryReservationCoordinator {
 
     private void compensate(OrderInventoryReservationRequestedEvent event, String failureCode) {
         List<UUID> reservationsToRelease = stateService.beginCompensation(event.eventId(), failureCode);
+        finishCompensation(event, failureCode, reservationsToRelease);
+    }
+
+    private void finishCompensation(
+            OrderInventoryReservationRequestedEvent event, String failureCode, List<UUID> reservationsToRelease) {
         List<UUID> released = new ArrayList<>();
         List<UUID> unresolved = new ArrayList<>();
         for (UUID reservationId : reservationsToRelease) {
             try {
                 var result = reservationOperations.release(new ReleaseStockReservationCommand(reservationId));
-                if (result.status() != StockReservationStatus.RELEASED) {
-                    throw new IllegalStateException("inventory release did not return RELEASED");
+                if (result.status() != StockReservationStatus.RELEASED
+                        && result.status() != StockReservationStatus.EXPIRED) {
+                    throw new IllegalStateException("inventory release did not reach a released state");
                 }
                 stateService.markReleased(event.eventId(), reservationId);
                 released.add(reservationId);

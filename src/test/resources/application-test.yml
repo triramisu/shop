@@ -22,6 +22,11 @@ jwt:
   audience: shop-api-test
 
 app:
+  order:
+    checkout:
+      inventory:
+        reconciliation:
+          enabled: false
   inventory:
     reservation:
       expiration:

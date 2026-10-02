@@ -28,8 +28,5 @@ Thumbs.db
 .env
 *.log
 
-# Local project progress and planning
-/README.md
-
 # Local runtime data
 /data/
