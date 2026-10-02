@@ -5,9 +5,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
+import com.shop.order.internal.checkout.dto.request.CheckoutOrderRequest;
 import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.entity.OrderItemSnapshot;
 import com.shop.order.internal.repository.CartRepository;
+import com.shop.order.internal.repository.CheckoutIdempotencyRepository;
 import com.shop.order.internal.repository.CustomerOrderRepository;
 import com.shop.order.internal.repository.OrderInventoryOrchestrationRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -58,7 +60,7 @@ class OrderLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.order.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(6)
+                .hasSize(7)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -84,7 +86,10 @@ class OrderLayerArchitectureTests {
                 .resideInAPackage("..order.internal..repository..")
                 .should()
                 .onlyBeAccessed()
-                .byAnyPackage("..order.internal..repository..", "..order.internal..service..")
+                .byAnyPackage(
+                        "..order.internal..repository..",
+                        "..order.internal..service..",
+                        "..order.internal.checkout.idempotency..")
                 .check(applicationClasses);
     }
 
@@ -103,6 +108,7 @@ class OrderLayerArchitectureTests {
     void orderRepositoriesDoNotExposeAggregateDeletion() {
         assertThat(List.of(
                         CartRepository.class,
+                        CheckoutIdempotencyRepository.class,
                         CustomerOrderRepository.class,
                         OrderInventoryOrchestrationRepository.class))
                 .allSatisfy(repository -> assertThat(Arrays.stream(repository.getMethods())
@@ -113,10 +119,11 @@ class OrderLayerArchitectureTests {
 
     @Test
     void checkoutRequestNeverAcceptsClientOwnedPricingOrItems() {
-        assertThat(Arrays.stream(CheckoutQuoteRequest.class.getDeclaredFields())
-                        .filter(field -> !field.isSynthetic())
-                        .map(java.lang.reflect.Field::getName))
-                .containsExactly("expectedCartVersion");
+        assertThat(List.of(CheckoutQuoteRequest.class, CheckoutOrderRequest.class))
+                .allSatisfy(requestType -> assertThat(Arrays.stream(requestType.getDeclaredFields())
+                                .filter(field -> !field.isSynthetic())
+                                .map(java.lang.reflect.Field::getName))
+                        .containsExactly("expectedCartVersion"));
     }
 
     @Test

@@ -34,8 +34,11 @@ import com.shop.inventory.internal.dto.request.CreateStockItemRequest;
 import com.shop.inventory.internal.dto.request.StockAdjustmentRequest;
 import com.shop.inventory.internal.dto.response.StockItemResponse;
 import com.shop.inventory.internal.service.StockInventoryService;
+import com.shop.order.internal.checkout.dto.request.CheckoutOrderRequest;
 import com.shop.order.internal.checkout.dto.request.CheckoutQuoteRequest;
 import com.shop.order.internal.checkout.dto.response.CheckoutQuoteResponse;
+import com.shop.order.internal.checkout.dto.response.OrderSnapshotResponse;
+import com.shop.order.internal.checkout.idempotency.CheckoutIdempotencyService;
 import com.shop.order.internal.checkout.service.CheckoutPricingService;
 import com.shop.order.internal.checkout.service.OrderCreationService;
 import com.shop.order.internal.checkout.service.OrderInventoryOrchestrationQueryService;
@@ -50,6 +53,8 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -124,6 +129,9 @@ class MySqlCompatibilityIntegrationTests {
     @Autowired
     private OrderSnapshotQueryService orderSnapshotQueryService;
 
+    @Autowired
+    private CheckoutIdempotencyService checkoutIdempotencyService;
+
     @DynamicPropertySource
     static void configureMySql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -144,7 +152,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(18);
+        assertThat(migrationCount).isEqualTo(19);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -162,7 +170,7 @@ class MySqlCompatibilityIntegrationTests {
                         "SELECT COUNT(*) FROM information_schema.tables "
                                 + "WHERE table_schema = DATABASE() AND table_name LIKE 'don_hang_%'",
                         Integer.class))
-                .isEqualTo(6);
+                .isEqualTo(7);
     }
 
     @Test
@@ -276,6 +284,97 @@ class MySqlCompatibilityIntegrationTests {
                     assertThat(item.getUnitPrice()).isEqualByComparingTo("29.9000");
                     assertThat(item.getTotal()).isEqualByComparingTo("59.8000");
                 });
+    }
+
+    @Test
+    void serializesConcurrentCheckoutRequestsWithTheSameIdempotencyKeyOnMySql() throws Exception {
+        CategoryResponse category = catalogCategoryService.create(CreateCategoryRequest.builder()
+                .code("MYSQL_IDEMPOTENCY")
+                .name("MySQL Idempotency")
+                .slug("mysql-idempotency")
+                .build());
+        ProductResponse product = catalogProductService.create(CreateProductRequest.builder()
+                .categoryId(category.getId())
+                .name("MySQL Idempotency Product")
+                .slug("mysql-idempotency-product")
+                .build());
+        product = catalogProductService.addVariant(
+                product.getId(),
+                CreateProductVariantRequest.builder()
+                        .sku("MYSQL-IDEMPOTENCY-01")
+                        .name("Default")
+                        .price(new java.math.BigDecimal("31.50"))
+                        .currency("USD")
+                        .productVersion(product.getVersion())
+                        .build());
+        catalogProductService.publish(
+                product.getId(),
+                VersionedCatalogRequest.builder().version(product.getVersion()).build());
+        StockItemResponse stock = stockInventoryService.create(CreateStockItemRequest.builder()
+                .sku("MYSQL-IDEMPOTENCY-01")
+                .locationCode("MAIN")
+                .initialQuantity(10L)
+                .reason("Tồn kho kiểm thử idempotency MySQL")
+                .referenceId("MYSQL-IDEMPOTENCY")
+                .build());
+        String owner = "mysql-idempotency-owner";
+        CartResponse cart = cartService.addItem(
+                owner,
+                AddCartItemRequest.builder()
+                        .sku("MYSQL-IDEMPOTENCY-01")
+                        .quantity(2)
+                        .build());
+        CheckoutOrderRequest request = CheckoutOrderRequest.builder()
+                .expectedCartVersion(cart.getVersion())
+                .build();
+        String key = "mysql-idempotency-key-001";
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        List<CheckoutAttempt> attempts;
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            List<Future<CheckoutAttempt>> futures = IntStream.range(0, 2)
+                    .mapToObj(index -> executor.submit(() -> {
+                        ready.countDown();
+                        await(start);
+                        return attemptCheckout(owner, key, request);
+                    }))
+                    .toList();
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            attempts = futures.stream().map(this::getCheckoutAttempt).toList();
+        }
+
+        List<UUID> successfulOrderIds = attempts.stream()
+                .map(CheckoutAttempt::response)
+                .filter(Objects::nonNull)
+                .map(OrderSnapshotResponse::getId)
+                .distinct()
+                .toList();
+        List<ErrorCode> errorCodes = attempts.stream()
+                .map(CheckoutAttempt::errorCode)
+                .filter(Objects::nonNull)
+                .toList();
+        assertThat(successfulOrderIds).hasSize(1);
+        assertThat(errorCodes)
+                .hasSizeLessThanOrEqualTo(1)
+                .allMatch(errorCode -> errorCode == ErrorCode.CHECKOUT_ALREADY_PROCESSING);
+
+        UUID replayedOrderId =
+                checkoutIdempotencyService.checkout(owner, key, request).getId();
+        assertThat(replayedOrderId).isEqualTo(successfulOrderIds.getFirst());
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM don_hang_don_dat_hang WHERE owner_subject = ?", Integer.class, owner))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM don_hang_yeu_cau_luy_dang WHERE owner_subject = ?", Integer.class, owner))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ton_kho_bien_dong WHERE stock_item_id = UNHEX(REPLACE(?, '-', '')) "
+                                + "AND movement_type = 'RESERVATION'",
+                        Integer.class,
+                        stock.getId().toString()))
+                .isEqualTo(1);
     }
 
     @Test
@@ -488,6 +587,24 @@ class MySqlCompatibilityIntegrationTests {
         }
     }
 
+    private CheckoutAttempt attemptCheckout(String owner, String key, CheckoutOrderRequest request) {
+        try {
+            return new CheckoutAttempt(checkoutIdempotencyService.checkout(owner, key, request), null);
+        } catch (AppException exception) {
+            return new CheckoutAttempt(null, exception.getErrorCode());
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Unexpected checkout idempotency failure", exception);
+        }
+    }
+
+    private CheckoutAttempt getCheckoutAttempt(Future<CheckoutAttempt> future) {
+        try {
+            return future.get(20, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Concurrent checkout did not complete", exception);
+        }
+    }
+
     private RefreshAttempt getAttempt(Future<RefreshAttempt> future) {
         try {
             return future.get(15, TimeUnit.SECONDS);
@@ -532,4 +649,6 @@ class MySqlCompatibilityIntegrationTests {
     }
 
     private record RefreshAttempt(AuthenticationResponse response, ErrorCode errorCode) {}
+
+    private record CheckoutAttempt(OrderSnapshotResponse response, ErrorCode errorCode) {}
 }

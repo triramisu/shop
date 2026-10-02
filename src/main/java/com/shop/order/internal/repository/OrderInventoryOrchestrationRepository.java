@@ -18,4 +18,7 @@ public interface OrderInventoryOrchestrationRepository extends Repository<OrderI
 
     @EntityGraph(attributePaths = {"order", "lines"})
     Optional<OrderInventoryOrchestration> findByOrder_Id(UUID orderId);
+
+    @EntityGraph(attributePaths = {"order", "lines"})
+    Optional<OrderInventoryOrchestration> findByCorrelationId(UUID correlationId);
 }

@@ -152,6 +152,11 @@ public enum ErrorCode {
     CHECKOUT_CURRENCY_MISMATCH(1317, "error.checkout.currency.mismatch", HttpStatus.CONFLICT),
     CHECKOUT_CART_VERSION_REQUIRED(1318, "error.checkout.cart-version.required", HttpStatus.BAD_REQUEST),
     CHECKOUT_CART_VERSION_INVALID(1319, "error.checkout.cart-version.invalid", HttpStatus.BAD_REQUEST),
+    CHECKOUT_IDEMPOTENCY_KEY_REQUIRED(1320, "error.checkout.idempotency-key.required", HttpStatus.BAD_REQUEST),
+    CHECKOUT_IDEMPOTENCY_KEY_INVALID(1321, "error.checkout.idempotency-key.invalid", HttpStatus.BAD_REQUEST),
+    CHECKOUT_IDEMPOTENCY_CONFLICT(1322, "error.checkout.idempotency.conflict", HttpStatus.CONFLICT),
+    CHECKOUT_ALREADY_PROCESSING(1323, "error.checkout.idempotency.processing", HttpStatus.CONFLICT),
+    CHECKOUT_REPLAY_UNAVAILABLE(1324, "error.checkout.idempotency.replay-unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

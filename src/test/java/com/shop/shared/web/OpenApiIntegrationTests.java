@@ -82,6 +82,11 @@ class OpenApiIntegrationTests {
                 .andExpect(
                         jsonPath("$.paths['/api/cart/items/{itemId}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/checkout/quote'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/checkout/orders'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/checkout/orders'].post.parameters[0].name")
+                        .value("Idempotency-Key"))
+                .andExpect(jsonPath("$.paths['/api/checkout/orders'].post.parameters[0].required")
+                        .value(true))
                 .andExpect(jsonPath("$.paths['/api/auth/token'].post.security").doesNotExist())
                 .andExpect(
                         jsonPath("$.paths['/api/auth/register'].post.security").doesNotExist())
@@ -100,6 +105,8 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/cart'].get.security[0].bearerAuth")
                         .isArray())
                 .andExpect(jsonPath("$.paths['/api/checkout/quote'].post.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/checkout/orders'].post.security[0].bearerAuth")
                         .isArray());
     }
 

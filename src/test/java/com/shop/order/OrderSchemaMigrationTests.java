@@ -33,7 +33,8 @@ class OrderSchemaMigrationTests {
                         "don_hang_dong_giu_ton_kho",
                         "don_hang_gio_hang",
                         "don_hang_muc_don_hang",
-                        "don_hang_muc_gio_hang");
+                        "don_hang_muc_gio_hang",
+                        "don_hang_yeu_cau_luy_dang");
     }
 
     @Test
@@ -102,6 +103,29 @@ class OrderSchemaMigrationTests {
                         "ck_don_hang_dong_giu_ton_kho_quantity",
                         "ck_don_hang_dong_giu_ton_kho_line",
                         "ck_don_hang_dong_giu_ton_kho_status");
+    }
+
+    @Test
+    void protectsCheckoutIdempotencyScopeStateAndResult() {
+        assertThat(constraints("don_hang_yeu_cau_luy_dang"))
+                .contains(
+                        "uk_don_hang_luy_dang_scope",
+                        "uk_don_hang_luy_dang_execution",
+                        "uk_don_hang_luy_dang_order",
+                        "fk_don_hang_luy_dang_order",
+                        "ck_don_hang_luy_dang_operation",
+                        "ck_don_hang_luy_dang_status",
+                        "ck_don_hang_luy_dang_key_hash",
+                        "ck_don_hang_luy_dang_fingerprint",
+                        "ck_don_hang_luy_dang_expiration",
+                        "ck_don_hang_luy_dang_result");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT LOWER(index_name)
+                  FROM information_schema.indexes
+                 WHERE table_schema = 'public'
+                   AND table_name = 'don_hang_yeu_cau_luy_dang'
+                """, String.class))
+                .contains("idx_don_hang_luy_dang_status_expiration", "idx_don_hang_luy_dang_owner_created");
     }
 
     private List<String> constraints(String table) {
