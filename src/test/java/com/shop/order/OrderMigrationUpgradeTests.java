@@ -14,13 +14,13 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 class OrderMigrationUpgradeTests {
 
     @Test
-    void upgradesFromV17WithoutChangingExistingCartOrderOrSnapshotData() {
+    void upgradesFromV18WithoutChangingExistingCartOrderSnapshotOrOrchestrationData() {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
                 "jdbc:h2:mem:order-upgrade;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE", "sa", "");
         Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration", "classpath:db/h2")
-                .target(MigrationVersion.fromVersion("17"))
+                .target(MigrationVersion.fromVersion("18"))
                 .load()
                 .migrate();
 
@@ -76,9 +76,11 @@ class OrderMigrationUpgradeTests {
                 .isZero();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM don_hang_dong_giu_ton_kho", Integer.class))
                 .isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM don_hang_yeu_cau_luy_dang", Integer.class))
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(18);
+                .isEqualTo(19);
     }
 }

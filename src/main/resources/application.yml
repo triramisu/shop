@@ -61,6 +61,12 @@ app:
       inventory:
         location-code: ${CHECKOUT_INVENTORY_LOCATION_CODE:MAIN}
         reservation-duration: ${CHECKOUT_INVENTORY_RESERVATION_DURATION:15m}
+      idempotency:
+        retention: ${CHECKOUT_IDEMPOTENCY_RETENTION:24h}
+        cleanup:
+          enabled: ${CHECKOUT_IDEMPOTENCY_CLEANUP_ENABLED:true}
+          fixed-delay: ${CHECKOUT_IDEMPOTENCY_CLEANUP_FIXED_DELAY:1h}
+          initial-delay: ${CHECKOUT_IDEMPOTENCY_CLEANUP_INITIAL_DELAY:1h}
   inventory:
     reservation:
       max-duration: ${INVENTORY_RESERVATION_MAX_DURATION:30m}
