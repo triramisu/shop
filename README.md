@@ -13,10 +13,10 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 ## 2. Trạng thái hiện tại
 
-- Giai đoạn hiện tại: `M4 — Cart, Checkout và Order`.
-- Nhiệm vụ vừa hoàn thành: `M4.6 — Idempotency key cho checkout`.
-- Nhiệm vụ đang thực hiện: `M4.7 — Test lỗi giữa chừng và compensation`.
-- Nhiệm vụ kế tiếp: chưa bắt đầu; chỉ xác định sau khi M4.7 vượt quality gate đóng M4.
+- Giai đoạn vừa đóng: `M4 — Cart, Checkout và Order`.
+- Nhiệm vụ vừa hoàn thành: `M4.7 — Test lỗi giữa chừng và compensation`.
+- Nhiệm vụ đang thực hiện: chưa có; M4.7 đang qua bước merge cuối.
+- Nhiệm vụ kế tiếp: `M5.1 — Payment aggregate và provider interface`.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
@@ -465,7 +465,7 @@ Tiêu chí hoàn thành M3:
   - **Triển khai và khôi phục:** chạy backup rồi áp V19 trước hoặc cùng artifact; V19 chỉ thêm bảng nên tương thích ngược. Rollback code giữ bảng V19 vô hại, không sửa/xóa migration đã áp dụng. Cleanup chỉ xóa bản ghi terminal hết hạn; bản ghi `PROCESSING` được giữ cho M4.7 reconciliation.
   - **Bằng chứng ngày 02/10/2026:** full `clean verify` đạt 277 test, 0 failure/error/skipped; instruction coverage 91,16%, line coverage 90,96%, branch coverage 69,85%. Flyway V1–V19 fresh/upgrade trên H2 và MySQL 8.0.46, test tranh chấp/deadlock/recovery/cleanup, Spring Modulith/ArchUnit, Spotless, JaCoCo, `git diff --check`, code-smell scan và Docker Compose đều đạt.
   - **Git:** PR `#28` vượt hai required check `verify` và `dependency-review`, merge thành commit `e5b64ea`; workflow `verify` của merge commit trên `main` tiếp tục thành công. Nhánh feature đã được xóa local/remote, `main` đồng bộ với `origin/main`; README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
-- [~] M4.7 Test lỗi giữa chừng và compensation.
+- [x] M4.7 Test lỗi giữa chừng và compensation.
   - **Mục tiêu và phạm vi:** tự phục hồi luồng Order–Inventory khi event sau commit bị mất, tiến trình dừng giữa reserve và cập nhật trạng thái Order, hoặc compensation dừng giữa chừng. Failure point trước/sau payment chỉ được kiểm thử khi M5 có payment aggregate/provider; M4.7 không tạo payment giả hoặc cho phép Order chuyển `PAID` ngoài state machine.
   - **Mô hình phục hồi:** job theo lịch chỉ chọn orchestration `REQUESTED`, `PROCESSING`, `RETRY_REQUIRED`, `COMPENSATING` hoặc `COMPENSATION_REQUIRED` đã quá ngưỡng stale; mỗi bản ghi được khóa bi quan và kiểm tra lại trước khi claim. Batch có giới hạn, cô lập lỗi từng item và không để một order lỗi chặn các order khác.
   - **Retry an toàn:** reserve dùng lại reservation ID, expiration và payload ban đầu nên Inventory replay kết quả đã commit thay vì trừ kho lần hai. `PROCESSING` bị gián đoạn được đưa qua trạng thái retry hợp lệ; bản ghi còn mới không bị scheduler chiếm mất.
@@ -474,7 +474,7 @@ Tiêu chí hoàn thành M3:
   - **Failure injection:** test chỉ tạo khoảng lỗi bằng fixture/mutation dữ liệu trong môi trường test; production không có backdoor hoặc endpoint bật lỗi. Integration test phải chứng minh event bị mất được xử lý, reserve đã commit được replay đúng một lần, compensation được tiếp tục, và item `PROCESSING` còn mới không bị lấy.
   - **Runbook order mắc kẹt:** cảnh báo khi metric `shop.order.checkout.inventory.reconciliation.items{outcome="failed"}` tăng hoặc còn bản ghi non-terminal quá stale; tra cứu theo `request_event_id`/`correlation_id`, đối chiếu reservation/movement bên Inventory, sửa nguyên nhân hạ tầng rồi để reconciliation retry. Không cập nhật trực tiếp Order thành `PAID`, không xóa movement/idempotency; nếu compensation vẫn lỗi phải giữ `COMPENSATION_REQUIRED` và chuyển xử lý thủ công có audit.
   - **Nghiệm thu đóng M4:** không tạo hai reservation/movement khi replay, không còn giữ tồn kho sau compensation thành công, lỗi từng item có metric/cảnh báo, full regression/fresh-upgrade Flyway/H2/MySQL/Spring Modulith/ArchUnit/Spotless/JaCoCo/Docker Compose/Sonar và dependency-security scan đều đạt trước khi merge.
-  - **Bằng chứng local ngày 02/10/2026:** `mvnw.cmd clean verify` đạt 287 test, 0 failure/error/skipped; Flyway V1–V19 chạy fresh/upgrade trên H2 và MySQL 8.0.46; Testcontainers kiểm tra MySQL, MinIO, replay reservation và reconciliation thực tế. Coverage đạt 91,32% instruction, 91,11% line và 69,67% branch; Spring Modulith/ArchUnit, Spotless, `git diff --check` và `docker compose config --quiet` đều đạt. Sonar không có issue, Security Hotspot hoặc Taint Vulnerability trong phần thay đổi M4.7; báo cáo toàn dự án còn 65 code smell cũ/ngoài phạm vi M4.7 cần được xử lý theo backlog kỹ thuật. Chỉ chuyển `[x]` sau khi PR vượt `verify` và `dependency-review`.
+  - **Bằng chứng ngày 02–03/10/2026:** `mvnw.cmd clean verify` đạt 287 test, 0 failure/error/skipped; Flyway V1–V19 chạy fresh/upgrade trên H2 và MySQL 8.0.46; Testcontainers kiểm tra MySQL, MinIO, replay reservation và reconciliation thực tế. Coverage đạt 91,32% instruction, 91,11% line và 69,67% branch; Spring Modulith/ArchUnit, Spotless, `git diff --check` và `docker compose config --quiet` đều đạt. Sonar không có issue, Security Hotspot hoặc Taint Vulnerability trong phần thay đổi M4.7; báo cáo toàn dự án còn 65 code smell cũ/ngoài phạm vi M4.7 cần được xử lý theo backlog kỹ thuật. PR `#29` đã vượt cả `verify` và `dependency-review` trên commit triển khai `7d8e48e` trước bước cập nhật trạng thái tài liệu cuối.
 
 Tiêu chí hoàn thành M4:
 
@@ -850,7 +850,7 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.6, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. M4.7 đã vượt toàn bộ gate local và đang chờ hai required check trên PR trước khi đóng M4.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; nhiệm vụ kế tiếp là M5.1 và chỉ bắt đầu trên nhánh feature riêng sau khi PR M4.7 được merge.
 
 ## 8. Luồng nghiệp vụ đích
 
