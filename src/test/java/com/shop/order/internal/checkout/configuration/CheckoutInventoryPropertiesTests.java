@@ -33,4 +33,30 @@ class CheckoutInventoryPropertiesTests {
         properties.setReservationDuration(Duration.ofMinutes(31));
         assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void validatesReconciliationSafetyBoundaries() {
+        CheckoutInventoryProperties properties = new CheckoutInventoryProperties();
+        var reconciliation = properties.getReconciliation();
+        reconciliation.setStaleAfter(Duration.ofSeconds(1));
+        reconciliation.setFixedDelay(Duration.ofHours(1));
+        reconciliation.setInitialDelay(Duration.ZERO);
+        reconciliation.setBatchSize(1_000);
+
+        properties.validate();
+
+        reconciliation.setStaleAfter(Duration.ofMillis(999));
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        reconciliation.setStaleAfter(Duration.ofSeconds(30));
+        reconciliation.setFixedDelay(Duration.ofHours(1).plusSeconds(1));
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        reconciliation.setFixedDelay(Duration.ofSeconds(30));
+        reconciliation.setInitialDelay(Duration.ofMillis(-1));
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        reconciliation.setInitialDelay(Duration.ZERO);
+        reconciliation.setBatchSize(1_001);
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        properties.setReconciliation(null);
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+    }
 }

@@ -15,14 +15,14 @@ class OrderInventoryEventContractTests {
         UUID reservationId = UUID.randomUUID();
         var first = line(reservationId, UUID.randomUUID());
         var duplicate = line(reservationId, UUID.randomUUID());
+        UUID eventId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        Instant expiresAt = occurredAt.plusSeconds(60);
+        List<OrderInventoryReservationRequestedLine> lines = List.of(first, duplicate);
 
         assertThatThrownBy(() -> new OrderInventoryReservationRequestedEvent(
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        occurredAt.plusSeconds(60),
-                        List.of(first, duplicate),
-                        occurredAt))
+                        eventId, correlationId, orderId, expiresAt, lines, occurredAt))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unique");
     }
@@ -30,28 +30,37 @@ class OrderInventoryEventContractTests {
     @Test
     void requiresCompensationSetsToBeDisjointAndConsistentWithStatus() {
         UUID reservationId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID requestEventId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        Instant occurredAt = Instant.now();
+        List<UUID> released = List.of(reservationId);
+        List<UUID> unresolved = List.of(reservationId);
         assertThatThrownBy(() -> new OrderInventoryCompensationEvent(
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
+                        eventId,
+                        requestEventId,
+                        correlationId,
+                        orderId,
                         OrderInventoryCompensationStatus.REQUIRED,
                         "FAILURE",
-                        List.of(reservationId),
-                        List.of(reservationId),
-                        Instant.now()))
+                        released,
+                        unresolved,
+                        occurredAt))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("disjoint");
+        UUID completedEventId = UUID.randomUUID();
+        List<UUID> completedUnresolved = List.of(UUID.randomUUID());
         assertThatThrownBy(() -> new OrderInventoryCompensationEvent(
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
-                        UUID.randomUUID(),
+                        completedEventId,
+                        requestEventId,
+                        correlationId,
+                        orderId,
                         OrderInventoryCompensationStatus.COMPLETED,
                         "FAILURE",
                         List.of(),
-                        List.of(UUID.randomUUID()),
-                        Instant.now()))
+                        completedUnresolved,
+                        occurredAt))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("completed");
     }

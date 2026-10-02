@@ -120,6 +120,14 @@ public class StockReservationLifecycleTransactionService {
                     StockMovementType.RELEASE,
                     StockReservationStatus.RELEASED);
         }
+        if (reservation.getStatus() == StockReservationStatus.EXPIRED) {
+            return idempotencyStore.recoverLegacy(
+                    reservation,
+                    StockReservationOperation.RELEASE,
+                    fingerprint,
+                    StockMovementType.EXPIRATION,
+                    StockReservationStatus.EXPIRED);
+        }
         requireReserved(reservation);
         StockItem stockItem = getStockItemForUpdate(reservation);
 

@@ -30,7 +30,8 @@ class OrderInventoryOrchestrationTests {
         assertThat(orchestration.claim(
                         eventId, correlationId, orchestration.getOrder().getId(), createdAt.plusSeconds(4)))
                 .isFalse();
-        assertThatThrownBy(() -> orchestration.getLines().clear()).isInstanceOf(UnsupportedOperationException.class);
+        var readOnlyLines = orchestration.getLines();
+        assertThatThrownBy(readOnlyLines::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -46,9 +47,37 @@ class OrderInventoryOrchestrationTests {
         orchestration.markReserved(line.getReservationId(), stockItemId, createdAt.plusSeconds(2));
         orchestration.beginCompensation("INVENTORY_INSUFFICIENT_STOCK", createdAt.plusSeconds(3));
 
-        assertThatThrownBy(() -> orchestration.completeFailed(createdAt.plusSeconds(4)))
-                .isInstanceOf(IllegalStateException.class);
+        Instant incompleteAt = createdAt.plusSeconds(4);
+        assertThatThrownBy(() -> orchestration.completeFailed(incompleteAt)).isInstanceOf(IllegalStateException.class);
         orchestration.markCompensationRequired(createdAt.plusSeconds(4));
         assertThat(orchestration.getStatus()).isEqualTo(InventoryOrchestrationStatus.COMPENSATION_REQUIRED);
+    }
+
+    @Test
+    void recoversOnlyInterruptedProcessingAndCompensationStates() {
+        Instant createdAt = Instant.parse("2026-10-02T00:00:00Z");
+        UUID eventId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        var orchestration = OrderInventoryOrchestration.start(
+                pendingOrder("owner", createdAt), eventId, correlationId, createdAt.plusSeconds(900), createdAt);
+        var line = orchestration.getLines().getFirst();
+        orchestration.claim(eventId, correlationId, orchestration.getOrder().getId(), createdAt.plusSeconds(1));
+
+        orchestration.markRetryRequired("INTERRUPTED", createdAt.plusSeconds(2));
+
+        assertThat(orchestration.getStatus()).isEqualTo(InventoryOrchestrationStatus.RETRY_REQUIRED);
+        assertThat(orchestration.getFailureCode()).isEqualTo("INTERRUPTED");
+        orchestration.claim(eventId, correlationId, orchestration.getOrder().getId(), createdAt.plusSeconds(3));
+        orchestration.markReserved(line.getReservationId(), UUID.randomUUID(), createdAt.plusSeconds(4));
+        orchestration.beginCompensation("FAILED", createdAt.plusSeconds(5));
+        orchestration.markCompensationRequired(createdAt.plusSeconds(6));
+
+        orchestration.resumeCompensation(createdAt.plusSeconds(7));
+
+        assertThat(orchestration.getStatus()).isEqualTo(InventoryOrchestrationStatus.COMPENSATING);
+        assertThat(orchestration.getUpdatedAt()).isEqualTo(createdAt.plusSeconds(7));
+        Instant invalidRetryAt = createdAt.plusSeconds(8);
+        assertThatThrownBy(() -> orchestration.markRetryRequired("INTERRUPTED", invalidRetryAt))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

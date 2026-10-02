@@ -31,6 +31,8 @@ import lombok.Getter;
 @Table(name = OrderTableNames.INVENTORY_ORCHESTRATIONS)
 public class OrderInventoryOrchestration {
 
+    private static final String OCCURRENCE_TIME_REQUIRED = "occurrence time is required";
+
     @Id
     @Column(nullable = false, updatable = false, columnDefinition = "BINARY(16)")
     private UUID id;
@@ -130,7 +132,7 @@ public class OrderInventoryOrchestration {
         }
         status = InventoryOrchestrationStatus.PROCESSING;
         failureCode = null;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
         return true;
     }
 
@@ -151,14 +153,14 @@ public class OrderInventoryOrchestration {
         requireProcessing();
         status = InventoryOrchestrationStatus.RETRY_REQUIRED;
         failureCode = requireFailureCode(code);
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     public void beginCompensation(String code, Instant occurredAt) {
         requireProcessing();
         status = InventoryOrchestrationStatus.COMPENSATING;
         failureCode = requireFailureCode(code);
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     public void markReleased(UUID reservationId, Instant occurredAt) {
@@ -176,7 +178,7 @@ public class OrderInventoryOrchestration {
         }
         status = InventoryOrchestrationStatus.RESERVED;
         failureCode = null;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     public void completeFailed(Instant occurredAt) {
@@ -185,7 +187,7 @@ public class OrderInventoryOrchestration {
             throw new IllegalStateException("inventory compensation is incomplete");
         }
         status = InventoryOrchestrationStatus.FAILED;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     public void markCompensationRequired(Instant occurredAt) {
@@ -194,7 +196,16 @@ public class OrderInventoryOrchestration {
             throw new IllegalStateException("no unresolved inventory compensation exists");
         }
         status = InventoryOrchestrationStatus.COMPENSATION_REQUIRED;
-        updatedAt = Objects.requireNonNull(occurredAt, "occurrence time is required");
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    public void resumeCompensation(Instant occurredAt) {
+        if (status != InventoryOrchestrationStatus.COMPENSATING
+                && status != InventoryOrchestrationStatus.COMPENSATION_REQUIRED) {
+            throw new IllegalStateException("inventory orchestration does not require compensation");
+        }
+        status = InventoryOrchestrationStatus.COMPENSATING;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     private void requireIdentity(UUID eventId, UUID eventCorrelationId, UUID orderId) {
