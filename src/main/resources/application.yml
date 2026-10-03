@@ -53,6 +53,13 @@ springdoc:
     tags-sorter: alpha
 
 app:
+  payment:
+    provider:
+      type: ${PAYMENT_PROVIDER_TYPE:none}
+    fake:
+      default-mode: ${FAKE_PAYMENT_DEFAULT_MODE:success}
+      max-stored-attempts: ${FAKE_PAYMENT_MAX_STORED_ATTEMPTS:10000}
+      max-callback-deliveries: ${FAKE_PAYMENT_MAX_CALLBACK_DELIVERIES:10}
   order:
     checkout:
       pricing:
