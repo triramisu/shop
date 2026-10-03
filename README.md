@@ -14,8 +14,8 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M5 — Payment`.
-- Nhiệm vụ vừa hoàn thành: `M5.2 — Fake payment provider để hoàn chỉnh luồng trước`.
-- Nhiệm vụ đang thực hiện: `M5.3 — Tích hợp Stripe hosted checkout`; implementation, quality gate local và smoke test Stripe sandbox thật đã đạt, đang chờ required checks của PR trước khi đóng/merge.
+- Nhiệm vụ vừa hoàn thành: `M5.3 — Tích hợp Stripe hosted checkout an toàn`.
+- Nhiệm vụ đang thực hiện: chưa có; M5.3 đang qua bước merge cuối trên PR số `32`.
 - Nhiệm vụ kế tiếp: `M5.4 — Xác minh chữ ký webhook và chống webhook lặp`; chỉ bắt đầu sau khi M5.3 vượt quality gate và được merge.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
@@ -505,7 +505,7 @@ Tiêu chí hoàn thành M4:
   - **Ngoài phạm vi:** provider thật, hosted redirect, timeout/circuit breaker mạng thật (M5.3), ký/xác minh webhook và inbox dedup (M5.4), cập nhật Order/Inventory qua event (M5.5), reconciliation (M5.6), REST API payment cho client và refund.
   - **Nghiệm thu:** integration test chứng minh bốn mode đưa payment về đúng trạng thái và dữ liệu được persist; unit/contract test chứng minh replay/mismatch/duplicate callback; configuration test chứng minh fake chỉ tồn tại khi được chọn và production fail-fast. Spring Modulith/ArchUnit, Spotless, regression liên quan, `git diff --check` và Docker Compose phải đạt; chỉ đổi `[x]` sau required checks của PR.
   - **Bằng chứng:** 324 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,24%, line coverage 91,08%, branch coverage 69,97%. Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V20, H2, MySQL 8.0.46, MinIO Testcontainers, Docker Compose và `git diff --check` đều đạt. PR số `31` đã vượt `verify` và `dependency-review` trên implementation commit; commit tài liệu đóng task tiếp tục phải vượt lại hai required checks trước khi merge.
-- [~] M5.3 Tích hợp provider thật bằng hosted checkout/token; không lưu dữ liệu thẻ.
+- [x] M5.3 Tích hợp provider thật bằng hosted checkout/token; không lưu dữ liệu thẻ.
   - Yêu cầu: dùng hosted page/tokenization, credential từ secret store, TLS, timeout/circuit breaker và redirect allowlist; hoàn thành PCI scope review trước go-live.
   - Đầu ra: provider adapter, typed config, request signing/authentication, return/cancel handler và sanitized operational docs.
   - Ví dụ và nghiệm thu: tạo session và return hợp lệ hoạt động trên sandbox; URL giả, amount mismatch, timeout và provider error được xử lý; database/log không có PAN/CVV.
@@ -518,7 +518,7 @@ Tiêu chí hoàn thành M4:
   - **Smoke test sandbox có chủ đích:** `StripeSandboxSmokeIT` không khớp naming convention test mặc định nên không gọi Stripe trong `clean verify`/CI. Chỉ chạy bằng `mvnw.cmd -Dtest=StripeSandboxSmokeIT -Dstripe.sandbox.enabled=true test` khi process test đã có `STRIPE_SECRET_KEY=sk_test_...` và `STRIPE_RETURN_STATE_SECRET`; test đi qua `PaymentInitiationOperations`, tạo đúng một Checkout Session thật, replay không gọi provider lần hai và giữ bản ghi `REQUIRES_ACTION` trong MySQL local để đối chiếu. Test tự từ chối `sk_live_` và không in credential/action URL.
   - **Bằng chứng local ngày 03/10/2026:** 359 test mặc định, 0 failure/error/skipped; instruction coverage 91,30%, line coverage 91,19%, branch coverage 69,20%. Maven `clean verify`, Spring Modulith/ArchUnit, Spotless, Flyway fresh/upgrade V1–V21, H2, MySQL 8.0.46, MinIO Testcontainers, Docker Compose, URL/amount/currency/reference validation, timeout/retry/circuit breaker, return/cancel security, quét credential và `git diff --check` đều đạt. Test bổ sung xác nhận HTTP loopback chỉ được dùng với `sk_test_`; khóa live, host ngoài loopback và callback sai path đều fail-fast. Test HTTP adapter không chứa credential thật.
   - **Bằng chứng sandbox thật:** smoke test opt-in đạt 1/1 bằng `sk_test_`, tạo Checkout Session `cs_test_*` tại host `checkout.stripe.com`, persist đúng một attempt `REQUIRES_ACTION` trị giá 199.000 VND vào MySQL và replay trả lại bản ghi cũ mà không gọi provider lần hai. Quá trình test phát hiện và sửa tương thích API `ui_mode=hosted_page` cùng việc Stripe Checkout URL hợp lệ có thể mang fragment; credential, session ID đầy đủ và action URL không bị ghi ra log hoặc Git.
-  - **Trạng thái nghiệm thu:** quality gate local đã hoàn tất; giữ `[~]` cho đến khi PR vượt `verify` và `dependency-review`, sau đó mới đổi `[x]`, merge và chuyển M5.4.
+  - **Trạng thái nghiệm thu:** implementation commit trên PR số `32` đã vượt `verify` và `dependency-review`; commit tài liệu đóng task phải vượt lại hai required checks trước khi merge. Không bắt đầu M5.4 trước khi merge commit trên `main` được xác nhận xanh.
 - [ ] M5.4 Xác minh chữ ký webhook và chống webhook lặp.
   - Yêu cầu: đọc raw body đúng định dạng provider, kiểm tra signature/timestamp/replay window trước parse nghiệp vụ và deduplicate bằng provider event ID.
   - Đầu ra: webhook endpoint, signature verifier, inbox/dedup persistence và audit/metrics.
@@ -880,7 +880,7 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.2, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.2 đã merge qua PR số `31`. M5.3 đã vượt toàn bộ gate local trên nhánh feature nhưng còn chờ smoke test Stripe sandbox thật nên chưa mở PR/merge.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.3, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.2 đã merge qua PR số `31`. M5.3 đã vượt full regression, sandbox thật và required checks trên implementation commit của PR số `32`; còn bước xác nhận lại commit tài liệu trước khi merge.
 
 ## 8. Luồng hoạt động toàn dự án
 
@@ -915,7 +915,7 @@ Order orchestration
       → UNKNOWN/PENDING: reconciliation hỏi lại provider, không tự suy diễn thành công
 ```
 
-Return/cancel trên trình duyệt và polling chỉ phục vụ giao diện, không phải bằng chứng thanh toán. Implementation M5.3 đã dựng hosted checkout/return an toàn nhưng còn chờ smoke test Stripe sandbox; webhook, event cập nhật Order/Inventory, reconciliation và QR lần lượt thuộc M5.4–M5.7 nên sơ đồ trên là luồng đích, không phải tuyên bố mọi bước đã triển khai.
+Return/cancel trên trình duyệt và polling chỉ phục vụ giao diện, không phải bằng chứng thanh toán. M5.3 đã dựng và smoke test hosted checkout/return an toàn; webhook, event cập nhật Order/Inventory, reconciliation và QR lần lượt thuộc M5.4–M5.7 nên sơ đồ trên là luồng đích, không phải tuyên bố mọi bước đã triển khai.
 
 ### 8.3. Audit, độ tin cậy và tách microservices
 
