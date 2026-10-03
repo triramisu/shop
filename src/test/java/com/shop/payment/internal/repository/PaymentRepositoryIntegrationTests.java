@@ -7,6 +7,7 @@ import com.shop.payment.event.PaymentStatus;
 import com.shop.payment.internal.entity.PaymentAttempt;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.UUID;
@@ -72,5 +73,30 @@ class PaymentRepositoryIntegrationTests {
         assertThatThrownBy(() -> paymentAttemptRepository.saveAndFlush(duplicateReference))
                 .isInstanceOf(RuntimeException.class)
                 .hasRootCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void persistsHostedCheckoutUrlAndClearsItAfterCompletion() {
+        PaymentAttempt attempt = PaymentAttempt.start(
+                UUID.randomUUID(), UUID.randomUUID(), 1, new BigDecimal("100.00"), "USD", "STRIPE", CREATED_AT);
+        URI checkoutUrl = URI.create("https://checkout.stripe.com/c/pay/test-session");
+        attempt.transition(
+                PaymentStatus.REQUIRES_ACTION, "cs_test_session", checkoutUrl, null, CREATED_AT.plusSeconds(1));
+        paymentAttemptRepository.saveAndFlush(attempt);
+        entityManager.clear();
+
+        PaymentAttempt awaitingAction =
+                paymentAttemptRepository.findById(attempt.getId()).orElseThrow();
+        assertThat(awaitingAction.getActionUrl()).isEqualTo(checkoutUrl);
+
+        awaitingAction.transition(PaymentStatus.SUCCEEDED, null, null, null, CREATED_AT.plusSeconds(2));
+        paymentAttemptRepository.saveAndFlush(awaitingAction);
+        entityManager.clear();
+
+        assertThat(paymentAttemptRepository
+                        .findById(attempt.getId())
+                        .orElseThrow()
+                        .getActionUrl())
+                .isNull();
     }
 }

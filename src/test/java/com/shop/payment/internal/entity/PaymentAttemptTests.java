@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shop.payment.event.PaymentStatus;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,39 @@ class PaymentAttemptTests {
         assertThat(attempt.getProviderReference()).isNull();
         assertThat(attempt.getFailureCode()).isEqualTo("CONFIGURATION_ERROR");
         assertThat(event.providerReference()).isNull();
+    }
+
+    @Test
+    void storesActionUrlOnlyWhileHostedCheckoutActionIsRequired() {
+        PaymentAttempt attempt = newAttempt();
+        URI checkoutUrl = URI.create("https://checkout.stripe.com/c/pay/test-session#provider-state");
+
+        attempt.transition(
+                PaymentStatus.REQUIRES_ACTION, "cs_test_session", checkoutUrl, null, CREATED_AT.plusSeconds(1));
+
+        assertThat(attempt.getActionUrl()).isEqualTo(checkoutUrl);
+
+        attempt.transition(PaymentStatus.SUCCEEDED, null, null, null, CREATED_AT.plusSeconds(2));
+        assertThat(attempt.getActionUrl()).isNull();
+    }
+
+    @Test
+    void rejectsMissingOrUnsafeHostedCheckoutActionUrl() {
+        PaymentAttempt missingUrl = newAttempt();
+        PaymentAttempt insecureUrl = newAttempt();
+
+        assertThatThrownBy(() -> missingUrl.transition(
+                        PaymentStatus.REQUIRES_ACTION, "cs_test_missing", null, null, CREATED_AT.plusSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("URL thao tác");
+        assertThatThrownBy(() -> insecureUrl.transition(
+                        PaymentStatus.REQUIRES_ACTION,
+                        "cs_test_insecure",
+                        URI.create("http://checkout.stripe.com/session"),
+                        null,
+                        CREATED_AT.plusSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("HTTPS");
     }
 
     private PaymentAttempt newAttempt() {

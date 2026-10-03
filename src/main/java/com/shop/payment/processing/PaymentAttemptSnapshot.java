@@ -2,6 +2,7 @@ package com.shop.payment.processing;
 
 import com.shop.payment.event.PaymentStatus;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ public record PaymentAttemptSnapshot(
         String providerReference,
         PaymentStatus status,
         String failureCode,
+        URI actionUrl,
         Instant completedAt,
         long version,
         Instant createdAt,

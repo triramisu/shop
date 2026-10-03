@@ -18,6 +18,7 @@ final class PaymentAttemptSnapshotMapper {
                 attempt.getProviderReference(),
                 attempt.getStatus(),
                 attempt.getFailureCode(),
+                attempt.getActionUrl(),
                 attempt.getCompletedAt(),
                 attempt.getVersion(),
                 attempt.getCreatedAt(),

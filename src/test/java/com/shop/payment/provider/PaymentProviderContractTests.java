@@ -28,13 +28,14 @@ class PaymentProviderContractTests {
         PaymentProviderResult requiresAction = new PaymentProviderResult(
                 PaymentProviderStatus.REQUIRES_ACTION,
                 "provider-reference-1",
-                URI.create("https://payments.example.test/session/1"),
+                URI.create("https://payments.example.test/session/1#provider-state"),
                 null);
         PaymentProviderResult unknown = new PaymentProviderResult(PaymentProviderStatus.UNKNOWN, null, null, null);
         PaymentProviderResult declined =
                 new PaymentProviderResult(PaymentProviderStatus.FAILED, "reference", null, "declined");
 
         assertThat(requiresAction.actionUrl()).hasScheme("https");
+        assertThat(requiresAction.actionUrl().getFragment()).isEqualTo("provider-state");
         assertThat(unknown.providerReference()).isNull();
         assertThat(declined.failureCode()).isEqualTo("DECLINED");
         assertThatThrownBy(

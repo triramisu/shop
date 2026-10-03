@@ -53,6 +53,21 @@ class PaymentSchemaMigrationTests {
                 .isZero();
     }
 
+    @Test
+    void addsHostedCheckoutUrlWithoutAddingSensitiveCardColumns() {
+        List<String> columns = jdbcTemplate.queryForList(
+                "SELECT LOWER(column_name) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = 'thanh_toan_lan_thu'",
+                String.class);
+
+        assertThat(columns).contains("action_url");
+        assertThat(columns)
+                .noneMatch(column -> column.contains("pan")
+                        || column.contains("card_number")
+                        || column.contains("cvv")
+                        || column.contains("cvc"));
+    }
+
     private List<String> constraints(String table) {
         return jdbcTemplate.queryForList(
                 "SELECT LOWER(constraint_name) FROM information_schema.table_constraints "
