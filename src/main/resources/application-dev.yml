@@ -9,6 +9,9 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:shop-local-password}
 
 app:
+  payment:
+    provider:
+      type: ${PAYMENT_PROVIDER_TYPE:fake}
   catalog:
     images:
       storage:

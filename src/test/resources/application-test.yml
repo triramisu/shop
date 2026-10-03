@@ -22,6 +22,11 @@ jwt:
   audience: shop-api-test
 
 app:
+  payment:
+    provider:
+      type: fake
+    fake:
+      default-mode: success
   order:
     checkout:
       inventory:
