@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.agent
+.env
+.env.*
+!.env.example
+target
+data
+*.log
+README.md

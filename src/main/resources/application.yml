@@ -60,6 +60,27 @@ app:
       default-mode: ${FAKE_PAYMENT_DEFAULT_MODE:success}
       max-stored-attempts: ${FAKE_PAYMENT_MAX_STORED_ATTEMPTS:10000}
       max-callback-deliveries: ${FAKE_PAYMENT_MAX_CALLBACK_DELIVERIES:10}
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:}
+      api-version: ${STRIPE_API_VERSION:2026-09-30.endive}
+      return-state-secret: ${STRIPE_RETURN_STATE_SECRET:}
+      success-url: ${STRIPE_SUCCESS_URL:}
+      cancel-url: ${STRIPE_CANCEL_URL:}
+      allowed-return-hosts: ${STRIPE_ALLOWED_RETURN_HOSTS:}
+      allowed-checkout-hosts: ${STRIPE_ALLOWED_CHECKOUT_HOSTS:checkout.stripe.com}
+      return-state-ttl: ${STRIPE_RETURN_STATE_TTL:24h}
+      connect-timeout: ${STRIPE_CONNECT_TIMEOUT:2s}
+      read-timeout: ${STRIPE_READ_TIMEOUT:5s}
+      call-timeout: ${STRIPE_CALL_TIMEOUT:8s}
+      retry:
+        max-attempts: ${STRIPE_RETRY_MAX_ATTEMPTS:2}
+        wait-duration: ${STRIPE_RETRY_WAIT_DURATION:200ms}
+      circuit-breaker:
+        sliding-window-size: ${STRIPE_CIRCUIT_BREAKER_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${STRIPE_CIRCUIT_BREAKER_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${STRIPE_CIRCUIT_BREAKER_FAILURE_RATE:50}
+        open-state-duration: ${STRIPE_CIRCUIT_BREAKER_OPEN_DURATION:30s}
+        permitted-calls-in-half-open-state: ${STRIPE_CIRCUIT_BREAKER_HALF_OPEN_CALLS:3}
   order:
     checkout:
       pricing:

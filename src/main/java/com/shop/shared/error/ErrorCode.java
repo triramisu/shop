@@ -157,6 +157,7 @@ public enum ErrorCode {
     CHECKOUT_IDEMPOTENCY_CONFLICT(1322, "error.checkout.idempotency.conflict", HttpStatus.CONFLICT),
     CHECKOUT_ALREADY_PROCESSING(1323, "error.checkout.idempotency.processing", HttpStatus.CONFLICT),
     CHECKOUT_REPLAY_UNAVAILABLE(1324, "error.checkout.idempotency.replay-unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    PAYMENT_CHECKOUT_RETURN_INVALID(1400, "error.payment.checkout-return.invalid", HttpStatus.BAD_REQUEST),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

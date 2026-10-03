@@ -52,6 +52,7 @@ import com.shop.payment.internal.repository.PaymentAttemptRepository;
 import com.shop.shared.error.AppException;
 import com.shop.shared.error.ErrorCode;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -160,7 +161,7 @@ class MySqlCompatibilityIntegrationTests {
                 "SELECT COUNT(*) FROM xac_thuc_vai_tro WHERE code IN ('ADMIN', 'STAFF', 'USER')", Integer.class);
 
         assertThat(databaseVersion).startsWith("8.0.");
-        assertThat(migrationCount).isEqualTo(20);
+        assertThat(migrationCount).isEqualTo(21);
         assertThat(defaultRoleCount).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList("SELECT version FROM xac_thuc_vai_tro", Long.class))
                 .containsOnly(0L);
@@ -191,9 +192,10 @@ class MySqlCompatibilityIntegrationTests {
         UUID orderId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-10-03T00:00:00Z");
         PaymentAttempt attempt = PaymentAttempt.start(
-                UUID.randomUUID(), orderId, 1, new BigDecimal("125000.00"), "vnd", "sandbox", createdAt);
-        attempt.transition(PaymentStatus.PENDING, "mysql-payment-reference-1", null, createdAt.plusSeconds(1));
-        attempt.transition(PaymentStatus.SUCCEEDED, null, null, createdAt.plusSeconds(2));
+                UUID.randomUUID(), orderId, 1, new BigDecimal("125000.00"), "vnd", "stripe", createdAt);
+        URI actionUrl = URI.create("https://checkout.stripe.com/c/pay/mysql-session");
+        attempt.transition(
+                PaymentStatus.REQUIRES_ACTION, "mysql-payment-reference-1", actionUrl, null, createdAt.plusSeconds(1));
 
         PaymentAttempt saved = paymentAttemptRepository.saveAndFlush(attempt);
         PaymentAttempt reloaded =
@@ -202,10 +204,15 @@ class MySqlCompatibilityIntegrationTests {
         assertThat(reloaded.getOrderId()).isEqualTo(orderId);
         assertThat(reloaded.getAmount()).isEqualByComparingTo("125000.00");
         assertThat(reloaded.getCurrency()).isEqualTo("VND");
-        assertThat(reloaded.getProviderCode()).isEqualTo("SANDBOX");
+        assertThat(reloaded.getProviderCode()).isEqualTo("STRIPE");
         assertThat(reloaded.getProviderReference()).isEqualTo("mysql-payment-reference-1");
-        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
-        assertThat(reloaded.getCompletedAt()).isEqualTo(createdAt.plusSeconds(2));
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.REQUIRES_ACTION);
+        assertThat(reloaded.getActionUrl()).isEqualTo(actionUrl);
+
+        reloaded.transition(PaymentStatus.SUCCEEDED, null, null, null, createdAt.plusSeconds(2));
+        PaymentAttempt completed = paymentAttemptRepository.saveAndFlush(reloaded);
+        assertThat(completed.getActionUrl()).isNull();
+        assertThat(completed.getCompletedAt()).isEqualTo(createdAt.plusSeconds(2));
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM thanh_toan_lan_thu WHERE order_id = UNHEX(REPLACE(?, '-', ''))",
                         Integer.class,

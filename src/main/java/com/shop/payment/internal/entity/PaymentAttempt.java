@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
@@ -30,6 +31,7 @@ public class PaymentAttempt {
     private static final int MAX_PROVIDER_CODE_LENGTH = 50;
     private static final int MAX_PROVIDER_REFERENCE_LENGTH = 150;
     private static final int MAX_FAILURE_CODE_LENGTH = 100;
+    private static final int MAX_ACTION_URL_LENGTH = 2048;
 
     @Id
     @Column(nullable = false, updatable = false, columnDefinition = "BINARY(16)")
@@ -59,6 +61,9 @@ public class PaymentAttempt {
 
     @Column(name = "failure_code", length = MAX_FAILURE_CODE_LENGTH)
     private String failureCode;
+
+    @Column(name = "action_url", length = MAX_ACTION_URL_LENGTH)
+    private String actionUrl;
 
     @Column(name = "completed_at")
     private Instant completedAt;
@@ -119,6 +124,15 @@ public class PaymentAttempt {
 
     public PaymentStatusChangedEvent transition(
             PaymentStatus targetStatus, String newProviderReference, String newFailureCode, Instant occurredAt) {
+        return transition(targetStatus, newProviderReference, null, newFailureCode, occurredAt);
+    }
+
+    public PaymentStatusChangedEvent transition(
+            PaymentStatus targetStatus,
+            String newProviderReference,
+            URI newActionUrl,
+            String newFailureCode,
+            Instant occurredAt) {
         PaymentStatus target = Objects.requireNonNull(targetStatus, "target payment status is required");
         PaymentStateMachine.requireTransition(status, target);
         Instant transitionTime = Objects.requireNonNull(occurredAt, "transition time is required");
@@ -127,10 +141,12 @@ public class PaymentAttempt {
         }
 
         String resolvedProviderReference = resolveProviderReference(target, newProviderReference);
+        String resolvedActionUrl = resolveActionUrl(target, newActionUrl);
         String resolvedFailureCode = resolveFailureCode(target, newFailureCode);
         PaymentStatus previousStatus = status;
         status = target;
         providerReference = resolvedProviderReference;
+        actionUrl = resolvedActionUrl;
         failureCode = resolvedFailureCode;
         updatedAt = transitionTime;
         completedAt = target.isTerminal() ? transitionTime : null;
@@ -147,6 +163,10 @@ public class PaymentAttempt {
                 providerReference,
                 failureCode,
                 transitionTime);
+    }
+
+    public URI getActionUrl() {
+        return actionUrl == null ? null : URI.create(actionUrl);
     }
 
     @PrePersist
@@ -184,6 +204,30 @@ public class PaymentAttempt {
             throw new IllegalArgumentException("failure code is only valid for a failed payment");
         }
         return null;
+    }
+
+    private String resolveActionUrl(PaymentStatus target, URI value) {
+        if (target != PaymentStatus.REQUIRES_ACTION) {
+            if (value != null) {
+                throw new IllegalArgumentException(
+                        "URL thao tác chỉ hợp lệ khi cổng thanh toán yêu cầu người dùng thao tác");
+            }
+            return null;
+        }
+        if (value == null
+                || !value.isAbsolute()
+                || value.isOpaque()
+                || value.getHost() == null
+                || !"https".equalsIgnoreCase(value.getScheme())
+                || value.getUserInfo() != null) {
+            throw new IllegalArgumentException(
+                    "Cần URL thao tác HTTPS hợp lệ khi cổng thanh toán yêu cầu người dùng thao tác");
+        }
+        String normalized = value.normalize().toASCIIString();
+        if (normalized.length() > MAX_ACTION_URL_LENGTH) {
+            throw new IllegalArgumentException("URL thao tác vượt quá độ dài cho phép");
+        }
+        return normalized;
     }
 
     private static boolean requiresProviderReference(PaymentStatus target) {

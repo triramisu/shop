@@ -1,4 +1,40 @@
 services:
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shop:local
+    container_name: shop-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_DRIVER: com.mysql.cj.jdbc.Driver
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-shop}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-shop}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-shop-local-password}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-shop-local-access}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-shop-local-secret-change-me}
+      MINIO_BUCKET: ${MINIO_BUCKET:-shop-product-images}
+      MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
+      JWT_SIGNER_KEY: ${JWT_SIGNER_KEY:-1TjXchw5FloESb63Kc+DFhTARvpWL4jUGCwfGWxuG5SIf/1y/LgJxHnMqaF6A/ij}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      PAYMENT_PROVIDER_TYPE: ${PAYMENT_PROVIDER_TYPE:-fake}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_RETURN_STATE_SECRET: ${STRIPE_RETURN_STATE_SECRET:-}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-http://localhost:8080/api/payments/checkout/return}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-http://localhost:8080/api/payments/checkout/cancel}
+      STRIPE_ALLOWED_RETURN_HOSTS: ${STRIPE_ALLOWED_RETURN_HOSTS:-localhost,127.0.0.1}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+    restart: unless-stopped
+    stop_grace_period: 30s
+
   mysql:
     image: mysql:8.0.46
     container_name: shop-mysql

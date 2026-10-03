@@ -14,9 +14,9 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 ## 2. Trạng thái hiện tại
 
 - Giai đoạn hiện tại: `M5 — Payment`.
-- Nhiệm vụ vừa hoàn thành: `M5.2 — Fake payment provider để hoàn chỉnh luồng trước`.
-- Nhiệm vụ đang thực hiện: chưa có; M5.2 đang qua bước merge cuối.
-- Nhiệm vụ kế tiếp: `M5.3 — Tích hợp provider thật bằng hosted checkout/token`; chỉ bắt đầu sau khi M5.2 vượt quality gate và được merge.
+- Nhiệm vụ vừa hoàn thành: `M5.3 — Tích hợp Stripe hosted checkout an toàn`.
+- Nhiệm vụ đang thực hiện: chưa có; M5.3 đang qua bước merge cuối trên PR số `32`.
+- Nhiệm vụ kế tiếp: `M5.4 — Xác minh chữ ký webhook và chống webhook lặp`; chỉ bắt đầu sau khi M5.3 vượt quality gate và được merge.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
@@ -41,6 +41,7 @@ Ký hiệu:
 8. Không đưa secret hoặc mật khẩu production vào Git; JWT key hiện tại là key local/dev cố định theo source tham khảo và phải được thay thế trước khi deploy.
 9. Mỗi endpoint phải có validation, phân quyền và error response nhất quán.
 10. Mọi thao tác có thể bị gửi lặp như checkout, reserve stock và payment phải có idempotency.
+11. Mọi message trả cho người dùng phải là tiếng Việt và được quản lý tập trung trong `message.properties`; mã kỹ thuật ổn định cho máy vẫn dùng ASCII.
 
 ## 4. Công nghệ nền
 
@@ -191,8 +192,8 @@ Trước khi đánh dấu hoàn thành toàn bộ một milestone như M1, M2, M
 
 1. Chạy toàn bộ Flyway từ schema rỗng và nâng cấp từ phiên bản cuối của milestone trước; checksum phải hợp lệ và không mất dữ liệu cũ.
 2. Đối chiếu bảng, cột, kiểu dữ liệu, khóa chính/ngoại, unique, check constraint và index với mapping/entity cùng contract đã chốt.
-3. Nạp bộ dữ liệu đại diện gồm happy path, biên, trạng thái không hợp lệ và quan hệ nhiều bản ghi; không dùng dữ liệu production hoặc thông tin nhạy cảm thật.
-4. Chạy các luồng CRUD/nghiệp vụ, phân quyền, transaction rollback, idempotency và cạnh tranh dữ liệu quan trọng trên MySQL thật.
+3. Nạp bộ dữ liệu deterministic giống dữ liệu thật, gồm happy path, biên, trạng thái không hợp lệ và quan hệ nhiều bản ghi; không dùng dữ liệu production hoặc thông tin nhạy cảm thật. Bảng nghiệp vụ chính có tối thiểu 500 bản ghi khi phù hợp về ngữ nghĩa; bảng danh mục hệ thống nhỏ phải dùng bộ giá trị đầy đủ, không nhân bản giả để đủ số lượng.
+4. Chạy end-to-end từ API qua service, database và provider fake/sandbox; kiểm tra CRUD/nghiệp vụ, phân quyền, transaction rollback, idempotency và cạnh tranh dữ liệu quan trọng trên MySQL thật.
 5. Chạy truy vấn kiểm tra invariant: không có bản ghi mồ côi, liên kết sai, khóa trùng, trạng thái bất hợp lệ hoặc dữ liệu phụ còn sót sau rollback/xóa.
 6. Xác nhận test có thể chạy lặp lại, fixture được dọn sạch và kết quả phân trang/sắp xếp ổn định.
 7. Với migration có rủi ro, kiểm tra backup/restore hoặc phương án rollback/roll-forward đã ghi trong task contract.
@@ -504,10 +505,20 @@ Tiêu chí hoàn thành M4:
   - **Ngoài phạm vi:** provider thật, hosted redirect, timeout/circuit breaker mạng thật (M5.3), ký/xác minh webhook và inbox dedup (M5.4), cập nhật Order/Inventory qua event (M5.5), reconciliation (M5.6), REST API payment cho client và refund.
   - **Nghiệm thu:** integration test chứng minh bốn mode đưa payment về đúng trạng thái và dữ liệu được persist; unit/contract test chứng minh replay/mismatch/duplicate callback; configuration test chứng minh fake chỉ tồn tại khi được chọn và production fail-fast. Spring Modulith/ArchUnit, Spotless, regression liên quan, `git diff --check` và Docker Compose phải đạt; chỉ đổi `[x]` sau required checks của PR.
   - **Bằng chứng:** 324 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,24%, line coverage 91,08%, branch coverage 69,97%. Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V20, H2, MySQL 8.0.46, MinIO Testcontainers, Docker Compose và `git diff --check` đều đạt. PR số `31` đã vượt `verify` và `dependency-review` trên implementation commit; commit tài liệu đóng task tiếp tục phải vượt lại hai required checks trước khi merge.
-- [ ] M5.3 Tích hợp provider thật bằng hosted checkout/token; không lưu dữ liệu thẻ.
+- [x] M5.3 Tích hợp provider thật bằng hosted checkout/token; không lưu dữ liệu thẻ.
   - Yêu cầu: dùng hosted page/tokenization, credential từ secret store, TLS, timeout/circuit breaker và redirect allowlist; hoàn thành PCI scope review trước go-live.
   - Đầu ra: provider adapter, typed config, request signing/authentication, return/cancel handler và sanitized operational docs.
   - Ví dụ và nghiệm thu: tạo session và return hợp lệ hoạt động trên sandbox; URL giả, amount mismatch, timeout và provider error được xử lý; database/log không có PAN/CVV.
+  - **Thiết kế đang triển khai:** Stripe Checkout Session ở `ui_mode=hosted_page` theo API version đang pin; Shop chỉ gửi order/payment-attempt ID, amount/currency do server xác lập và nhận session ID cùng HTTPS checkout URL. Request `POST` dùng `Idempotency-Key` ổn định theo payment attempt nên chỉ retry lỗi tạm thời; không có trường card/PAN/CVV trong provider port, entity hoặc migration.
+  - **Biên an toàn:** API Stripe cố định tại `https://api.stripe.com`; checkout URL chỉ được chấp nhận khi dùng HTTPS, cổng mặc định/443 và host nằm trong `STRIPE_ALLOWED_CHECKOUT_HOSTS`. Adapter đối chiếu lại order reference, amount theo minor unit và currency trước khi lưu URL; response quá lớn, sai content type, sai JSON hoặc sai dữ liệu đều bị coi là protocol error.
+  - **Return/cancel:** success/cancel URL phải trỏ đúng `/api/payments/checkout/return` và `/api/payments/checkout/cancel`, đồng thời host phải thuộc `STRIPE_ALLOWED_RETURN_HOSTS`. HTTPS là bắt buộc, ngoại trừ `http://localhost` hoặc `http://127.0.0.1` chỉ được phép với khóa `sk_test_` để smoke test local; khóa `sk_live_` không có ngoại lệ này. Mỗi URL mang state HMAC-SHA256 có hạn dùng và gắn với payment attempt; return còn phải khớp Stripe session ID đã lưu. Trình duyệt quay lại hoặc bấm hủy không được tự đánh dấu thanh toán thành công/thất bại; M5.4 mới tin webhook đã xác minh chữ ký.
+  - **Resilience/telemetry:** OkHttp tắt retry ngầm và áp dụng connect/read/call timeout riêng. Resilience4j retry tối đa 3 lần chỉ cho lỗi retryable, circuit breaker đếm đúng lỗi tạm thời và xuất Micrometer metrics cho circuit breaker/retry; không có fallback giả success.
+  - **Biến môi trường bắt buộc khi chọn `PAYMENT_PROVIDER_TYPE=stripe`:** `STRIPE_SECRET_KEY`, `STRIPE_RETURN_STATE_SECRET`, `STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`, `STRIPE_ALLOWED_RETURN_HOSTS`. Không commit giá trị secret; production lấy từ secret manager/runtime injection. API mặc định pin `2026-09-30.endive`; các timeout, retry, circuit breaker, API version và checkout-host allowlist có biến override tương ứng trong `application.yml`. Khi tạo webhook ở M5.4 phải dùng cùng API version.
+  - **Runbook sandbox:** dùng Stripe test secret, backend có callback HTTPS công khai và host đã allowlist; tạo payment attempt từ order sandbox, mở action URL, dùng test card trên trang Stripe rồi kiểm tra return chỉ báo `REQUIRES_ACTION` cho đến khi webhook M5.4 xác nhận. Kiểm tra metrics `resilience4j.circuitbreaker.*`/`resilience4j.retry.*`, bảng `thanh_toan_lan_thu` chỉ có `provider_reference` và `action_url`, đồng thời xoay ngay credential nếu từng xuất hiện trong log hoặc Git.
+  - **Smoke test sandbox có chủ đích:** `StripeSandboxSmokeIT` không khớp naming convention test mặc định nên không gọi Stripe trong `clean verify`/CI. Chỉ chạy bằng `mvnw.cmd -Dtest=StripeSandboxSmokeIT -Dstripe.sandbox.enabled=true test` khi process test đã có `STRIPE_SECRET_KEY=sk_test_...` và `STRIPE_RETURN_STATE_SECRET`; test đi qua `PaymentInitiationOperations`, tạo đúng một Checkout Session thật, replay không gọi provider lần hai và giữ bản ghi `REQUIRES_ACTION` trong MySQL local để đối chiếu. Test tự từ chối `sk_live_` và không in credential/action URL.
+  - **Bằng chứng local ngày 03/10/2026:** 359 test mặc định, 0 failure/error/skipped; instruction coverage 91,30%, line coverage 91,19%, branch coverage 69,20%. Maven `clean verify`, Spring Modulith/ArchUnit, Spotless, Flyway fresh/upgrade V1–V21, H2, MySQL 8.0.46, MinIO Testcontainers, Docker Compose, URL/amount/currency/reference validation, timeout/retry/circuit breaker, return/cancel security, quét credential và `git diff --check` đều đạt. Test bổ sung xác nhận HTTP loopback chỉ được dùng với `sk_test_`; khóa live, host ngoài loopback và callback sai path đều fail-fast. Test HTTP adapter không chứa credential thật.
+  - **Bằng chứng sandbox thật:** smoke test opt-in đạt 1/1 bằng `sk_test_`, tạo Checkout Session `cs_test_*` tại host `checkout.stripe.com`, persist đúng một attempt `REQUIRES_ACTION` trị giá 199.000 VND vào MySQL và replay trả lại bản ghi cũ mà không gọi provider lần hai. Quá trình test phát hiện và sửa tương thích API `ui_mode=hosted_page` cùng việc Stripe Checkout URL hợp lệ có thể mang fragment; credential, session ID đầy đủ và action URL không bị ghi ra log hoặc Git.
+  - **Trạng thái nghiệm thu:** implementation commit trên PR số `32` đã vượt `verify` và `dependency-review`; commit tài liệu đóng task phải vượt lại hai required checks trước khi merge. Không bắt đầu M5.4 trước khi merge commit trên `main` được xác nhận xanh.
 - [ ] M5.4 Xác minh chữ ký webhook và chống webhook lặp.
   - Yêu cầu: đọc raw body đúng định dạng provider, kiểm tra signature/timestamp/replay window trước parse nghiệp vụ và deduplicate bằng provider event ID.
   - Đầu ra: webhook endpoint, signature verifier, inbox/dedup persistence và audit/metrics.
@@ -520,12 +531,19 @@ Tiêu chí hoàn thành M4:
   - Yêu cầu: quét payment pending/unknown theo batch, gọi provider bằng rate limit/timeout, backoff và lock nhiều instance; không tự suy diễn success khi provider không xác nhận.
   - Đầu ra: scheduled job, checkpoint/metrics/alert và operator runbook.
   - Ví dụ và nghiệm thu: pending chuyển đúng theo provider; provider unavailable giữ trạng thái an toàn và retry sau; job lặp không tạo refund/confirm trùng.
+- [ ] M5.7 Tích hợp thanh toán QR động theo mô hình ví/sàn thương mại điện tử.
+  - **Mục tiêu:** ưu tiên adapter VNPay/QR cho thị trường Việt Nam; MoMo, ZaloPay hoặc ShopeePay là adapter mở rộng khi có hợp đồng merchant/API phù hợp. Stripe được giữ như provider thẻ quốc tế tùy chọn và adapter tham chiếu; domain Payment không bị khóa vào một SDK cụ thể.
+  - **Luồng:** Shop tạo payment attempt và gửi amount/currency/order reference/idempotency key do server xác lập; provider trả QR payload hoặc hosted QR URL cùng thời điểm hết hạn. Frontend chỉ hiển thị dữ liệu provider trả về và có thể polling để cải thiện trải nghiệm, nhưng không được tự báo thanh toán thành công.
+  - **Nguồn sự thật:** chỉ webhook đã xác minh chữ ký hoặc reconciliation từ API provider mới được chuyển attempt sang `SUCCEEDED`/`FAILED`/`EXPIRED`; xử lý lặp bằng provider event ID và payment idempotency key.
+  - **An toàn:** không tạo QR chuyển khoản tĩnh, không nhúng merchant secret vào QR/client, không lưu PAN/CVV, kiểm tra allowlist URL/kích thước payload/TTL và che QR URL hoặc token khỏi log nếu provider coi đó là bearer credential.
+  - **Nghiệm thu:** sandbox chứng minh QR đúng số tiền và đơn hàng, hết hạn đúng, webhook trùng không tạo side effect, browser giả success không có tác dụng, reconciliation sửa được trạng thái mất webhook và database/log không chứa credential.
 
 Tiêu chí hoàn thành M5:
 
 - Webhook lặp không tạo side effect lặp.
 - Payment thành công mới confirm kho; thất bại/timeout phải release kho.
 - Có audit trail cho mọi lần thử thanh toán.
+- QR động hết hạn, webhook lặp/mất và browser giả trạng thái đều được xử lý an toàn trên sandbox provider đã chọn.
 
 ### M6 — Hoàn thiện monolith
 
@@ -862,22 +880,64 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.2, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; implementation commit M5.2 trên PR số `31` đã vượt required checks và đang chờ commit tài liệu đóng task vượt lại quality gate trước khi merge.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.3, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.2 đã merge qua PR số `31`. M5.3 đã vượt full regression, sandbox thật và required checks trên implementation commit của PR số `32`; còn bước xác nhận lại commit tài liệu trước khi merge.
 
-## 8. Luồng nghiệp vụ đích
+## 8. Luồng hoạt động toàn dự án
+
+### 8.1. Từ xác thực đến checkout
 
 ```text
-Client gửi checkout + Idempotency-Key
-  → Order đọc giỏ hàng và lấy giá hiện tại từ Catalog API
-  → Order tạo PENDING order + snapshot
-  → Inventory reserve theo reservationId
-  → Payment tạo payment attempt
-  → Provider gửi signed webhook
-  → Thành công: confirm inventory, Order → PAID
-  → Thất bại/timeout: release inventory, Order → PAYMENT_FAILED/EXPIRED
+Client
+  → Identity: đăng ký/đăng nhập, CAPTCHA thích ứng, rate limit
+  → JWT: access token mang role/permission; refresh token được hash, rotation và revoke theo family
+  → Catalog: xem danh mục, sản phẩm, biến thể và ảnh đang được phép bán
+  → Cart: thêm/sửa/xóa SKU; server kiểm tra SKU và giới hạn số lượng
+  → Checkout + Idempotency-Key
+      → Order đọc giỏ hàng hiện tại
+      → Catalog cung cấp lại giá/currency phía server
+      → Order lưu PENDING order và snapshot từng dòng
+      → Inventory reserve nguyên tử theo reservationId và TTL
 ```
 
-Không sử dụng distributed database transaction. Luồng thất bại được xử lý bằng state machine, idempotency, event và compensation.
+Client không được gửi giá đáng tin cậy, tự gán role, tự đổi trạng thái Order/Payment hoặc xác nhận tồn kho. Controller chỉ nhận contract; service điều phối use case; entity bảo vệ invariant; repository chỉ thuộc module sở hữu dữ liệu.
+
+### 8.2. Thanh toán và hoàn tất đơn
+
+```text
+Order orchestration
+  → Payment tạo attempt + provider idempotency key
+  → Provider adapter tạo hosted checkout hoặc QR động
+  → Client thanh toán trên trang/app của provider
+  → Provider gửi webhook có chữ ký
+  → Payment xác minh chữ ký + chống event lặp + cập nhật state machine
+      → SUCCEEDED: phát event → Inventory confirm → Order PAID
+      → FAILED/CANCELLED/EXPIRED: phát event → Inventory release → Order PAYMENT_FAILED/EXPIRED
+      → UNKNOWN/PENDING: reconciliation hỏi lại provider, không tự suy diễn thành công
+```
+
+Return/cancel trên trình duyệt và polling chỉ phục vụ giao diện, không phải bằng chứng thanh toán. M5.3 đã dựng và smoke test hosted checkout/return an toàn; webhook, event cập nhật Order/Inventory, reconciliation và QR lần lượt thuộc M5.4–M5.7 nên sơ đồ trên là luồng đích, không phải tuyên bố mọi bước đã triển khai.
+
+### 8.3. Audit, độ tin cậy và tách microservices
+
+- Identity ghi lịch sử truy cập append-only; không lưu password, token thô, CAPTCHA answer hoặc payment secret.
+- Correlation ID đi xuyên request/event để truy vết. Error API dùng `ApiResponse<T>` và message tiếng Việt từ `message.properties`.
+- M6 bổ sung outbox/inbox, observability, performance, backup/restore và purchase-flow end-to-end. State cùng outbox được commit một transaction; publisher/consumer có retry và idempotency.
+- Chỉ sau cổng dữ liệu cuối M6 mới tách M7 theo thứ tự Gateway → Identity → Catalog → Inventory → Payment → Order. Contract nội bộ được thay bằng HTTP/event theo từng bước, không dùng distributed database transaction.
+- Mỗi service sở hữu database/schema của mình; state machine, idempotency, event, reconciliation và compensation xử lý lỗi giữa các service.
+
+### 8.4. Thanh toán QR kiểu sàn thương mại điện tử
+
+QR đúng cho Shop là **QR động theo từng payment attempt**, không phải ảnh QR tài khoản ngân hàng cố định:
+
+1. Backend khóa amount/currency/order reference, tạo idempotency key rồi gọi API merchant của provider.
+2. Provider trả `providerReference`, QR payload hoặc hosted QR URL và `expiresAt`; Shop lưu metadata tối thiểu, frontend dựng QR/hiển thị URL mà không nhận merchant secret.
+3. Người mua quét bằng ứng dụng ngân hàng/ví. Trang frontend có thể polling trạng thái nhưng kết quả polling chỉ để cập nhật UX.
+4. Provider gọi webhook; backend kiểm tra chữ ký, timestamp/replay window, amount/currency/reference và deduplicate event trước khi đổi trạng thái.
+5. Nếu webhook mất hoặc trạng thái còn `UNKNOWN/PENDING`, reconciliation hỏi API provider. QR hết hạn chuyển `EXPIRED` và release tồn kho đúng một lần.
+
+Stripe hosted checkout của M5.3 là adapter đầu tiên để ổn định payment port. M5.7 sẽ cắm provider QR phù hợp thị trường qua cùng port; nhà cung cấp cụ thể chỉ được chọn sau khi có tài khoản merchant, tài liệu sandbox, phí và yêu cầu pháp lý. Cách này giống trải nghiệm Shopee ở mức luồng nghiệp vụ nhưng không sao chép hay phụ thuộc API nội bộ của Shopee.
+
+Không sử dụng distributed database transaction. Luồng thất bại được xử lý bằng state machine, idempotency, event, reconciliation và compensation.
 
 ## 9. Chạy dự án
 
@@ -894,6 +954,20 @@ Windows PowerShell:
 docker start mysql-8.0
 $env:SPRING_PROFILES_ACTIVE="dev"
 .\mvnw.cmd spring-boot:run
+```
+
+Chạy cả ứng dụng bằng Docker Compose (service `app` dùng profile riêng nên không ảnh hưởng lệnh chỉ khởi động hạ tầng):
+
+```powershell
+Copy-Item .env.example .env
+docker compose --profile app up -d --build
+```
+
+Compose tự đọc `.env`, nhưng chỉ truyền vào container các biến được khai báo tường minh trong `compose.yaml`. `.env` đã được loại khỏi Git và Docker build context. Để chuyển từ provider giả lập sang Stripe sandbox, điền `STRIPE_SECRET_KEY`, `STRIPE_RETURN_STATE_SECRET`, sau đó đặt `PAYMENT_PROVIDER_TYPE=stripe` và tạo lại container `app`. Profile local đã mặc định callback tại `http://localhost:8080/api/payments/checkout/return|cancel` và allowlist `localhost,127.0.0.1`; ngoại lệ HTTP này chỉ hoạt động với `sk_test_`. Staging/production vẫn phải override bằng URL HTTPS và allowlist hostname tương ứng.
+
+```powershell
+docker compose --profile app up -d --build --force-recreate app
+docker compose logs -f app
 ```
 
 Project mặc định kết nối MySQL tại `localhost:3307`. Nếu chưa có container `mysql-8.0`, có thể dùng `docker compose up -d mysql`; không chạy đồng thời hai container trên cùng port.

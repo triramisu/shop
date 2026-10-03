@@ -61,7 +61,8 @@ class PaymentAttemptTransactionService {
         if (attempt.getStatus() == targetStatus) {
             return PaymentAttemptSnapshotMapper.toSnapshot(attempt);
         }
-        attempt.transition(targetStatus, result.providerReference(), result.failureCode(), occurredAt);
+        attempt.transition(
+                targetStatus, result.providerReference(), result.actionUrl(), result.failureCode(), occurredAt);
         return PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(attempt));
     }
 

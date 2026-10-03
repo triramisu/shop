@@ -47,8 +47,8 @@ public record PaymentProviderResult(
         if (!"https".equalsIgnoreCase(value.getScheme())) {
             throw new IllegalArgumentException("provider action URL must use HTTPS");
         }
-        if (value.getUserInfo() != null || value.getFragment() != null) {
-            throw new IllegalArgumentException("provider action URL must not contain user information or a fragment");
+        if (value.getUserInfo() != null) {
+            throw new IllegalArgumentException("provider action URL must not contain user information");
         }
     }
 
