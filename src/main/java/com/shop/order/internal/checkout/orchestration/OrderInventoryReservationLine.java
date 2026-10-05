@@ -113,6 +113,14 @@ public class OrderInventoryReservationLine {
         updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
     }
 
+    void markConfirmed(Instant occurredAt) {
+        if (status != InventoryReservationLineStatus.RESERVED) {
+            throw new IllegalStateException("only a reserved inventory line can be confirmed");
+        }
+        status = InventoryReservationLineStatus.CONFIRMED;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
     private String requireFailureCode(String code) {
         if (code == null || code.isBlank() || code.strip().length() > 100) {
             throw new IllegalArgumentException("failure code must contain 1 to 100 characters");

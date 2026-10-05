@@ -28,6 +28,11 @@ app:
     fake:
       default-mode: success
   order:
+    payment:
+      auto-initiation-enabled: false
+      event-consumption-enabled: false
+      recovery:
+        enabled: false
     checkout:
       inventory:
         reconciliation:

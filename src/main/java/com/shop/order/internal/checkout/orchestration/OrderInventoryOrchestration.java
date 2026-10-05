@@ -3,6 +3,7 @@ package com.shop.order.internal.checkout.orchestration;
 import com.shop.order.event.OrderInventoryReservationRequestedEvent;
 import com.shop.order.internal.constant.OrderTableNames;
 import com.shop.order.internal.entity.CustomerOrder;
+import com.shop.payment.event.PaymentStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,6 +57,19 @@ public class OrderInventoryOrchestration {
 
     @Column(name = "failure_code", length = 100)
     private String failureCode;
+
+    @Column(name = "payment_attempt_id", columnDefinition = "BINARY(16)")
+    private UUID paymentAttemptId;
+
+    @Column(name = "payment_attempt_number")
+    private Integer paymentAttemptNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "last_payment_status", length = 30)
+    private PaymentStatus lastPaymentStatus;
+
+    @Column(name = "last_payment_event_at")
+    private Instant lastPaymentEventAt;
 
     @Version
     @Column(nullable = false)
@@ -197,6 +211,140 @@ public class OrderInventoryOrchestration {
         }
         status = InventoryOrchestrationStatus.COMPENSATION_REQUIRED;
         updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    public void assignPaymentAttempt(UUID attemptId, int attemptNumber, Instant occurredAt) {
+        UUID requiredAttemptId = Objects.requireNonNull(attemptId, "payment attempt id is required");
+        if (attemptNumber < 1) {
+            throw new IllegalArgumentException("payment attempt number must be positive");
+        }
+        if (status != InventoryOrchestrationStatus.RESERVED
+                && status != InventoryOrchestrationStatus.PAYMENT_PENDING
+                && status != InventoryOrchestrationStatus.PAYMENT_RECOVERY_REQUIRED) {
+            throw new IllegalStateException("inventory orchestration is not ready for payment");
+        }
+        if (paymentAttemptId != null
+                && (!paymentAttemptId.equals(requiredAttemptId) || !paymentAttemptNumber.equals(attemptNumber))) {
+            throw new IllegalStateException("payment attempt identity cannot be changed");
+        }
+        paymentAttemptId = requiredAttemptId;
+        paymentAttemptNumber = attemptNumber;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    public boolean isStalePaymentEvent(PaymentStatus paymentStatus, Instant eventOccurredAt) {
+        Objects.requireNonNull(paymentStatus, "payment status is required");
+        Instant occurrenceTime = Objects.requireNonNull(eventOccurredAt, "payment event time is required");
+        return lastPaymentEventAt != null && occurrenceTime.isBefore(lastPaymentEventAt);
+    }
+
+    public boolean beginPaymentConfirmation(PaymentStatus paymentStatus, Instant eventOccurredAt, Instant handledAt) {
+        requirePaymentAttempt();
+        if (isStalePaymentEvent(paymentStatus, eventOccurredAt)
+                || status == InventoryOrchestrationStatus.PAYMENT_CONFIRMED
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASING
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASED) {
+            return false;
+        }
+        if (paymentStatus != PaymentStatus.SUCCEEDED) {
+            throw new IllegalArgumentException("payment confirmation requires a successful payment");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_CONFIRMING;
+        recordPaymentEvent(paymentStatus, eventOccurredAt, handledAt);
+        return true;
+    }
+
+    public boolean beginPaymentRelease(PaymentStatus paymentStatus, Instant eventOccurredAt, Instant handledAt) {
+        requirePaymentAttempt();
+        if (isStalePaymentEvent(paymentStatus, eventOccurredAt)
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASED
+                || status == InventoryOrchestrationStatus.PAYMENT_CONFIRMING
+                || status == InventoryOrchestrationStatus.PAYMENT_CONFIRMED) {
+            return false;
+        }
+        if (paymentStatus != PaymentStatus.FAILED
+                && paymentStatus != PaymentStatus.CANCELLED
+                && paymentStatus != PaymentStatus.EXPIRED) {
+            throw new IllegalArgumentException("payment release requires a terminal unsuccessful payment");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_RELEASING;
+        recordPaymentEvent(paymentStatus, eventOccurredAt, handledAt);
+        return true;
+    }
+
+    public boolean recordPaymentPending(PaymentStatus paymentStatus, Instant eventOccurredAt, Instant handledAt) {
+        requirePaymentAttempt();
+        if (isStalePaymentEvent(paymentStatus, eventOccurredAt)
+                || status == InventoryOrchestrationStatus.PAYMENT_CONFIRMING
+                || status == InventoryOrchestrationStatus.PAYMENT_CONFIRMED
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASING
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASED) {
+            return false;
+        }
+        if (paymentStatus != PaymentStatus.PENDING
+                && paymentStatus != PaymentStatus.REQUIRES_ACTION
+                && paymentStatus != PaymentStatus.UNKNOWN) {
+            throw new IllegalArgumentException("payment status is not pending");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_PENDING;
+        recordPaymentEvent(paymentStatus, eventOccurredAt, handledAt);
+        return true;
+    }
+
+    public void markPaymentRecoveryRequired(Instant occurredAt) {
+        if (status == InventoryOrchestrationStatus.PAYMENT_CONFIRMED
+                || status == InventoryOrchestrationStatus.PAYMENT_RELEASED) {
+            throw new IllegalStateException("a completed payment orchestration cannot require recovery");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_RECOVERY_REQUIRED;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    public void markPaymentConfirmed(UUID reservationId, Instant occurredAt) {
+        if (status != InventoryOrchestrationStatus.PAYMENT_CONFIRMING) {
+            throw new IllegalStateException("payment inventory confirmation is not active");
+        }
+        line(reservationId).markConfirmed(occurredAt);
+        updatedAt = occurredAt;
+    }
+
+    public void completePaymentConfirmation(Instant occurredAt) {
+        if (status != InventoryOrchestrationStatus.PAYMENT_CONFIRMING
+                || lines.stream().anyMatch(line -> line.getStatus() != InventoryReservationLineStatus.CONFIRMED)) {
+            throw new IllegalStateException("payment inventory confirmation is incomplete");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_CONFIRMED;
+        failureCode = null;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    public void markPaymentReleased(UUID reservationId, Instant occurredAt) {
+        if (status != InventoryOrchestrationStatus.PAYMENT_RELEASING) {
+            throw new IllegalStateException("payment inventory release is not active");
+        }
+        line(reservationId).markReleased(occurredAt);
+        updatedAt = occurredAt;
+    }
+
+    public void completePaymentRelease(Instant occurredAt) {
+        if (status != InventoryOrchestrationStatus.PAYMENT_RELEASING
+                || lines.stream().anyMatch(line -> line.getStatus() != InventoryReservationLineStatus.RELEASED)) {
+            throw new IllegalStateException("payment inventory release is incomplete");
+        }
+        status = InventoryOrchestrationStatus.PAYMENT_RELEASED;
+        updatedAt = Objects.requireNonNull(occurredAt, OCCURRENCE_TIME_REQUIRED);
+    }
+
+    private void requirePaymentAttempt() {
+        if (paymentAttemptId == null || paymentAttemptNumber == null) {
+            throw new IllegalStateException("payment attempt has not been assigned");
+        }
+    }
+
+    private void recordPaymentEvent(PaymentStatus paymentStatus, Instant eventOccurredAt, Instant handledAt) {
+        lastPaymentStatus = Objects.requireNonNull(paymentStatus, "payment status is required");
+        lastPaymentEventAt = Objects.requireNonNull(eventOccurredAt, "payment event time is required");
+        updatedAt = Objects.requireNonNull(handledAt, OCCURRENCE_TIME_REQUIRED);
     }
 
     public void resumeCompensation(Instant occurredAt) {

@@ -78,7 +78,14 @@ public class OrderInventoryOrchestrationStateService {
                         failureCode,
                         reservationIds(orchestration, InventoryReservationLineStatus.RESERVED)));
             }
-            case RESERVED, FAILED -> Optional.empty();
+            case RESERVED,
+                    FAILED,
+                    PAYMENT_PENDING,
+                    PAYMENT_CONFIRMING,
+                    PAYMENT_CONFIRMED,
+                    PAYMENT_RELEASING,
+                    PAYMENT_RELEASED,
+                    PAYMENT_RECOVERY_REQUIRED -> Optional.empty();
         };
     }
 

@@ -15,8 +15,8 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - Giai đoạn hiện tại: `M5 — Payment`.
 - Nhiệm vụ vừa hoàn thành: `M5.4 — Xác minh chữ ký webhook và chống webhook lặp`, được nghiệm thu qua PR số `33`.
-- Nhiệm vụ đang thực hiện: chưa khởi động nhiệm vụ mới; dừng sau khi đóng M5.4.
-- Nhiệm vụ kế tiếp: `M5.5 — Payment cập nhật Order qua domain event`; chỉ bắt đầu sau khi merge commit của M5.4 trên `main` được xác nhận xanh.
+- Nhiệm vụ đang thực hiện: `M5.5A — Payment success/failure cập nhật Order và Inventory qua domain event`.
+- Nhiệm vụ kế tiếp: `M5.5B — Partial/full refund`; chỉ bắt đầu sau khi M5.5A được kiểm thử và merge.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
@@ -530,10 +530,14 @@ Tiêu chí hoàn thành M4:
   - **Triển khai và khôi phục:** V22 chỉ thêm bảng/index/FK nội module, không sửa dữ liệu Payment cũ và tương thích artifact M5.3. Triển khai migration trước hoặc cùng artifact rồi cấu hình webhook secret/endpoint; rollback code giữ nguyên bảng inbox để không mất dedup history. Không xóa hoặc sửa V22 sau khi đã áp dụng; sự cố xử lý dùng roll-forward.
   - **Bằng chứng local ngày 05/10/2026:** 381 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,29%, line coverage 91,00%, branch coverage 69,15%. Maven `spotless:apply clean verify`, Spring Modulith/ArchUnit, Flyway fresh/upgrade V1–V22 và V21→V22, H2, MySQL 8.0.46, MinIO Testcontainers, duplicate race thật trên MySQL, OpenAPI/security, Docker Compose, quét credential runtime và `git diff --check` đều đạt. Test race xác nhận đúng một delivery `APPLIED`, delivery còn lại `DUPLICATE`, chỉ một inbox và một lần đổi trạng thái Payment.
   - **Trạng thái nghiệm thu:** implementation commit `ba99560` trên PR số `33` đã vượt `verify` và `dependency-review`; commit tài liệu đóng task phải vượt lại hai required checks trước khi merge. CI dùng webhook secret giả lập an toàn; đăng ký endpoint và delivery thử từ Stripe Workbench/CLI bằng secret thật của từng môi trường là bước triển khai, không ghi secret vào Git hoặc log.
-- [ ] M5.5 Payment success/failure/refund cập nhật Order qua event.
-  - Yêu cầu: định nghĩa versioned events và mapping state; xử lý event đến trễ/sai thứ tự, partial/full refund theo phạm vi đã chốt.
-  - Đầu ra: publisher/consumer, order transition handlers và compensation inventory tương ứng.
-  - Ví dụ và nghiệm thu: success confirm order/kho đúng một lần; failure release; refund cập nhật tổng và trạng thái hợp lệ; duplicate/out-of-order tests đạt.
+- [~] M5.5 Payment success/failure/refund cập nhật Order qua event.
+  - [~] **M5.5A — Đồng bộ kết quả thanh toán với Order/Inventory:** event có version và dữ liệu đối soát; Payment phát event sau khi lưu state, Order ghi inbox trước side effect. `SUCCEEDED` phải confirm toàn bộ reservation rồi mới chuyển Order sang `PAID`; `FAILED`/`CANCELLED`/`EXPIRED` phải release rồi mới hủy Order. Duplicate, concurrent delivery và event đến trễ không được tạo movement hoặc transition lặp; lỗi tạm thời được recovery, còn payment success sau khi reservation hết hạn phải giữ trạng thái cần xử lý thủ công thay vì giả thành công.
+    - **Actor, dữ liệu và ranh giới:** đây là luồng nội bộ `Payment → Order → Inventory`, không mở REST API mới. Payment chỉ công khai contract `PaymentStatusChangedEvent` version 1 và `PaymentInitiationOperations`; Order sở hữu orchestration/inbox `don_hang_su_kien_thanh_toan`, không truy cập entity/repository Payment hoặc Inventory và không tạo foreign key xuyên module.
+    - **Bất biến:** số tiền/currency/attempt của event phải khớp snapshot Order; mỗi order chỉ gắn một payment attempt trong phạm vi M5.5A. Xử lý theo pessimistic lock trên orchestration và unique `event_id`; cùng ID/khác payload bị từ chối. Chỉ khi mọi reservation đã `CONFIRMED` mới đổi Order sang `PAID`; thất bại thanh toán chỉ đổi Order sang `CANCELLED` sau khi mọi reservation đã release.
+    - **Độ tin cậy:** listener chạy sau commit, inbox và từng side effect dùng transaction mới; scheduler quét payment initiation/event bị gián đoạn theo batch có giới hạn, metric tag hữu hạn và cô lập lỗi từng item. Inbox giúp consumer replay an toàn, nhưng khoảng trống producer chết sau commit trước khi publish chỉ được đóng bằng transactional outbox M6.1; trạng thái provider `UNKNOWN` được đối soát ở M5.6.
+    - **Cấu hình/vận hành:** `app.order.payment.auto-initiation-enabled`, `event-consumption-enabled` và nhóm `recovery` cho phép rollout/kill switch; production bật mặc định, test cũ tắt và test luồng bật tường minh. Flyway V23 thêm metadata attempt/inbox, V24 mở rộng check constraint cho trạng thái payment; rollback code giữ nguyên bảng/cột để bảo toàn lịch sử và dùng migration roll-forward.
+    - **Nghiệm thu bắt buộc:** success/failure, duplicate, cùng ID/khác payload, event đến trễ, reservation hết hạn, scheduler recovery, concurrent duplicate thật và upgrade V22→V24 trên MySQL phải đạt; Spring Modulith/ArchUnit phải giữ đúng named interface `payment :: event` và `payment :: processing`.
+  - [ ] **M5.5B — Partial/full refund:** bổ sung refund aggregate/provider contract, tổng đã hoàn, state transition và event riêng. Refund chỉ bắt đầu sau khi M5.5A ổn định để không trộn luồng thu tiền với luồng hoàn tiền và để mỗi task có rollback/acceptance độc lập.
 - [ ] M5.6 Reconciliation job cho trạng thái không chắc chắn.
   - Yêu cầu: quét payment pending/unknown theo batch, gọi provider bằng rate limit/timeout, backoff và lock nhiều instance; không tự suy diễn success khi provider không xác nhận.
   - Đầu ra: scheduled job, checkpoint/metrics/alert và operator runbook.
@@ -887,7 +891,7 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.4, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.4 được triển khai và nghiệm thu qua PR số `33`. M5.5 chưa bắt đầu.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.4, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.4 được triển khai và nghiệm thu qua PR số `33`. M5.5A đang ở bước kiểm thử/CI, chưa được đánh dấu hoàn thành hoặc merge.
 
 ## 8. Luồng hoạt động toàn dự án
 
@@ -918,11 +922,11 @@ Order orchestration
   → Provider gửi webhook có chữ ký
   → Payment xác minh chữ ký + chống event lặp + cập nhật state machine
       → SUCCEEDED: phát event → Inventory confirm → Order PAID
-      → FAILED/CANCELLED/EXPIRED: phát event → Inventory release → Order PAYMENT_FAILED/EXPIRED
+      → FAILED/CANCELLED/EXPIRED: phát event → Inventory release → Order CANCELLED
       → UNKNOWN/PENDING: reconciliation hỏi lại provider, không tự suy diễn thành công
 ```
 
-Return/cancel trên trình duyệt và polling chỉ phục vụ giao diện, không phải bằng chứng thanh toán. M5.3 đã dựng và smoke test hosted checkout/return an toàn; M5.4 đã hoàn thiện biên webhook có xác minh chữ ký và inbox chống lặp. Event cập nhật Order/Inventory, reconciliation và QR lần lượt thuộc M5.5–M5.7 nên phần sau webhook trong sơ đồ trên vẫn là luồng đích, không phải tuyên bố mọi bước đã triển khai.
+Return/cancel trên trình duyệt và polling chỉ phục vụ giao diện, không phải bằng chứng thanh toán. M5.3 đã dựng và smoke test hosted checkout/return an toàn; M5.4 đã hoàn thiện biên webhook có xác minh chữ ký và inbox chống lặp; M5.5A đang bổ sung đoạn Payment event → Inventory/Order. Partial/full refund, provider reconciliation và QR lần lượt thuộc M5.5B–M5.7 nên các đoạn đó trong sơ đồ vẫn là luồng đích, chưa phải chức năng đã nghiệm thu.
 
 ### 8.3. Audit, độ tin cậy và tách microservices
 
@@ -987,7 +991,7 @@ Kết nối DataGrip vào MySQL local:
 2. Nhập `Host=localhost`, `Port=3307`, `User=shop`, `Password=shop-local-password`, `Database=shop`.
 3. JDBC URL tương ứng là `jdbc:mysql://localhost:3307/shop`.
 4. Chọn `Test Connection`, sau đó trong tab `Schemas` đánh dấu schema `shop` và bấm `Apply`.
-5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` hiện phải lên tới V22; các bảng Identity mang tiền tố `xac_thuc_`, còn Payment có `thanh_toan_lan_thu` và `thanh_toan_su_kien_webhook`.
+5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` hiện phải lên tới V24; các bảng Identity mang tiền tố `xac_thuc_`, Payment có `thanh_toan_lan_thu`/`thanh_toan_su_kien_webhook`, còn Order có inbox `don_hang_su_kien_thanh_toan`.
 
 Nếu DataGrip vẫn hiển thị `identity_*`, chạy câu lệnh sau để kiểm tra. Kết quả dừng trước V8 nghĩa là container chưa được ứng dụng mới chạy đủ migration, không phải entity vẫn ánh xạ tên tiếng Anh:
 

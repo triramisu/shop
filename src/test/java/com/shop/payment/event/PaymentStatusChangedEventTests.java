@@ -35,6 +35,7 @@ class PaymentStatusChangedEventTests {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("only valid");
         assertThatThrownBy(() -> new PaymentStatusChangedEvent(
+                        PaymentStatusChangedEvent.CURRENT_VERSION,
                         UUID.randomUUID(),
                         UUID.randomUUID(),
                         UUID.randomUUID(),
@@ -50,8 +51,28 @@ class PaymentStatusChangedEventTests {
                 .hasMessageContaining("provider code");
     }
 
+    @Test
+    void rejectsAnUnsupportedContractVersion() {
+        assertThatThrownBy(() -> new PaymentStatusChangedEvent(
+                        2,
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        PaymentStatus.CREATED,
+                        PaymentStatus.PENDING,
+                        new BigDecimal("10.00"),
+                        "USD",
+                        "SANDBOX",
+                        "reference-1",
+                        null,
+                        OCCURRED_AT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("version");
+    }
+
     private PaymentStatusChangedEvent event(PaymentStatus currentStatus, String providerReference, String failureCode) {
         return new PaymentStatusChangedEvent(
+                PaymentStatusChangedEvent.CURRENT_VERSION,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),

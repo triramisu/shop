@@ -34,6 +34,7 @@ class OrderSchemaMigrationTests {
                         "don_hang_gio_hang",
                         "don_hang_muc_don_hang",
                         "don_hang_muc_gio_hang",
+                        "don_hang_su_kien_thanh_toan",
                         "don_hang_yeu_cau_luy_dang");
     }
 
@@ -126,6 +127,28 @@ class OrderSchemaMigrationTests {
                    AND table_name = 'don_hang_yeu_cau_luy_dang'
                 """, String.class))
                 .contains("idx_don_hang_luy_dang_status_expiration", "idx_don_hang_luy_dang_owner_created");
+    }
+
+    @Test
+    void protectsPaymentEventIdentityPayloadAndProcessingState() {
+        assertThat(constraints("don_hang_su_kien_thanh_toan"))
+                .contains(
+                        "uk_don_hang_su_kien_thanh_toan_event",
+                        "ck_don_hang_su_kien_thanh_toan_version",
+                        "ck_don_hang_su_kien_thanh_toan_hash",
+                        "ck_don_hang_su_kien_thanh_toan_amount",
+                        "ck_don_hang_su_kien_thanh_toan_currency",
+                        "ck_don_hang_su_kien_thanh_toan_outcome",
+                        "ck_don_hang_su_kien_thanh_toan_processed");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT LOWER(index_name)
+                  FROM information_schema.indexes
+                 WHERE table_schema = 'public'
+                   AND table_name = 'don_hang_su_kien_thanh_toan'
+                """, String.class))
+                .contains(
+                        "idx_don_hang_su_kien_thanh_toan_outcome_received",
+                        "idx_don_hang_su_kien_thanh_toan_order_occurred");
     }
 
     private List<String> constraints(String table) {

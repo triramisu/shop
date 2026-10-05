@@ -152,6 +152,7 @@ public class PaymentAttempt {
         completedAt = target.isTerminal() ? transitionTime : null;
 
         return new PaymentStatusChangedEvent(
+                PaymentStatusChangedEvent.CURRENT_VERSION,
                 UUID.randomUUID(),
                 id,
                 orderId,

@@ -45,6 +45,10 @@ public class OrderInventoryOrchestrationQueryService {
                 orchestration.getStatus(),
                 orchestration.getExpiresAt(),
                 orchestration.getFailureCode(),
+                orchestration.getPaymentAttemptId(),
+                orchestration.getPaymentAttemptNumber(),
+                orchestration.getLastPaymentStatus(),
+                orchestration.getLastPaymentEventAt(),
                 orchestration.getVersion(),
                 orchestration.getLines().stream().map(this::lineSnapshot).toList());
     }

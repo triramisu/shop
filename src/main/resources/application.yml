@@ -85,6 +85,15 @@ app:
         open-state-duration: ${STRIPE_CIRCUIT_BREAKER_OPEN_DURATION:30s}
         permitted-calls-in-half-open-state: ${STRIPE_CIRCUIT_BREAKER_HALF_OPEN_CALLS:3}
   order:
+    payment:
+      auto-initiation-enabled: ${ORDER_PAYMENT_AUTO_INITIATION_ENABLED:true}
+      event-consumption-enabled: ${ORDER_PAYMENT_EVENT_CONSUMPTION_ENABLED:true}
+      recovery:
+        enabled: ${ORDER_PAYMENT_RECOVERY_ENABLED:true}
+        stale-after: ${ORDER_PAYMENT_RECOVERY_STALE_AFTER:30s}
+        fixed-delay: ${ORDER_PAYMENT_RECOVERY_FIXED_DELAY:30s}
+        initial-delay: ${ORDER_PAYMENT_RECOVERY_INITIAL_DELAY:30s}
+        batch-size: ${ORDER_PAYMENT_RECOVERY_BATCH_SIZE:50}
     checkout:
       pricing:
         discount-rate: ${CHECKOUT_DISCOUNT_RATE:0}

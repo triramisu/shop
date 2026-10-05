@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 public record PaymentStatusChangedEvent(
+        int eventVersion,
         UUID eventId,
         UUID paymentAttemptId,
         UUID orderId,
@@ -20,7 +21,12 @@ public record PaymentStatusChangedEvent(
         String failureCode,
         Instant occurredAt) {
 
+    public static final int CURRENT_VERSION = 1;
+
     public PaymentStatusChangedEvent {
+        if (eventVersion != CURRENT_VERSION) {
+            throw new IllegalArgumentException("unsupported payment event version");
+        }
         Objects.requireNonNull(eventId, "event id is required");
         Objects.requireNonNull(paymentAttemptId, "payment attempt id is required");
         Objects.requireNonNull(orderId, "order id is required");

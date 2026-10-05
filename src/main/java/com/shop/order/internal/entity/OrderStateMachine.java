@@ -17,6 +17,16 @@ final class OrderStateMachine {
                     OrderTransitionActor.SYSTEM),
             rule(
                     OrderStatus.PENDING,
+                    OrderTransitionEvent.PAYMENT_FAILED,
+                    OrderStatus.CANCELLED,
+                    OrderTransitionActor.SYSTEM),
+            rule(
+                    OrderStatus.PENDING,
+                    OrderTransitionEvent.PAYMENT_CANCELLED,
+                    OrderStatus.CANCELLED,
+                    OrderTransitionActor.SYSTEM),
+            rule(
+                    OrderStatus.PENDING,
                     OrderTransitionEvent.INVENTORY_RESERVATION_FAILED,
                     OrderStatus.CANCELLED,
                     OrderTransitionActor.SYSTEM),

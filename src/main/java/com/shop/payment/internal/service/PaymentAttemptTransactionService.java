@@ -10,6 +10,7 @@ import com.shop.payment.provider.PaymentProviderResult;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -17,8 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 class PaymentAttemptTransactionService {
 
     private final PaymentAttemptRepository paymentAttemptRepository;
+    private final PaymentLifecycleEventPublisher lifecycleEventPublisher;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     PaymentAttemptSnapshot getOrCreate(PaymentInitiationCommand command, String providerCode, Instant now) {
         PaymentAttempt byId =
                 paymentAttemptRepository.findById(command.paymentAttemptId()).orElse(null);
@@ -46,7 +48,7 @@ class PaymentAttemptTransactionService {
         return PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(created));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     PaymentAttemptSnapshot applyProviderResult(
             java.util.UUID paymentAttemptId, PaymentProviderResult result, Instant occurredAt) {
         PaymentAttempt attempt = requireAttempt(paymentAttemptId);
@@ -61,12 +63,15 @@ class PaymentAttemptTransactionService {
         if (attempt.getStatus() == targetStatus) {
             return PaymentAttemptSnapshotMapper.toSnapshot(attempt);
         }
-        attempt.transition(
+        var event = attempt.transition(
                 targetStatus, result.providerReference(), result.actionUrl(), result.failureCode(), occurredAt);
-        return PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(attempt));
+        PaymentAttemptSnapshot snapshot =
+                PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(attempt));
+        lifecycleEventPublisher.publish(event);
+        return snapshot;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     PaymentAttemptSnapshot applyProviderError(
             java.util.UUID paymentAttemptId, PaymentProviderException exception, Instant occurredAt) {
         PaymentAttempt attempt = requireAttempt(paymentAttemptId);
@@ -75,8 +80,11 @@ class PaymentAttemptTransactionService {
             return PaymentAttemptSnapshotMapper.toSnapshot(attempt);
         }
         String failureCode = targetStatus == PaymentStatus.FAILED ? exception.getProviderErrorCode() : null;
-        attempt.transition(targetStatus, null, failureCode, occurredAt);
-        return PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(attempt));
+        var event = attempt.transition(targetStatus, null, failureCode, occurredAt);
+        PaymentAttemptSnapshot snapshot =
+                PaymentAttemptSnapshotMapper.toSnapshot(paymentAttemptRepository.saveAndFlush(attempt));
+        lifecycleEventPublisher.publish(event);
+        return snapshot;
     }
 
     private PaymentAttempt requireAttempt(java.util.UUID paymentAttemptId) {

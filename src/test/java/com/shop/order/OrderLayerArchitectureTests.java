@@ -60,7 +60,7 @@ class OrderLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.order.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(7)
+                .hasSize(8)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
