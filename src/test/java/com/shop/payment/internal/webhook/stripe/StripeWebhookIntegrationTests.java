@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shop.payment.event.PaymentStatus;
+import com.shop.payment.event.PaymentStatusChangedEvent;
 import com.shop.payment.internal.entity.PaymentAttempt;
 import com.shop.payment.internal.repository.PaymentAttemptRepository;
 import com.shop.payment.internal.webhook.entity.PaymentWebhookOutcome;
@@ -22,6 +23,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -37,6 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@RecordApplicationEvents
 class StripeWebhookIntegrationTests {
 
     @Autowired
@@ -47,6 +51,9 @@ class StripeWebhookIntegrationTests {
 
     @Autowired
     private PaymentWebhookEventRepository webhookEventRepository;
+
+    @Autowired
+    private ApplicationEvents applicationEvents;
 
     @Test
     void validSignatureAppliesPaymentOnceAndDuplicateDeliveryIsAcknowledged() throws Exception {
@@ -67,6 +74,10 @@ class StripeWebhookIntegrationTests {
         long versionAfterFirst = afterFirst.getVersion();
         assertThat(afterFirst.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(afterFirst.getActionUrl()).isNull();
+        assertThat(applicationEvents.stream(PaymentStatusChangedEvent.class)
+                        .filter(event -> event.paymentAttemptId().equals(payment.attemptId()))
+                        .filter(event -> event.currentStatus() == PaymentStatus.SUCCEEDED))
+                .hasSize(1);
 
         mockMvc.perform(post("/api/payments/webhooks/stripe")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,6 +90,10 @@ class StripeWebhookIntegrationTests {
                 paymentAttemptRepository.findById(payment.attemptId()).orElseThrow();
         assertThat(afterDuplicate.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(afterDuplicate.getVersion()).isEqualTo(versionAfterFirst);
+        assertThat(applicationEvents.stream(PaymentStatusChangedEvent.class)
+                        .filter(event -> event.paymentAttemptId().equals(payment.attemptId()))
+                        .filter(event -> event.currentStatus() == PaymentStatus.SUCCEEDED))
+                .hasSize(1);
         assertThat(webhookEventRepository.findByProviderCodeAndProviderEventId("STRIPE", "evt_webhook_success"))
                 .get()
                 .satisfies(event -> {

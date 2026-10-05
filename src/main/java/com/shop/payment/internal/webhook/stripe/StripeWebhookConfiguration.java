@@ -2,6 +2,7 @@ package com.shop.payment.internal.webhook.stripe;
 
 import com.shop.payment.internal.provider.stripe.StripePaymentProviderProperties;
 import com.shop.payment.internal.repository.PaymentAttemptRepository;
+import com.shop.payment.internal.service.PaymentLifecycleEventPublisher;
 import com.shop.payment.internal.webhook.repository.PaymentWebhookEventRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
@@ -29,10 +30,12 @@ class StripeWebhookConfiguration {
     StripeWebhookTransactionService stripeWebhookTransactionService(
             PaymentWebhookEventRepository webhookEventRepository,
             PaymentAttemptRepository paymentAttemptRepository,
+            PaymentLifecycleEventPublisher lifecycleEventPublisher,
             StripePaymentProviderProperties properties) {
         return new StripeWebhookTransactionService(
                 webhookEventRepository,
                 paymentAttemptRepository,
+                lifecycleEventPublisher,
                 properties.getApiVersion(),
                 properties.getSecretKey().startsWith("sk_live_"));
     }

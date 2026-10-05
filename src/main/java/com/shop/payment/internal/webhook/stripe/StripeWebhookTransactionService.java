@@ -4,6 +4,7 @@ import com.shop.payment.event.PaymentStatus;
 import com.shop.payment.internal.entity.PaymentAttempt;
 import com.shop.payment.internal.provider.stripe.StripeMoney;
 import com.shop.payment.internal.repository.PaymentAttemptRepository;
+import com.shop.payment.internal.service.PaymentLifecycleEventPublisher;
 import com.shop.payment.internal.webhook.entity.PaymentWebhookEvent;
 import com.shop.payment.internal.webhook.entity.PaymentWebhookOutcome;
 import com.shop.payment.internal.webhook.repository.PaymentWebhookEventRepository;
@@ -21,6 +22,7 @@ class StripeWebhookTransactionService {
 
     private final PaymentWebhookEventRepository webhookEventRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
+    private final PaymentLifecycleEventPublisher lifecycleEventPublisher;
     private final String expectedApiVersion;
     private final boolean expectedLiveMode;
 
@@ -53,8 +55,10 @@ class StripeWebhookTransactionService {
         } else if (attempt.getStatus().isTerminal()) {
             outcome = PaymentWebhookOutcome.IGNORED_TERMINAL;
         } else {
-            attempt.transition(targetStatus, event.objectId(), null, event.failureCode(), receivedAt);
+            var statusChangedEvent =
+                    attempt.transition(targetStatus, event.objectId(), null, event.failureCode(), receivedAt);
             paymentAttemptRepository.saveAndFlush(attempt);
+            lifecycleEventPublisher.publish(statusChangedEvent);
             outcome = PaymentWebhookOutcome.APPLIED;
         }
         inboxEvent.complete(outcome, attempt.getId(), receivedAt);

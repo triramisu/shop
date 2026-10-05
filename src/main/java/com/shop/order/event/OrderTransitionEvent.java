@@ -2,6 +2,8 @@ package com.shop.order.event;
 
 public enum OrderTransitionEvent {
     PAYMENT_CONFIRMED,
+    PAYMENT_FAILED,
+    PAYMENT_CANCELLED,
     INVENTORY_RESERVATION_FAILED,
     CANCELLED_BEFORE_PAYMENT,
     PAYMENT_EXPIRED,

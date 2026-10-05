@@ -25,6 +25,12 @@ public interface OrderInventoryOrchestrationRepository extends Repository<OrderI
     @EntityGraph(attributePaths = {"order", "lines"})
     Optional<OrderInventoryOrchestration> findByOrder_Id(UUID orderId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"order", "lines"})
+    @Query(
+            "select orchestration from OrderInventoryOrchestration orchestration where orchestration.order.id = :orderId")
+    Optional<OrderInventoryOrchestration> findByOrderIdForUpdate(@Param("orderId") UUID orderId);
+
     @EntityGraph(attributePaths = {"order", "lines"})
     Optional<OrderInventoryOrchestration> findByCorrelationId(UUID correlationId);
 
@@ -37,6 +43,18 @@ public interface OrderInventoryOrchestrationRepository extends Repository<OrderI
             """)
     List<UUID> findRecoveryCandidateRequestEventIds(
             @Param("statuses") List<InventoryOrchestrationStatus> statuses,
+            @Param("staleBefore") Instant staleBefore,
+            Pageable pageable);
+
+    @Query("""
+            select orchestration.order.id
+              from OrderInventoryOrchestration orchestration
+             where orchestration.status = :status
+               and orchestration.updatedAt <= :staleBefore
+             order by orchestration.updatedAt, orchestration.id
+            """)
+    List<UUID> findPaymentInitiationCandidateOrderIds(
+            @Param("status") InventoryOrchestrationStatus status,
             @Param("staleBefore") Instant staleBefore,
             Pageable pageable);
 }

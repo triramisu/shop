@@ -76,7 +76,7 @@ class PaymentWebhookMigrationMySqlTests {
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1 AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(22);
+                .isEqualTo(24);
     }
 
     private byte[] toBytes(UUID value) {
