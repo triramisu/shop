@@ -45,6 +45,7 @@ class StripeHostedCheckoutReturnIntegrationTests {
     static void stripeCredentials(DynamicPropertyRegistry registry) {
         registry.add("app.payment.stripe.secret-key", StripeTestCredentials::apiKey);
         registry.add("app.payment.stripe.return-state-secret", StripeTestCredentials::stateSigningKey);
+        registry.add("app.payment.stripe.webhook-secrets", StripeTestCredentials::webhookSigningKey);
     }
 
     @Autowired

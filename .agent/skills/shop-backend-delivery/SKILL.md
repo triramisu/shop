@@ -154,6 +154,9 @@ Time limiter giới hạn thời gian chờ, rate limiter giới hạn lưu lư�
 - Provider cho thị trường Việt Nam ưu tiên VNPay/QR khi có merchant sandbox; Stripe được giữ như adapter thẻ quốc tế tùy chọn và adapter tham chiếu. Domain Payment phải dùng provider port để thay hoặc chạy nhiều adapter mà không đổi state machine.
 - Pin API version của provider và có smoke test opt-in bằng test credential ngoài regression mặc định. Mock contract không thay thế được phép thử sandbox thật đối với enum/field/version do provider kiểm soát.
 - Action URL phải được adapter kiểm tra scheme, host allowlist, port, user-info và độ dài. Không cấm query/fragment ở contract dùng chung nếu provider hợp lệ cần chúng; dữ liệu opaque do provider phát hành không được ghi đầy đủ vào log.
+- Webhook provider là endpoint công khai ở lớp JWT nhưng không vô danh về mặt tin cậy: luôn xác minh chữ ký trên raw bytes trước khi parse, giới hạn body, kiểm tra timestamp/replay window, hỗ trợ nhiều secret khi xoay khóa và so sánh constant-time.
+- Dedup webhook dùng unique key `(provider, eventId)` trong inbox. Claim, cập nhật aggregate và hoàn tất audit cùng một transaction; replay cùng payload trả kết quả lũy đẳng, cùng event ID/khác payload là conflict. Không lưu raw payload nếu hash cùng các ID/timestamp/outcome đã đủ cho audit.
+- Provider có thể retry và gửi event sai thứ tự. Event đến sau không được hạ cấp aggregate terminal; kiểm thử cạnh tranh trên MySQL phải chứng minh một event chỉ tạo một side effect.
 - Không dùng distributed database transaction. Dùng state machine, event, outbox/inbox, retry có kiểm soát và compensation.
 
 ## Audit và lịch sử truy cập

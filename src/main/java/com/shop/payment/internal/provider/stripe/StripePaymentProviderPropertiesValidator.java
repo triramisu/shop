@@ -3,6 +3,7 @@ package com.shop.payment.internal.provider.stripe;
 import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ final class StripePaymentProviderPropertiesValidator implements InitializingBean
         requireStripeSecret(properties.getSecretKey());
         requireSecret("Khóa ký trạng thái trả về của Stripe", properties.getReturnStateSecret());
         requireApiVersion(properties.getApiVersion());
+        properties.setWebhookSecrets(normalizeWebhookSecrets(properties.getWebhookSecrets()));
         properties.setAllowedReturnHosts(
                 normalizeHosts("Danh sách host trả về của Stripe", properties.getAllowedReturnHosts()));
         properties.setAllowedCheckoutHosts(
@@ -46,6 +48,14 @@ final class StripePaymentProviderPropertiesValidator implements InitializingBean
                 properties.getReturnStateTtl(),
                 Duration.ofMinutes(1),
                 Duration.ofDays(7));
+        requireDuration(
+                "Khoảng thời gian xác minh webhook Stripe",
+                properties.getWebhookSignatureTolerance(),
+                Duration.ofSeconds(1),
+                Duration.ofHours(1));
+        if (properties.getWebhookMaxPayloadBytes() < 1024 || properties.getWebhookMaxPayloadBytes() > 1_048_576) {
+            throw new IllegalStateException("Dung lượng webhook Stripe phải từ 1 KiB đến 1 MiB");
+        }
         requireDuration(
                 "Thời gian chờ kết nối Stripe",
                 properties.getConnectTimeout(),
@@ -90,6 +100,25 @@ final class StripePaymentProviderPropertiesValidator implements InitializingBean
         if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}(\\.[a-z]+)?")) {
             throw new IllegalStateException("Phiên bản API Stripe không hợp lệ");
         }
+    }
+
+    private static List<String> normalizeWebhookSecrets(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            throw new IllegalStateException("Danh sách khóa ký webhook Stripe không được để trống");
+        }
+        List<String> normalized = values.stream()
+                .map(value -> value == null ? "" : value.strip())
+                .distinct()
+                .toList();
+        if (normalized.stream()
+                .anyMatch(value -> !value.startsWith("whsec_")
+                        || value.length() < MINIMUM_SECRET_LENGTH
+                        || value.length() > 512
+                        || value.chars().anyMatch(character -> character < 33 || character > 126))) {
+            throw new IllegalStateException(
+                    "Mỗi khóa ký webhook Stripe phải bắt đầu bằng whsec_ và có từ 32 đến 512 ký tự hiển thị");
+        }
+        return normalized;
     }
 
     private static Set<String> normalizeHosts(String name, Set<String> values) {

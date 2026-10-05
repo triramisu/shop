@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
 import com.shop.payment.internal.repository.PaymentAttemptRepository;
+import com.shop.payment.internal.webhook.repository.PaymentWebhookEventRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import jakarta.persistence.Entity;
@@ -44,7 +45,7 @@ class PaymentLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.payment.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(1)
+                .hasSize(2)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -64,10 +65,16 @@ class PaymentLayerArchitectureTests {
     }
 
     @Test
-    void paymentRepositoryDoesNotExposeAggregateDeletion() {
-        assertThat(Arrays.stream(PaymentAttemptRepository.class.getMethods())
+    void paymentRepositoriesDoNotExposeAggregateOrInboxDeletion() {
+        assertDoesNotExposeDeletion(PaymentAttemptRepository.class);
+        assertDoesNotExposeDeletion(PaymentWebhookEventRepository.class);
+    }
+
+    private void assertDoesNotExposeDeletion(Class<?> repositoryType) {
+        assertThat(Arrays.stream(repositoryType.getMethods())
                         .map(Method::getName)
                         .filter(methodName -> methodName.startsWith("delete")))
+                .as("repository %s must keep payment records append-only", repositoryType.getSimpleName())
                 .isEmpty();
     }
 }

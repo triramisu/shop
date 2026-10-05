@@ -51,8 +51,13 @@ class PaymentMigrationUpgradeTests {
                         Integer.class))
                 .isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                                + "WHERE table_schema = 'public' AND table_name = 'thanh_toan_su_kien_webhook'",
+                        Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(21);
+                .isEqualTo(22);
     }
 }

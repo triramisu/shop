@@ -3,6 +3,7 @@ package com.shop.payment.internal.provider.stripe;
 import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "app.payment.stripe")
-class StripePaymentProviderProperties {
+public class StripePaymentProviderProperties {
 
     private String secretKey;
     private String apiVersion = "2026-09-30.endive";
@@ -20,6 +21,9 @@ class StripePaymentProviderProperties {
     private URI cancelUrl;
     private Set<String> allowedReturnHosts = new LinkedHashSet<>();
     private Set<String> allowedCheckoutHosts = new LinkedHashSet<>(Set.of("checkout.stripe.com"));
+    private List<String> webhookSecrets = List.of();
+    private Duration webhookSignatureTolerance = Duration.ofMinutes(5);
+    private int webhookMaxPayloadBytes = 262_144;
     private Duration returnStateTtl = Duration.ofHours(24);
     private Duration connectTimeout = Duration.ofSeconds(2);
     private Duration readTimeout = Duration.ofSeconds(5);

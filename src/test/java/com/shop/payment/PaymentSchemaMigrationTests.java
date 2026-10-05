@@ -68,6 +68,30 @@ class PaymentSchemaMigrationTests {
                         || column.contains("cvc"));
     }
 
+    @Test
+    void createsWebhookInboxWithDeduplicationAndWithoutRawPayloadStorage() {
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.tables "
+                                + "WHERE table_schema = 'public' AND table_name = 'thanh_toan_su_kien_webhook'",
+                        Integer.class))
+                .isEqualTo(1);
+        assertThat(constraints("thanh_toan_su_kien_webhook"))
+                .contains(
+                        "uk_thanh_toan_webhook_provider_event",
+                        "fk_thanh_toan_webhook_attempt",
+                        "ck_thanh_toan_webhook_provider_code",
+                        "ck_thanh_toan_webhook_payload_hash",
+                        "ck_thanh_toan_webhook_outcome",
+                        "ck_thanh_toan_webhook_attempt_outcome",
+                        "ck_thanh_toan_webhook_time");
+        List<String> columns = jdbcTemplate.queryForList(
+                "SELECT LOWER(column_name) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = 'thanh_toan_su_kien_webhook'",
+                String.class);
+        assertThat(columns).contains("provider_event_id", "payload_hash", "signature_timestamp", "outcome");
+        assertThat(columns).noneMatch(column -> column.contains("raw") || column.contains("payload_body"));
+    }
+
     private List<String> constraints(String table) {
         return jdbcTemplate.queryForList(
                 "SELECT LOWER(constraint_name) FROM information_schema.table_constraints "
