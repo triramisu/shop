@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
             "app.payment.provider.type=stripe",
+            "app.payment.stripe.webhook-secrets=whsec_sandbox_smoke_only_cccccccccccccccccccccccccccccccc",
             "app.order.checkout.inventory.reconciliation.enabled=false",
             "app.inventory.reservation.expiration.enabled=false"
         })

@@ -16,6 +16,7 @@ app:
       success-url: ${STRIPE_SUCCESS_URL:http://localhost:8080/api/payments/checkout/return}
       cancel-url: ${STRIPE_CANCEL_URL:http://localhost:8080/api/payments/checkout/cancel}
       allowed-return-hosts: ${STRIPE_ALLOWED_RETURN_HOSTS:localhost,127.0.0.1}
+      webhook-secrets: ${STRIPE_WEBHOOK_SECRETS:}
   catalog:
     images:
       storage:

@@ -158,6 +158,10 @@ public enum ErrorCode {
     CHECKOUT_ALREADY_PROCESSING(1323, "error.checkout.idempotency.processing", HttpStatus.CONFLICT),
     CHECKOUT_REPLAY_UNAVAILABLE(1324, "error.checkout.idempotency.replay-unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     PAYMENT_CHECKOUT_RETURN_INVALID(1400, "error.payment.checkout-return.invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_WEBHOOK_SIGNATURE_INVALID(1401, "error.payment.webhook.signature-invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_WEBHOOK_PAYLOAD_INVALID(1402, "error.payment.webhook.payload-invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_WEBHOOK_REFERENCE_INVALID(1403, "error.payment.webhook.reference-invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_WEBHOOK_EVENT_CONFLICT(1404, "error.payment.webhook.event-conflict", HttpStatus.CONFLICT),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ class StripePaymentProviderPropertiesValidatorTests {
         assertThatCode(() -> new StripePaymentProviderPropertiesValidator(properties).afterPropertiesSet())
                 .doesNotThrowAnyException();
         assertThat(properties.getAllowedReturnHosts()).containsExactly("shop.example.com");
+        assertThat(properties.getWebhookSecrets()).containsExactly(StripeTestCredentials.webhookSigningKey());
     }
 
     @Test
@@ -85,10 +87,36 @@ class StripePaymentProviderPropertiesValidatorTests {
                 .hasMessageContaining("circuit breaker");
     }
 
+    @Test
+    void rejectsMissingMalformedAndUnsafeWebhookSettings() {
+        StripePaymentProviderProperties missingSecret = validProperties();
+        missingSecret.setWebhookSecrets(List.of());
+        StripePaymentProviderProperties malformedSecret = validProperties();
+        malformedSecret.setWebhookSecrets(List.of("not-a-stripe-webhook-secret"));
+        StripePaymentProviderProperties zeroTolerance = validProperties();
+        zeroTolerance.setWebhookSignatureTolerance(Duration.ZERO);
+        StripePaymentProviderProperties oversizedPayload = validProperties();
+        oversizedPayload.setWebhookMaxPayloadBytes(1_048_577);
+
+        assertThatThrownBy(() -> new StripePaymentProviderPropertiesValidator(missingSecret).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("khóa ký webhook");
+        assertThatThrownBy(() -> new StripePaymentProviderPropertiesValidator(malformedSecret).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("whsec_");
+        assertThatThrownBy(() -> new StripePaymentProviderPropertiesValidator(zeroTolerance).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Khoảng thời gian xác minh webhook");
+        assertThatThrownBy(() -> new StripePaymentProviderPropertiesValidator(oversizedPayload).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Dung lượng webhook");
+    }
+
     private StripePaymentProviderProperties validProperties() {
         StripePaymentProviderProperties properties = new StripePaymentProviderProperties();
         properties.setSecretKey(StripeTestCredentials.apiKey());
         properties.setReturnStateSecret(StripeTestCredentials.stateSigningKey());
+        properties.setWebhookSecrets(List.of(StripeTestCredentials.webhookSigningKey()));
         properties.setSuccessUrl(URI.create("https://shop.example.com/api/payments/checkout/return"));
         properties.setCancelUrl(URI.create("https://shop.example.com/api/payments/checkout/cancel"));
         properties.setAllowedReturnHosts(new LinkedHashSet<>(Set.of("shop.example.com")));

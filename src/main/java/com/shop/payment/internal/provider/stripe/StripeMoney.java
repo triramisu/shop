@@ -5,7 +5,7 @@ import com.shop.payment.provider.PaymentProviderException;
 import java.math.BigDecimal;
 import java.util.Set;
 
-final class StripeMoney {
+public final class StripeMoney {
 
     private static final Set<String> ZERO_DECIMAL_CURRENCIES = Set.of(
             "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "VND", "VUV", "XAF", "XOF", "XPF");
@@ -13,7 +13,7 @@ final class StripeMoney {
 
     private StripeMoney() {}
 
-    static long toMinorUnit(BigDecimal amount, String currency) {
+    public static long toMinorUnit(BigDecimal amount, String currency) {
         try {
             BigDecimal minorAmount = ZERO_DECIMAL_CURRENCIES.contains(currency)
                     ? amount.setScale(0)

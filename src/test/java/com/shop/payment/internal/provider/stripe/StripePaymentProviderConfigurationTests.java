@@ -44,6 +44,7 @@ class StripePaymentProviderConfigurationTests {
             "app.payment.provider.type=stripe",
             "app.payment.stripe.secret-key=" + StripeTestCredentials.apiKey(),
             "app.payment.stripe.return-state-secret=" + StripeTestCredentials.stateSigningKey(),
+            "app.payment.stripe.webhook-secrets=" + StripeTestCredentials.webhookSigningKey(),
             "app.payment.stripe.success-url=https://shop.example.com/api/payments/checkout/return",
             "app.payment.stripe.cancel-url=https://shop.example.com/api/payments/checkout/cancel",
             "app.payment.stripe.allowed-return-hosts=shop.example.com"

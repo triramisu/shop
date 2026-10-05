@@ -81,6 +81,6 @@ class OrderMigrationUpgradeTests {
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(21);
+                .isEqualTo(22);
     }
 }

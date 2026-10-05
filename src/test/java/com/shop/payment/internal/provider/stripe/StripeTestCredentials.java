@@ -11,4 +11,8 @@ final class StripeTestCredentials {
     static String stateSigningKey() {
         return "test-state-key-" + "b".repeat(32);
     }
+
+    static String webhookSigningKey() {
+        return "whsec_" + "c".repeat(32);
+    }
 }
