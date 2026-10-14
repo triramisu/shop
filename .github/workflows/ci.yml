@@ -43,3 +43,12 @@ jobs:
         run: |
           chmod +x mvnw
           ./mvnw --batch-mode clean verify
+
+      - name: Validate deployment bundle
+        run: |
+          bash -n deploy/deploy.sh
+          bash -n deploy/mysql/init/01-create-accounts.sh
+          docker compose \
+            --env-file deploy/.env.prod.example \
+            -f deploy/compose.prod.yml \
+            config --quiet
