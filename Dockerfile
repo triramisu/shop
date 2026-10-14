@@ -11,9 +11,10 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw --batch-mode clean package -DskipTests
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN useradd --system --uid 10001 spring
+RUN addgroup --system spring \
+    && adduser --system --disabled-password --no-create-home --uid 10001 --ingroup spring spring
 COPY --from=build /workspace/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
 USER 10001
