@@ -7,8 +7,10 @@ Pipeline này chỉ triển khai backend modular monolith lên một máy Ubuntu
 Luồng triển khai:
 
 ```text
-pull request -> CI verify -> merge main -> CI main xanh
-             -> build image sha-<commit> -> Docker Hub -> resolve digest
+pull request -> dependency review + full dependency scan + CI verify
+             -> merge main -> CI main xanh
+             -> build image sha-<commit> -> runtime image scan
+             -> Docker Hub -> resolve digest
              -> GitHub OIDC -> AWS SSM -> /opt/shop/deploy.sh
              -> health check -> giữ bản mới hoặc quay lại image trước
 ```
@@ -16,6 +18,8 @@ pull request -> CI verify -> merge main -> CI main xanh
 CD bị khóa mặc định. Thiếu biến hoặc secret không làm pipeline tự ý truy cập máy chủ.
 
 SHA tag dùng để truy vết commit; deployment thực tế dùng digest `docker.io/t1r4m15u/shop@sha256:...` do registry trả về. Container ứng dụng chạy read-only, không có Linux capability và bật `no-new-privileges`; log Docker được xoay vòng để tránh lấp đầy ổ đĩa.
+
+Pull request bị chặn nếu GitHub Dependency Review phát hiện dependency mới từ mức Moderate, hoặc Trivy phát hiện lỗ hổng đã có bản vá từ mức Medium trong toàn bộ dependency Maven. Trước khi push lên Docker Hub, CD còn quét riêng package hệ điều hành của runtime image và chặn High/Critical; image chưa vượt cổng này không được xuất bản.
 
 ## 1. Chuẩn bị Ubuntu một lần
 

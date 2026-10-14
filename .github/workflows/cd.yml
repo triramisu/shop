@@ -53,8 +53,7 @@ jobs:
           printf '%s' "$DOCKERHUB_TOKEN" \
             | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
 
-      - name: Build and push application image
-        id: publish
+      - name: Build application image
         env:
           IMAGE: ${{ steps.image.outputs.image }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -66,6 +65,31 @@ jobs:
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --tag "$IMAGE" \
             .
+
+      - name: Reject vulnerable runtime image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+            image \
+            --timeout 10m \
+            --scanners vuln \
+            --pkg-types os \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --no-progress \
+            "$IMAGE"
+
+      - name: Push immutable application image
+        id: publish
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euo pipefail
           docker push "$IMAGE"
 
           digest="$(docker buildx imagetools inspect \
