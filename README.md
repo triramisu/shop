@@ -1210,6 +1210,57 @@ $env:CORS_ALLOWED_ORIGINS="https://shop.example.com"
 
 `SPRING_DATASOURCE_*` là credential runtime chỉ có quyền DML cần thiết; `SPRING_FLYWAY_*` là credential triển khai có quyền DDL và chỉ dùng để chạy migration. Không dùng tài khoản `root` cho một trong hai nhóm. Trước khi triển khai bản có V7 lên database đang đúng V6, chạy `SELECT code FROM xac_thuc_vai_tro WHERE code = 'STAFF'`; nếu đã có custom role trùng tên thì phải đổi mã role đó có kiểm soát trước khi chạy migration.
 
+### 9.x Frontend (Vite + React)
+
+Frontend nằm trong thư mục [`frontend/`](frontend/), là SPA Vite + React +
+TypeScript ghép trực tiếp với API hiện có.
+
+- **Ghép chuẩn API:** client bóc envelope `ApiResponse<T>`, gắn
+  `Authorization: Bearer`, tự refresh access token (single-flight) và xoay vòng
+  refresh token theo thiết kế Identity; đăng nhập xử lý CAPTCHA thích ứng
+  (mã lỗi `CAPTCHA_REQUIRED=1025`), checkout gửi `Idempotency-Key` cho mỗi đơn.
+  Kiểu dữ liệu trong `frontend/src/lib/types.ts` phản chiếu DTO backend.
+- **Luồng khách hàng:** duyệt/tìm sản phẩm công khai (`/api/catalog/**`),
+  giỏ hàng, báo giá + đặt hàng, hồ sơ. Giá/thuế/trạng thái do server quyết định.
+- **Palette màu hệ thống:** hai tầng token trong
+  `frontend/src/styles/tokens.css` — palette thô (neutral/brand/semantic, mỗi
+  họ nhiều bậc) và token ngữ nghĩa (`--color-*`) cho vai trò UI; component chỉ
+  dùng token ngữ nghĩa nên đổi theme sáng/tối chỉ cần ánh xạ lại một tầng.
+
+Chạy dev (proxy `/api` sang backend `localhost:8080`):
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev     # http://localhost:5173
+```
+
+Khi đóng gói, image `frontend/Dockerfile` build SPA rồi phục vụ qua nginx, đồng
+thời làm **edge** proxy `/api` tới app (cùng origin, không cần nới CORS).
+
+### 9.y Lab nghiên cứu sức chịu tải / chống chịu DDoS
+
+Thư mục [`deploy/lab/`](deploy/lab/) dựng cả stack (edge nginx + app + mysql +
+minio) thành một *target* để **đo và quan sát** hành vi hệ thống dưới tải trong
+**mạng lab cô lập, đã được phép**. Thiết kế phục vụ nghiên cứu phòng thủ:
+
+- Mỗi container có giới hạn CPU/RAM/pids để lab có biên rõ ràng; Dockerfile app
+  thêm cờ JVM nhận biết cgroup để `mem_limit` bó heap.
+- App giữ nguyên phòng vệ (read-only rootfs, `cap_drop: ALL`,
+  `no-new-privileges`, rate limit JVM + CAPTCHA bật mặc định).
+- Edge nginx có hai profile `EDGE_PROFILE=hardened|baseline` để **đo đối chứng**
+  tác dụng của `limit_req`/`limit_conn`/timeout ở edge.
+- Repo **không kèm** công cụ sinh tải/tấn công; dùng công cụ benchmark tiêu
+  chuẩn bạn tự vận hành (k6/wrk/hey/vegeta) nhắm vào chính target trong lab.
+
+Chi tiết và cảnh báo phạm vi: [`deploy/lab/README.md`](deploy/lab/README.md).
+
+```bash
+cp deploy/lab/.env.lab.example deploy/lab/.env.lab   # điền secret ngẫu nhiên
+sudo deploy/lab/setup-ubuntu.sh --lab-cidr 10.10.0.0/24
+```
+
 ## 10. Nhật ký quyết định
 
 ### ADR-001: Modular monolith trước microservices

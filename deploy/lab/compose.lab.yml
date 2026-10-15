@@ -1,0 +1,147 @@
+name: shop-lab
+
+# ------------------------------------------------------------------------
+# Môi trường LAB để nghiên cứu sức chịu tải / khả năng chống chịu DDoS.
+# CHỈ chạy trên mạng lab CÔ LẬP, đã được phép (authorized), KHÔNG expose ra
+# Internet công cộng. Toàn bộ tải phải do công cụ bạn tự vận hành sinh ra và
+# nhắm vào chính target này, không nhắm bên thứ ba.
+#
+# Mục tiêu thiết kế:
+#   - Triển khai đủ cả stack (edge nginx + app + mysql + minio) bằng một lệnh.
+#   - GIỚI HẠN tài nguyên từng container để host luôn kiểm soát được, lab có
+#     biên rõ ràng và kết quả đo lặp lại được.
+#   - Giữ nguyên các lớp phòng vệ của ứng dụng (rate limit JVM, CAPTCHA...).
+#   - Cho phép bật/tắt lớp giảm thiểu ở edge (EDGE_PROFILE) để ĐO đối chứng
+#     "có vs. không" biện pháp giảm thiểu.
+# ------------------------------------------------------------------------
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  mysql:
+    image: mysql:8.0.46
+    command: ["mysqld", "--bind-address=0.0.0.0"]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shop}
+      MYSQL_USER: ${MYSQL_USER:-shop}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    ports:
+      # DB chỉ bind loopback của host lab; không phải bề mặt target.
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - shop-lab-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: ${MYSQL_MEM_LIMIT:-1g}
+    cpus: ${MYSQL_CPUS:-1.0}
+    pids_limit: 512
+    restart: unless-stopped
+    logging: *default-logging
+
+  minio:
+    image: pgsty/silo:RELEASE.2026-08-06T00-00-00Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shop-lab-access}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - shop-lab-minio:/data
+    healthcheck:
+      test: ["CMD", "silo", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: ${MINIO_MEM_LIMIT:-512m}
+    cpus: ${MINIO_CPUS:-0.5}
+    restart: unless-stopped
+    logging: *default-logging
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: shop:lab
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_DRIVER: com.mysql.cj.jdbc.Driver
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-shop}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-shop}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-shop-lab-access}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-shop-product-images}
+      MINIO_AUTO_CREATE_BUCKET: "true"
+      JWT_SIGNER_KEY: ${JWT_SIGNER_KEY:?JWT_SIGNER_KEY is required}
+      # Edge và app cùng origin qua nginx; cho phép origin của web container.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
+      PAYMENT_PROVIDER_TYPE: ${PAYMENT_PROVIDER_TYPE:-fake}
+      # Giữ rate limit tầng ứng dụng BẬT (mặc định của backend) — không hạ phòng vệ.
+      AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
+      AUTH_CAPTCHA_ENABLED: ${AUTH_CAPTCHA_ENABLED:-true}
+    expose:
+      - "8080"
+    # App KHÔNG bind trực tiếp ra host — mọi traffic đi qua edge nginx.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${APP_MEM_LIMIT:-768m}
+    cpus: ${APP_CPUS:-1.0}
+    pids_limit: 512
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
+
+  web:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    image: shop-frontend:lab
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      APP_UPSTREAM: app:8080
+      # Bật/tắt lớp giảm thiểu ở edge để đo đối chứng: hardened | baseline.
+      EDGE_PROFILE: ${EDGE_PROFILE:-hardened}
+      EDGE_API_RATE: ${EDGE_API_RATE:-50r/s}
+      EDGE_API_BURST: ${EDGE_API_BURST:-100}
+      EDGE_AUTH_RATE: ${EDGE_AUTH_RATE:-5r/s}
+      EDGE_AUTH_BURST: ${EDGE_AUTH_BURST:-10}
+      EDGE_CONN_PER_IP: ${EDGE_CONN_PER_IP:-20}
+      EDGE_MAX_BODY: ${EDGE_MAX_BODY:-30m}
+    ports:
+      # Bề mặt target của lab. Mặc định bind 0.0.0.0 để host tấn công trong
+      # mạng lab cô lập truy cập được. PHẢI đặt sau firewall của mạng lab.
+      - "${WEB_BIND_ADDRESS:-0.0.0.0}:${WEB_PORT:-8080}:80"
+    mem_limit: ${WEB_MEM_LIMIT:-256m}
+    cpus: ${WEB_CPUS:-1.0}
+    pids_limit: 256
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  shop-lab-mysql:
+  shop-lab-minio:

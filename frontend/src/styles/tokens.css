@@ -1,0 +1,160 @@
+/*
+ * HỆ THỐNG MÀU (design tokens)
+ * ------------------------------------------------------------------
+ * Hai tầng token:
+ *   1. Palette thô (--c-*): thang màu cố định, không phụ thuộc theme.
+ *      Mỗi họ màu có 10 bậc 50..900 theo độ sáng giảm dần.
+ *   2. Token ngữ nghĩa (--color-*): vai trò trong UI (bg, text, border,
+ *      brand, trạng thái...). Component CHỈ dùng token ngữ nghĩa, không
+ *      dùng trực tiếp palette thô, nhờ vậy đổi theme sáng/tối chỉ cần
+ *      ánh xạ lại tầng ngữ nghĩa.
+ * Khoảng cách, bo góc, bóng, typography cũng token hóa cho nhất quán.
+ */
+
+:root {
+  /* --- Palette thô: trung tính (slate) --- */
+  --c-neutral-50: #f8fafc;
+  --c-neutral-100: #f1f5f9;
+  --c-neutral-200: #e2e8f0;
+  --c-neutral-300: #cbd5e1;
+  --c-neutral-400: #94a3b8;
+  --c-neutral-500: #64748b;
+  --c-neutral-600: #475569;
+  --c-neutral-700: #334155;
+  --c-neutral-800: #1e293b;
+  --c-neutral-900: #0f172a;
+  --c-neutral-950: #020617;
+
+  /* --- Palette thô: thương hiệu (indigo) --- */
+  --c-brand-50: #eef2ff;
+  --c-brand-100: #e0e7ff;
+  --c-brand-200: #c7d2fe;
+  --c-brand-300: #a5b4fc;
+  --c-brand-400: #818cf8;
+  --c-brand-500: #6366f1;
+  --c-brand-600: #4f46e5;
+  --c-brand-700: #4338ca;
+  --c-brand-800: #3730a3;
+  --c-brand-900: #312e81;
+
+  /* --- Palette thô: trạng thái --- */
+  --c-success-500: #22c55e;
+  --c-success-600: #16a34a;
+  --c-success-50: #f0fdf4;
+  --c-warning-500: #f59e0b;
+  --c-warning-600: #d97706;
+  --c-warning-50: #fffbeb;
+  --c-danger-500: #ef4444;
+  --c-danger-600: #dc2626;
+  --c-danger-50: #fef2f2;
+  --c-info-500: #0ea5e9;
+  --c-info-600: #0284c7;
+  --c-info-50: #f0f9ff;
+
+  /* --- Token ngữ nghĩa: theme SÁNG (mặc định) --- */
+  --color-bg: var(--c-neutral-50);
+  --color-surface: #ffffff;
+  --color-surface-2: var(--c-neutral-100);
+  --color-surface-inset: var(--c-neutral-100);
+  --color-text: var(--c-neutral-900);
+  --color-text-muted: var(--c-neutral-500);
+  --color-text-inverted: #ffffff;
+  --color-border: var(--c-neutral-200);
+  --color-border-strong: var(--c-neutral-300);
+
+  --color-brand: var(--c-brand-600);
+  --color-brand-hover: var(--c-brand-700);
+  --color-brand-soft: var(--c-brand-50);
+  --color-on-brand: #ffffff;
+  --color-focus-ring: var(--c-brand-400);
+
+  --color-success: var(--c-success-600);
+  --color-success-soft: var(--c-success-50);
+  --color-warning: var(--c-warning-600);
+  --color-warning-soft: var(--c-warning-50);
+  --color-danger: var(--c-danger-600);
+  --color-danger-soft: var(--c-danger-50);
+  --color-info: var(--c-info-600);
+  --color-info-soft: var(--c-info-50);
+
+  /* --- Spacing (thang 4px) --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  /* --- Bo góc --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* --- Bóng --- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+
+  --container-max: 1120px;
+}
+
+/* --- Token ngữ nghĩa: theme TỐI ---
+   Kích hoạt tự động theo hệ điều hành, hoặc ép bằng [data-theme]. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: var(--c-neutral-950);
+    --color-surface: var(--c-neutral-900);
+    --color-surface-2: var(--c-neutral-800);
+    --color-surface-inset: #0b1324;
+    --color-text: var(--c-neutral-100);
+    --color-text-muted: var(--c-neutral-400);
+    --color-border: var(--c-neutral-800);
+    --color-border-strong: var(--c-neutral-700);
+
+    --color-brand: var(--c-brand-500);
+    --color-brand-hover: var(--c-brand-400);
+    --color-brand-soft: #1e1b4b;
+    --color-focus-ring: var(--c-brand-400);
+
+    --color-success-soft: #052e16;
+    --color-warning-soft: #451a03;
+    --color-danger-soft: #450a0a;
+    --color-info-soft: #082f49;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: var(--c-neutral-950);
+  --color-surface: var(--c-neutral-900);
+  --color-surface-2: var(--c-neutral-800);
+  --color-surface-inset: #0b1324;
+  --color-text: var(--c-neutral-100);
+  --color-text-muted: var(--c-neutral-400);
+  --color-border: var(--c-neutral-800);
+  --color-border-strong: var(--c-neutral-700);
+  --color-brand: var(--c-brand-500);
+  --color-brand-hover: var(--c-brand-400);
+  --color-brand-soft: #1e1b4b;
+  --color-success-soft: #052e16;
+  --color-warning-soft: #451a03;
+  --color-danger-soft: #450a0a;
+  --color-info-soft: #082f49;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}

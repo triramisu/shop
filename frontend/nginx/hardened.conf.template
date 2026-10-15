@@ -1,0 +1,68 @@
+# EDGE PROFILE: hardened
+# Edge có áp dụng các lớp giảm thiểu cơ bản để đo sức chịu tải so với baseline.
+# Các giá trị (rate, burst, connection) điều chỉnh qua biến môi trường để
+# chạy nhiều kịch bản lab mà không sửa image.
+
+# Giới hạn tần suất theo IP cho toàn bộ /api.
+limit_req_zone $binary_remote_addr zone=api_rl:10m rate=${EDGE_API_RATE};
+# Giới hạn tần suất chặt hơn cho các endpoint xác thực (chống brute-force/flood đăng nhập).
+limit_req_zone $binary_remote_addr zone=auth_rl:10m rate=${EDGE_AUTH_RATE};
+# Giới hạn số kết nối đồng thời theo IP.
+limit_conn_zone $binary_remote_addr zone=conn_per_ip:10m;
+
+limit_req_status 429;
+limit_conn_status 429;
+
+upstream app_upstream {
+    server ${APP_UPSTREAM};
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    # Chặn request body quá lớn ở edge trước khi chạm app.
+    client_max_body_size ${EDGE_MAX_BODY};
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    send_timeout 15s;
+    keepalive_timeout 15s;
+    keepalive_requests 200;
+
+    limit_conn conn_per_ip ${EDGE_CONN_PER_IP};
+
+    # Trang SPA (static).
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location /api/auth/ {
+        limit_req zone=auth_rl burst=${EDGE_AUTH_BURST} nodelay;
+        include /etc/nginx/snippets/common-proxy.conf;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 15s;
+        proxy_pass http://app_upstream;
+    }
+
+    location /api/ {
+        limit_req zone=api_rl burst=${EDGE_API_BURST} nodelay;
+        include /etc/nginx/snippets/common-proxy.conf;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 30s;
+        proxy_pass http://app_upstream;
+    }
+
+    location /actuator/health {
+        include /etc/nginx/snippets/common-proxy.conf;
+        proxy_pass http://app_upstream;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
