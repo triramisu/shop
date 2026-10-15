@@ -956,8 +956,14 @@ Không sử dụng distributed database transaction. Luồng thất bại đư�
 
 Yêu cầu: Java 21 và Docker.
 
+Mã nguồn backend nằm trong thư mục [`backend/`](backend/) (chứa `src`, `pom.xml`,
+`mvnw`, `Dockerfile`, `ci`); frontend nằm ở [`frontend/`](frontend/). Các lệnh
+Maven chạy bên trong `backend/`, còn `docker compose` vẫn chạy từ gốc repo
+(compose.yaml đã trỏ build context sang `./backend`).
+
 ```bash
 docker compose up -d mysql
+cd backend
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
@@ -965,6 +971,7 @@ Windows PowerShell:
 
 ```powershell
 docker start mysql-8.0
+cd backend
 $env:SPRING_PROFILES_ACTIVE="dev"
 .\mvnw.cmd spring-boot:run
 ```
@@ -1304,3 +1311,19 @@ Trạng thái: Accepted.
 Giữ mô hình user–role–chức năng từ `khcn-sso`, nhưng không sao chép ID role hard-code, mật khẩu mặc định, service quản trị quá lớn hoặc annotation quyền bị comment. Shop dùng permission constant trùng với dữ liệu Flyway, controller kiểm tra bằng `@PreAuthorize` và service tiếp tục bảo vệ invariant quan trọng.
 
 Permission là capability mà code thực sự kiểm tra nên API chỉ cho xem danh mục, không cho tự tạo permission. Role tùy biến được cấu hình từ capability có sẵn. `ADMIN` chỉ được bootstrap từ environment, không thể gán qua API và tài khoản này không thể bị khóa hoặc đổi role; sửa quyền làm thu hồi các phiên đang giữ claim cũ.
+
+### ADR-007: Tách mã nguồn thành backend/ và frontend/ trong cùng repo
+
+Trạng thái: Accepted.
+
+Backend (Spring) được chuyển từ gốc repo vào [`backend/`](backend/) để nằm song
+song với [`frontend/`](frontend/) đã có, giữ dạng monorepo một repo. Di chuyển
+bằng `git mv` để bảo toàn lịch sử. Các tham chiếu layout cũ được cập nhật cùng
+lúc: `compose.yaml` và `deploy/lab/compose.lab.yml` trỏ build context sang
+`backend/`; `cd.yml` build image từ context `backend`; `ci.yml` chạy Maven với
+`working-directory: backend` và cache theo `backend/pom.xml`; `.dockerignore`
+đi theo context mới trong `backend/`.
+
+Không đổi: coordinate Maven/artifact, package `com.shop`, image tag
+`docker.io/t1r4m15u/shop`, `deploy/compose.prod.yml` (dùng image dựng sẵn) và
+quy trình `deploy.sh` trên server. Lệnh `docker compose` vẫn chạy từ gốc repo.

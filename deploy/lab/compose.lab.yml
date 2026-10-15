@@ -71,7 +71,7 @@ services:
 
   app:
     build:
-      context: ../..
+      context: ../../backend
       dockerfile: Dockerfile
     image: shop:lab
     depends_on:

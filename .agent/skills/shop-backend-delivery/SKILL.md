@@ -88,7 +88,7 @@ Request → Controller → Request DTO/Validation → Service → Repository/Ent
 
 - Authentication API dùng base path `/api/auth`.
 - Response thống nhất bằng `ApiResponse<T>`; response phân trang phải có page, size, total elements, total pages và sort whitelist ổn định.
-- Bean Validation dùng key ổn định để ánh xạ `ErrorCode`; nội dung tiếng Việt nằm trong `src/main/resources/message.properties`.
+- Bean Validation dùng key ổn định để ánh xạ `ErrorCode`; nội dung tiếng Việt nằm trong `backend/src/main/resources/message.properties`.
 - Mọi thông báo lỗi hướng tới người dùng phải là tiếng Việt và được quản lý qua `message.properties`; không hard-code message API trong controller/service. Thông báo fail-fast cấu hình mới cũng dùng tiếng Việt. Mã máy ổn định như `STRIPE_TIMEOUT` hoặc permission code giữ ASCII/tiếng Anh vì đó không phải message hiển thị.
 - `GlobalExceptionHandler` phân biệt validation, `AppException`, access denied, authentication và lỗi không dự kiến; không lộ stack trace hoặc chi tiết nội bộ.
 - Mỗi error code là duy nhất và có HTTP status đúng semantics.

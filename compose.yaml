@@ -2,7 +2,7 @@ services:
   app:
     profiles: ["app"]
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     image: shop:local
     container_name: shop-app
