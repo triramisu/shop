@@ -115,4 +115,39 @@ class OpenApiIntegrationTests {
         mockMvc.perform(get("/swagger-ui.html")).andExpect(status().is3xxRedirection());
         mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
+
+    @Test
+    void documentsRefundSecurityIdempotencyAndNonFinalOutcomes() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                                "$.paths['/api/admin/payments/{paymentAttemptId}/refunds'].post.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath(
+                                "$.paths['/api/admin/payments/{paymentAttemptId}/refunds'].post.parameters[?(@.name == 'Idempotency-Key')].required")
+                        .value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.paths['/api/admin/payments/{paymentAttemptId}/refunds'].post.responses['409']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/admin/payments/{paymentAttemptId}/refunds'].post.responses['503']")
+                        .exists())
+                .andExpect(jsonPath(
+                                "$.paths['/api/admin/payments/{paymentAttemptId}/refunds/{refundId}'].get.security[0].bearerAuth")
+                        .isArray());
+    }
+
+    @Test
+    void documentsOwnedOrderQueriesAndNotFoundPolicy() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/orders'].get.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/api/orders/{orderId}'].get.security[0].bearerAuth")
+                        .isArray())
+                .andExpect(
+                        jsonPath("$.paths['/api/orders'].get.responses['400']").exists())
+                .andExpect(
+                        jsonPath("$.paths['/api/orders'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/api/orders/{orderId}'].get.responses['404']")
+                        .exists());
+    }
 }

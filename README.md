@@ -13,14 +13,115 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 ## 2. Trạng thái hiện tại
 
+- PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
+- M5.7A — VNPay sandbox được ưu tiên theo yêu cầu ngày 19/10/2026: đã triển khai local hosted checkout/IPN và API link thanh toán có owner-check. Docker Engine đã hoạt động; full `clean verify` đạt 537 test, 0 failure/error/skip, gồm MySQL concurrency 8 IPN đồng thời và MinIO; line 91,17%, branch 70,20% (chưa đạt mục tiêu >80%). Đã build image local `t1r4m15u/shop:0.0.1-vnpay-sandbox` (linux/amd64, user 10001), smoke profile prod + MySQL/MinIO riêng đạt healthy, kiểm tra IPN/auth/schema V25 bằng credential test. Xem [hợp đồng, cấu hình, bằng chứng và runbook](docs/vnpay-sandbox.md). Chưa có HTTPS/IPN public và chưa kiểm thử với VNPay thực tế; UI được nối riêng trong WEB-PAY-01 bên dưới. Chưa đóng M5.7A/M5.7/M5, chưa push Docker Hub/Git, merge hoặc CI.
+- WEB-PAY-01 — Đã nối UI trong `D:/shop-ui` với GET order payment: URL allowlist HTTPS, hosted handoff tab mới, đọc trạng thái có giới hạn và chỉ Order API xác nhận đã thanh toán. UI gate 59 test/TypeScript/Vite build và browser mock API đạt; xem [contract và giới hạn nghiệm thu](docs/frontend-payment.md). Không đổi API/schema/backend image, không đưa secret merchant vào UI hoặc gọi VNPay thật. Chưa commit/push/deploy/SIT; đây không phải hoàn tất milestone Payment.
 - Nhiệm vụ vừa hoàn thành: `M5.5A — Payment success/failure cập nhật Order và Inventory qua domain event`, được nghiệm thu qua PR số `34`.
-- Nhiệm vụ đang thực hiện: chưa mở task mới; dừng tại ranh giới một nhiệm vụ theo quality gate.
-- Nhiệm vụ kế tiếp: `M5.5B — Partial/full refund`; chỉ bắt đầu khi có yêu cầu tiếp tục.
+- WEB-01 — Lịch sử và chi tiết đơn của khách đã nghiệm thu local; backend chưa push/merge/CI. UI đã xuất bản riêng tại [triramisu/shop-ui](https://github.com/triramisu/shop-ui), initial commit `1a03080`, chưa deploy/CI UI.
+- Nhiệm vụ local vừa nghiệm thu: `M5.5B.1 — Lõi refund + budget/idempotency/API capability/fake`; xem [hợp đồng tám phần](docs/payment-refund-core.md). Full Maven verify đạt 459 test, line 90,96%, branch 68,99%; backend chưa commit/push/CI/deploy. API tạo refund mặc định tắt, chưa hoàn tiền thật hoặc đóng task cha M5.5B. Phần kế tiếp là B.2 provider refund/webhook.
 - Mục tiêu tiến độ: hoàn thành toàn bộ dự án trước ngày `30/10/2026`; Sonar và full regression chỉ chạy khi đóng từng milestone M2–M7, còn mỗi task vẫn phải vượt kiểm thử đúng phạm vi trước khi merge.
 - Hạ tầng tài liệu API: Swagger UI/OpenAPI đã cấu hình sớm theo yêu cầu; Resilience4j được hoãn đến khi có outbound adapter thực tế.
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
 - Kiến trúc đích: Gateway + Identity + Catalog + Inventory + Order + Payment.
+
+### Ưu tiên hiện hành — hoàn thiện dự án trước CI/CD
+
+Theo quyết định ngày 18/10/2026, hoãn xây mới/mở rộng CI/CD, tự động
+build/push/deploy và tự tăng phiên bản Docker cho đến sau khi hoàn thiện
+chức năng và nghiệm thu tổng thể. Có thể build/chạy Docker thủ công khi cần;
+không lấy việc hoàn thiện pipeline làm điều kiện để tiếp tục phát triển.
+Giữ nguyên workflow, kiểm thử và required checks đã có; quyết định này
+không tự tắt GitHub Actions, đổi repository variables hoặc bỏ branch protection.
+
+Ưu tiên gần nhất là khôi phục dev chạy độc lập với cổng thanh toán thật,
+tách cấu hình dev/prod và kiểm chứng MySQL/MinIO sẵn sàng. Sau đó tiếp tục
+Payment theo mục tiêu VNPay, hoàn thiện UI/backend và các luồng mua hàng,
+refund/đối soát, rồi chạy gate tổng thể về bảo mật, backup/restore và coverage.
+VNPay có adapter sandbox opt-in ở local trong task M5.7A; không yêu cầu Stripe secret để phát triển local. Dev mặc định fake, prod mặc định none. Merchant secret không nằm trong source/image.
+Việc đổi thứ tự hoặc provider của task Payment phải chốt contract riêng,
+không suy ra M5.5B/M5.6/M5.7 đã hoàn tất từ quyết định ưu tiên này.
+Xem [kế hoạch và phạm vi hoãn CI/CD](docs/website-delivery-plan.md).
+
+Hạ tầng lab AWS: [AWSLAB-01 — CloudFormation và hướng dẫn triển khai](deploy/aws/README.md)
+đã có template local cho một NAT, RDS Single-AZ, ASG 2–4 EC2 và S3/CloudFront.
+AWSLAB-01U chuyển cả bastion/app host sang Ubuntu Server 24.04 LTS amd64,
+user SSH `ubuntu`, APT HTTPS và root device `/dev/sda1`; không đổi distro
+container backend. Tại lần nghiệm thu AWSLAB-01U, chưa boot hoặc chuyển đổi
+EC2 thật trên AWS.
+Phiên bản AWSLAB-01U trước S3-01 đạt 19/19 kiểm tra hạ tầng (gồm Ubuntu bootstrap mock) và AWS
+`validate-template`; **chưa tạo
+stack hoặc deploy ở lần nghiệm thu đó**. App mode còn phụ thuộc kiểm chứng MySQL 8.4, image/secret
+và cutover ảnh đã đối chiếu; không thay đổi trạng thái nghiệm thu Payment ở trên.
+
+[S3-01 — Kho ảnh sản phẩm trên AWS](docs/product-images-s3.md) đã nghiệm thu
+phần source local ngày 18/10/2026: S3 adapter/IAM/bucket ảnh riêng, giữ MinIO
+dev/local; không đổi API hoặc migration V25. Full Maven `clean verify` đạt
+**477 test, 0 failure/error/skipped**; instruction **91,26%**, line **91,06%**,
+branch **69,91%**. Riêng S3 có 18 test, line 100%, branch 98,81%; kiểm tra
+hạ tầng 20/20 và AWS `validate-template` đạt. Branch toàn backend vẫn chưa
+đạt mục tiêu trên 80%. Trong lần nghiệm thu S3-01 chưa tạo AWS resource, copy ảnh, push/merge hoặc xác
+nhận CI/cloud smoke; không coi bước này là hoàn tất Payment hoặc mọi điều
+kiện release ASG.
+
+Ngày 19/10/2026, kiểm tra AWS Console xác nhận stack `shop-aydibro` tại
+`ap-southeast-1` do chủ tài khoản tạo đã `ROLLBACK_COMPLETE`: RDS từ chối
+backup retention 3 ngày theo giới hạn Free account plan. AWSLAB-01R đổi bản
+YAML local xuống **1 ngày**, giữ backup tự động, snapshot delete/replace,
+RDS private/encrypted/TLS. **21/21 test hạ tầng đạt, không skipped**; tại
+lần sửa source chưa thử tạo lại. Bằng chứng RDS thực tế xem AWSLAB-01D dưới đây. Console ghi
+hai bucket S3 và application log group `DELETE_SKIPPED`; không tự xóa chúng
+hoặc nâng plan. Xem [phạm vi và rollback AWSLAB-01R](deploy/aws/README.md).
+
+AWSLAB-01D: chủ tài khoản đã xác nhận tạo mới `shop-aydibro-v2` ở chế độ
+foundation, giữ tài nguyên cũ. Certificate origin đã kiểm tra `Issued`,
+đúng domain/region; chạy lại 21/21 Node checks đạt. Chủ tài khoản đã upload
+YAML; change set `foundation-v2-20261019` đã `CREATE_COMPLETE`/`AVAILABLE`,
+55 thay đổi đều `Add`, banner deployment validations báo đạt. SHA-256 bản
+template AWS khớp chính xác bản local đã test. Sau xác nhận tại bước cấp quyền,
+đã Execute lúc **00:27:13 ngày 19/10/2026 (UTC+7)**. Lần thử bị chặn tại
+`UiDistribution`: CloudFront trả 403 yêu cầu AWS xác minh tài khoản trước
+khi tạo resource mới. Stack chuyển `ROLLBACK_FAILED` lúc 00:34:23 do RDS
+chưa available khi CloudFormation muốn tạo snapshot để thu hồi. Kiểm tra
+sau đó: RDS đã `Available`, automated backup **1 ngày**, có automated
+snapshot `Available`; chưa kiểm thử restore hoặc nghiệm thu foundation.
+Đã gửi support case theo ủy quyền lúc 00:54:51, nhóm Account Activation /
+Account Verification, trạng thái `Unassigned`; chưa có xác nhận gỡ hạn chế.
+Không lưu mã case/email tài khoản vào repo public. Sau khi chủ tài khoản
+xác nhận tiếp tục phương án thu hồi riêng v2, đã Delete stack lúc
+**09:32:21 (UTC+7)** theo Snapshot/Retain, không Express/force. Stack đã
+`DELETE_COMPLETE` lúc **09:37:05**. RDS Console không còn instance;
+final manual snapshot đã `Available`, encrypted, đúng DB nguồn.
+Hai bucket S3/log group v2 `DELETE_SKIPPED` được giữ lại; không tác động
+stack cũ. AWSLAB-01C hoàn tất phạm vi thu hồi, không phải nghiệm thu
+restore hoặc foundation. Chạy lại 21/21 Node checks đạt, không skipped;
+không đổi YAML, API, migration hoặc push/merge. Snapshot và tài nguyên
+retain vẫn có thể tính phí; chưa phải kiểm kê chi phí toàn tài khoản.
+Không tự nâng plan, mở rộng IAM, bỏ CloudFront hoặc tạo thêm stack để né lỗi.
+CLI trên máy đang ở tài khoản khác nên không được dùng thay phiên Console.
+
+Cập nhật **AWSLAB-01P — 19/10/2026**: chủ tài khoản chuyển sang tự tạo hạ
+tầng và đã xác nhận xóa vĩnh viễn resource retain của hai stack. Bốn bucket
+S3 và hai log group đã xóa; final snapshot bị xóa, Manual/System snapshots
+không còn hiển thị, Retained backups trống. Stack cũ `shop-aydibro` cũng `DELETE_COMPLETE` lúc
+**09:48:07 (UTC+7)**. Không còn phục hồi từ snapshot đã xóa; trạng thái retain
+ở AWSLAB-01C phía trên là lịch sử. Giữ domain/certificate/key pair và tài nguyên
+tạo tay. Sau xác nhận riêng **AWSLAB-01T**, đã làm trống rồi xóa cả hai bucket
+upload `cf-templates-*` ở Singapore/Sydney: tổng 4 object, 0 lỗi xóa.
+Danh sách S3 General purpose buckets / All AWS Regions chỉ còn bucket tạo tay
+`d-s3-shop-demo-sk`; không coi đây là kiểm kê mọi dịch vụ hoặc hóa đơn AWS.
+Không tự tạo lại CloudFormation; YAML local giữ làm tham khảo, không đổi
+code/schema/workflow hoặc push/merge. Xem [phạm vi và bằng chứng cleanup](deploy/aws/README.md).
+
+Backend đặt trực tiếp tại **`D:/shop`**, UI riêng tại **`D:/shop-ui`**; không còn thư mục `backend/` theo [ROOT-01](docs/backend-root-layout.md). **WEB-01** đã có `GET /api/orders`, `GET /api/orders/{orderId}` và UI `/orders`, `/orders/:orderId`, chỉ cho khách xem đơn của chính mình, kể cả ADMIN. Nghiệm thu local ngày 16/10/2026: full Maven `verify` đạt **418 test, 0 failure/error/skipped**, line **90,62%**, branch **68,01%**; UI có 6 test bảo vệ phiên/cache và build đạt. Branch toàn backend vẫn chưa đạt mục tiêu cuối dự án trên 80%. Xem [hợp đồng và bằng chứng WEB-01](docs/customer-order-history.md) và [kế hoạch website](docs/website-delivery-plan.md). Chưa xác nhận CI/merge/deploy và không đánh dấu Payment/M6 hoàn thành từ kết quả local.
+
+Tại thời điểm B.1, bằng chứng local là **459 test, 0 failure/error/skipped**,
+instruction **91,14%**, line **90,96%**, branch **68,99%** (vẫn chưa trên 80%).
+V25 tạo budget/refund riêng, mặc định chỉ ADMIN có `PAYMENT_REFUND`; ADMIN có
+phiên cũ phải đăng nhập lại. JAR local 8080 đã khởi động lại, health UP,
+schema `shop` V25, API refund anonymous trả 401. Không có giao dịch hoàn tiền
+thật; không seed fixture refund vào schema chính. Sonar/dependency/security
+scan milestone, CI backend/UI và deploy chưa được xác nhận trong task này.
 
 Ký hiệu:
 
@@ -540,6 +641,9 @@ Tiêu chí hoàn thành M4:
     - **Bằng chứng local ngày 05/10/2026:** 400 test, 0 failure, 0 error, 0 skipped; instruction coverage 90,67%, line coverage 90,50%, branch coverage 67,80%. Maven `spotless:apply clean verify`, Spring Modulith/ArchUnit, Flyway fresh/upgrade V1–V24 và V22→V24, H2, MySQL 8.0.46, MinIO Testcontainers, duplicate race thật trên MySQL, Docker Compose, quét credential runtime và `git diff --check` đều đạt.
     - **Trạng thái nghiệm thu:** implementation commit `3c491b7` trên PR số `34` đã vượt `verify` và `dependency-review`; commit tài liệu đóng task phải vượt lại hai required checks trước khi merge. Giới hạn đã chấp nhận: consumer inbox chưa thay thế producer transactional outbox M6.1, còn provider `UNKNOWN` thuộc M5.6.
   - [ ] **M5.5B — Partial/full refund:** bổ sung refund aggregate/provider contract, tổng đã hoàn, state transition và event riêng. Refund chỉ bắt đầu sau khi M5.5A ổn định để không trộn luồng thu tiền với luồng hoàn tiền và để mỗi task có rollback/acceptance độc lập.
+    - [~] **B.1:** budget/refund attempt riêng, khóa MySQL và idempotency, quyền `PAYMENT_REFUND`, API tạo/đọc và fake adapter; Flyway V25, flag `PAYMENT_REFUND_ENABLED=false`. Đã nghiệm thu local theo [contract B.1](docs/payment-refund-core.md): 459 test, MySQL/H2, architecture/OpenAPI và Compose đạt; chưa CI/merge/deploy nên chưa đánh dấu `[x]`.
+    - [ ] **B.2:** provider payment ID tin cậy, Stripe refund adapter và refund webhook; không dùng Checkout Session ID thay PaymentIntent/Charge ID.
+    - [ ] **B.3:** refund event versioned, Order refund metadata/inbox; sau đó mới đóng M5.5B khi toàn bộ gate đạt.
 - [ ] M5.6 Reconciliation job cho trạng thái không chắc chắn.
   - Yêu cầu: quét payment pending/unknown theo batch, gọi provider bằng rate limit/timeout, backoff và lock nhiều instance; không tự suy diễn success khi provider không xác nhận.
   - Đầu ra: scheduled job, checkpoint/metrics/alert và operator runbook.
@@ -893,7 +997,7 @@ Ngày 2026-09-28:
 - Quality gate đóng M3 đạt 205 test, 0 failure, 0 error, 0 skipped; instruction coverage 91,33%, line coverage 90,79%, branch coverage 71,92%; Maven `clean verify`, Spotless, Spring Modulith, ArchUnit, Flyway V1–V14, H2, MySQL, MinIO Testcontainers, Sonar, dependency/security, `git diff --check` và Docker Compose đều đạt.
 - PR số `22` vượt hai required check `verify` và `dependency-review`, được merge thành commit `f01f2c8`. README tiến độ vẫn chỉ lưu local và được `.gitignore` loại trừ.
 
-Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.5A, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.5A được triển khai và nghiệm thu qua PR số `34`. M5.5 vẫn đang mở vì partial/full refund thuộc M5.5B chưa thực hiện.
+Toàn bộ M0.1–M0.8, M1.1, M1.2, M1.3, M1.4A–M1.4H, M1.5, M1.6, M1.6A, M1.7, M1.8, M2.1–M2.6, M3.1–M3.5, M4.1–M4.7, M5.1–M5.5A, M6.2A.1 và M6.9A đã vượt quality gate phạm vi tương ứng. Milestone M4 đã đóng; M5.5A được triển khai và nghiệm thu qua PR số `34`. M5.5 vẫn đang mở: M5.5B.1 mới nghiệm thu local; provider/webhook ở B.2 và event/Order ở B.3 chưa hoàn tất, chưa đóng M5.5B.
 
 ## 8. Luồng hoạt động toàn dự án
 
@@ -954,24 +1058,23 @@ Không sử dụng distributed database transaction. Luồng thất bại đư�
 
 ## 9. Chạy dự án
 
-Yêu cầu: Java 21 và Docker.
+Yêu cầu: JDK 21, `JAVA_HOME` trỏ đúng thư mục JDK và Docker. Chỉ có lệnh
+`java` trong PATH chưa đủ nếu Maven wrapper báo thiếu `JAVA_HOME`.
 
-Mã nguồn backend nằm trong thư mục [`backend/`](backend/) (chứa `src`, `pom.xml`,
-`mvnw`, `Dockerfile`, `ci`); frontend nằm ở [`frontend/`](frontend/). Các lệnh
-Maven chạy bên trong `backend/`, còn `docker compose` vẫn chạy từ gốc repo
-(compose.yaml đã trỏ build context sang `./backend`).
+Backend nằm trực tiếp tại gốc repo `shop/`: [`src/`](src/), `pom.xml`, `mvnw`,
+`.mvn/`, `ci/` và `Dockerfile`. Frontend là project riêng ở `../shop-ui/`
+(trên máy hiện tại: `D:/shop-ui`). Chạy cả Maven và Docker Compose từ gốc repo;
+build context backend là `.`.
 
 ```bash
 docker compose up -d mysql
-cd backend
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
 Windows PowerShell:
 
 ```powershell
-docker start mysql-8.0
-cd backend
+docker compose up -d mysql minio
 $env:SPRING_PROFILES_ACTIVE="dev"
 .\mvnw.cmd spring-boot:run
 ```
@@ -1000,7 +1103,7 @@ Kết nối DataGrip vào MySQL local:
 2. Nhập `Host=localhost`, `Port=3307`, `User=shop`, `Password=shop-local-password`, `Database=shop`.
 3. JDBC URL tương ứng là `jdbc:mysql://localhost:3307/shop`.
 4. Chọn `Test Connection`, sau đó trong tab `Schemas` đánh dấu schema `shop` và bấm `Apply`.
-5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` hiện phải lên tới V24; các bảng Identity mang tiền tố `xac_thuc_`, Payment có `thanh_toan_lan_thu`/`thanh_toan_su_kien_webhook`, còn Order có inbox `don_hang_su_kien_thanh_toan`.
+5. Sau khi ứng dụng chạy, dùng `Synchronize`/`Refresh` trong DataGrip. `flyway_schema_history` hiện tới V24; đối chiếu đúng hai location `db/migration` + `db/mysql` (test H2 dùng `db/migration` + `db/h2`), không chỉ kiểm tra thư mục chung. V11, V21 và V24 là SQL theo dialect. Kiểm tra read-only ngày 16/10/2026 xác nhận schema local `shop` và `shop_ui_qa_20261015` đều ở V24, tương ứng migration trong source. Các bảng Identity mang tiền tố `xac_thuc_`, Payment có `thanh_toan_lan_thu`/`thanh_toan_su_kien_webhook`, còn Order có inbox `don_hang_su_kien_thanh_toan`.
 
 Nếu DataGrip vẫn hiển thị `identity_*`, chạy câu lệnh sau để kiểm tra. Kết quả dừng trước V8 nghĩa là container chưa được ứng dụng mới chạy đủ migration, không phải entity vẫn ánh xạ tên tiếng Anh:
 
@@ -1219,32 +1322,45 @@ $env:CORS_ALLOWED_ORIGINS="https://shop.example.com"
 
 ### 9.x Frontend (Vite + React)
 
-Frontend nằm trong thư mục [`frontend/`](frontend/), là SPA Vite + React +
-TypeScript ghép trực tiếp với API hiện có.
+Frontend là project độc lập `shop-ui/`, đặt cạnh repo này, là SPA Vite + React +
+TypeScript ghép trực tiếp với API hiện có. Không còn source UI trong repo
+backend; clone backend không đồng thời tải UI. README riêng nằm tại
+`../shop-ui/README.md` sau khi chuẩn bị đủ hai project.
 
 - **Ghép chuẩn API:** client bóc envelope `ApiResponse<T>`, gắn
   `Authorization: Bearer`, tự refresh access token (single-flight) và xoay vòng
   refresh token theo thiết kế Identity; đăng nhập xử lý CAPTCHA thích ứng
   (mã lỗi `CAPTCHA_REQUIRED=1025`), checkout gửi `Idempotency-Key` cho mỗi đơn.
-  Kiểu dữ liệu trong `frontend/src/lib/types.ts` phản chiếu DTO backend.
+  Kiểu dữ liệu trong `shop-ui/src/lib/types.ts` phản chiếu DTO backend.
 - **Luồng khách hàng:** duyệt/tìm sản phẩm công khai (`/api/catalog/**`),
-  giỏ hàng, báo giá + đặt hàng, hồ sơ. Giá/thuế/trạng thái do server quyết định.
+  giỏ hàng, báo giá + đặt hàng, lịch sử/chi tiết đơn (`/orders`, `/orders/:orderId`),
+  hồ sơ. Giá/thuế/trạng thái do server quyết định. Checkout mở chi tiết đơn đọc
+  lại từ server, không lưu toàn bộ snapshot trong browser history. Logout/đổi
+  phiên hủy cache riêng tư; refresh token đến muộn không khôi phục phiên cũ.
 - **Palette màu hệ thống:** hai tầng token trong
-  `frontend/src/styles/tokens.css` — palette thô (neutral/brand/semantic, mỗi
+  `shop-ui/src/styles/tokens.css` — palette thô (neutral/brand/semantic, mỗi
   họ nhiều bậc) và token ngữ nghĩa (`--color-*`) cho vai trò UI; component chỉ
   dùng token ngữ nghĩa nên đổi theme sáng/tối chỉ cần ánh xạ lại một tầng.
 
 Chạy dev (proxy `/api` sang backend `localhost:8080`):
 
 ```bash
-cd frontend
-cp .env.example .env
-npm install
+cd ../shop-ui
+# Chỉ sao chép cấu hình nếu chưa có .env.local; không ghi đè cấu hình riêng.
+# cp .env.example .env.local
+npm ci
 npm run dev     # http://localhost:5173
 ```
 
-Khi đóng gói, image `frontend/Dockerfile` build SPA rồi phục vụ qua nginx, đồng
-thời làm **edge** proxy `/api` tới app (cùng origin, không cần nới CORS).
+Windows PowerShell có thể chuyển thẳng bằng `cd D:/shop-ui`. Mặc định Vite
+proxy `/api` sang `http://localhost:8080`; đổi `VITE_DEV_API_TARGET` trong
+`.env.local` của UI nếu backend ở địa chỉ khác. Không nhúng secret vào `VITE_*`.
+
+Khi đóng gói, chạy `docker build -t t1r4m15u/shop-ui:local .` từ `shop-ui/`.
+Dockerfile UI build SPA rồi phục vụ qua nginx, đồng thời làm **edge** proxy
+`/api` tới `APP_UPSTREAM` (mặc định `app:8080`, cùng Docker network). Lab Compose
+dùng `SHOP_UI_CONTEXT`, mặc định `../../../shop-ui` tính từ `deploy/lab/`.
+Pipeline và Compose backend-only dùng context gốc repo (`.`), không phụ thuộc UI.
 
 ### 9.y Lab nghiên cứu sức chịu tải / chống chịu DDoS
 
@@ -1314,10 +1430,10 @@ Permission là capability mà code thực sự kiểm tra nên API chỉ cho xem
 
 ### ADR-007: Tách mã nguồn thành backend/ và frontend/ trong cùng repo
 
-Trạng thái: Accepted.
+Trạng thái: Quyết định lịch sử; phần UI được thay thế bởi ADR-008, layout backend bởi ADR-009.
 
-Backend (Spring) được chuyển từ gốc repo vào [`backend/`](backend/) để nằm song
-song với [`frontend/`](frontend/) đã có, giữ dạng monorepo một repo. Di chuyển
+Backend (Spring) từng được chuyển từ gốc repo vào `backend/` để nằm song
+song với `frontend/` đã có, giữ dạng monorepo một repo ở thời điểm đó. Di chuyển
 bằng `git mv` để bảo toàn lịch sử. Các tham chiếu layout cũ được cập nhật cùng
 lúc: `compose.yaml` và `deploy/lab/compose.lab.yml` trỏ build context sang
 `backend/`; `cd.yml` build image từ context `backend`; `ci.yml` chạy Maven với
@@ -1327,3 +1443,36 @@ lúc: `compose.yaml` và `deploy/lab/compose.lab.yml` trỏ build context sang
 Không đổi: coordinate Maven/artifact, package `com.shop`, image tag
 `docker.io/t1r4m15u/shop`, `deploy/compose.prod.yml` (dùng image dựng sẵn) và
 quy trình `deploy.sh` trên server. Lệnh `docker compose` vẫn chạy từ gốc repo.
+
+### ADR-008: UI là project riêng đặt cạnh repo backend
+
+Trạng thái: Quyết định UI riêng được giữ; vị trí backend được thay thế bởi ADR-009. Chưa push/merge/deploy.
+
+Chuyển toàn bộ storefront, ảnh/font, nginx, Dockerfile và package lock sang
+`D:/shop-ui`; giữ backend ở `D:/shop/backend`. Đây là tách source/build của UI,
+không phải tách backend thành microservices. Hai project giao tiếp qua HTTP API;
+không chia sẻ source hoặc đưa secret backend vào bundle React.
+
+Dev giữ Vite proxy `/api`. Lab Compose dùng biến `SHOP_UI_CONTEXT` với mặc định
+hai project cạnh nhau; đường dẫn khác phải cung cấp tại máy build. Backend-only
+CI/CD và image `docker.io/t1r4m15u/shop` không thay đổi. UI có Git local riêng,
+chưa tạo remote hoặc pipeline; lịch sử cũ vẫn nằm trong repo Shop. Commit/push
+backend không đồng thời xuất bản UI. Khi triển khai cần version/rollback từng
+artifact và giữ API tương thích.
+
+Hợp đồng, nghiệm thu và rollback: [UI-STRUCTURE](docs/frontend-separation.md).
+
+### ADR-009: Repo Shop chính là backend, không lồng thêm backend/
+
+Trạng thái: Quyết định layout local theo yêu cầu người dùng; chưa push/merge/deploy.
+
+Vì UI đã là project riêng, đặt Spring trực tiếp ở gốc `shop/`: `src/`, `.mvn/`,
+`ci/`, `pom.xml`, Maven wrapper và Dockerfile. Giữ `shop-ui/` cạnh `shop/`; không
+nhúng Git UI vào backend, không đổi package/module/API/schema. CI cache theo
+`pom.xml` và chạy Maven tại gốc; CD/local Compose build context `.`; lab context
+backend `../..`, UI vẫn theo `SHOP_UI_CONTEXT`. `.dockerignore` loại secret,
+Git metadata, runtime data và các thư mục ngoài build để context gốc không
+kéo theo dữ liệu không cần thiết. Image repository và production deploy bundle
+giữ nguyên.
+
+Hợp đồng, kết quả kiểm tra và rollback: [ROOT-01](docs/backend-root-layout.md).

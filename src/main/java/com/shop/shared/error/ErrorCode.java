@@ -162,6 +162,16 @@ public enum ErrorCode {
     PAYMENT_WEBHOOK_PAYLOAD_INVALID(1402, "error.payment.webhook.payload-invalid", HttpStatus.BAD_REQUEST),
     PAYMENT_WEBHOOK_REFERENCE_INVALID(1403, "error.payment.webhook.reference-invalid", HttpStatus.BAD_REQUEST),
     PAYMENT_WEBHOOK_EVENT_CONFLICT(1404, "error.payment.webhook.event-conflict", HttpStatus.CONFLICT),
+    PAYMENT_REFUND_DATA_INVALID(1405, "error.payment.refund.data-invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_REFUND_KEY_INVALID(1406, "error.payment.refund.key-invalid", HttpStatus.BAD_REQUEST),
+    PAYMENT_ATTEMPT_NOT_FOUND(1407, "error.payment.attempt.not-found", HttpStatus.NOT_FOUND),
+    PAYMENT_REFUND_NOT_CAPTURED(1408, "error.payment.refund.not-captured", HttpStatus.CONFLICT),
+    PAYMENT_REFUND_LIMIT_EXCEEDED(1409, "error.payment.refund.limit-exceeded", HttpStatus.CONFLICT),
+    PAYMENT_REFUND_KEY_CONFLICT(1410, "error.payment.refund.key-conflict", HttpStatus.CONFLICT),
+    PAYMENT_REFUND_NOT_FOUND(1411, "error.payment.refund.not-found", HttpStatus.NOT_FOUND),
+    PAYMENT_REFUND_UNAVAILABLE(1412, "error.payment.refund.unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    PAYMENT_REFUND_PROVIDER_UNSUPPORTED(
+            1413, "error.payment.refund.provider-unsupported", HttpStatus.SERVICE_UNAVAILABLE),
     REQUIRED_ROLE_MISSING(1500, "error.required-role.missing", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;

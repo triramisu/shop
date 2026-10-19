@@ -19,9 +19,9 @@ class IdentitySchemaMigrationTests {
     @Test
     void createsIdentityTablesAndSeedsSystemAdministrationRbac() {
         assertThat(rowCount("xac_thuc_nguoi_dung")).isZero();
-        assertThat(rowCount("xac_thuc_quyen_han")).isEqualTo(12);
+        assertThat(rowCount("xac_thuc_quyen_han")).isEqualTo(13);
         assertThat(rowCount("xac_thuc_nguoi_dung_vai_tro")).isZero();
-        assertThat(rowCount("xac_thuc_vai_tro_quyen_han")).isEqualTo(23);
+        assertThat(rowCount("xac_thuc_vai_tro_quyen_han")).isEqualTo(24);
         assertThat(rowCount("xac_thuc_phien_lam_moi")).isZero();
         assertThat(rowCount("xac_thuc_dang_nhap_that_bai")).isZero();
         assertThat(rowCount("xac_thuc_thu_thach_captcha")).isZero();
@@ -45,12 +45,18 @@ class IdentitySchemaMigrationTests {
                         "CATALOG_WRITE",
                         "INVENTORY_READ",
                         "INVENTORY_WRITE",
+                        "PAYMENT_REFUND",
                         "SYSTEM_PERMISSION_READ",
                         "SYSTEM_ROLE_MANAGE",
                         "SYSTEM_ROLE_READ",
                         "SYSTEM_USER_READ",
                         "SYSTEM_USER_ROLE_ASSIGN",
                         "SYSTEM_USER_STATUS_UPDATE");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM xac_thuc_vai_tro_quyen_han WHERE permission_code='PAYMENT_REFUND' "
+                                + "AND role_code IN ('USER','STAFF')",
+                        Integer.class))
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT description FROM xac_thuc_vai_tro WHERE code = 'STAFF'", String.class))
                 .isEqualTo("Nhân viên quản trị");

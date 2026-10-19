@@ -60,6 +60,7 @@ class IdentityRepositoryIntegrationTests {
                         "CATALOG_WRITE",
                         "INVENTORY_READ",
                         "INVENTORY_WRITE",
+                        "PAYMENT_REFUND",
                         "SYSTEM_USER_READ",
                         "SYSTEM_USER_STATUS_UPDATE",
                         "SYSTEM_USER_ROLE_ASSIGN",

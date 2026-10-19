@@ -50,6 +50,7 @@ public class SecurityConfiguration {
     private static final String PUBLIC_CATALOG_PATTERN = "/api/catalog/**";
     private static final String PUBLIC_PAYMENT_CHECKOUT_PATTERN = "/api/payments/checkout/**";
     private static final String PUBLIC_STRIPE_WEBHOOK = "/api/payments/webhooks/stripe";
+    private static final String PUBLIC_VNPAY_IPN = "/api/payments/webhooks/vnpay";
 
     CustomJwtDecoder customJwtDecoder;
     JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
@@ -67,6 +68,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, PUBLIC_PAYMENT_CHECKOUT_PATTERN)
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, PUBLIC_STRIPE_WEBHOOK)
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_VNPAY_IPN)
                         .permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**")
                         .permitAll()

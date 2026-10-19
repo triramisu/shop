@@ -54,8 +54,18 @@ springdoc:
 
 app:
   payment:
+    refund:
+      enabled: ${PAYMENT_REFUND_ENABLED:false}
     provider:
       type: ${PAYMENT_PROVIDER_TYPE:none}
+    vnpay:
+      tmn-code: ${VNPAY_TMN_CODE:}
+      hash-secret: ${VNPAY_HASH_SECRET:}
+      previous-hash-secrets: ${VNPAY_PREVIOUS_HASH_SECRETS:}
+      public-base-url: ${VNPAY_PUBLIC_BASE_URL:}
+      allowed-hosts: ${VNPAY_ALLOWED_HOSTS:}
+      checkout-ttl: ${VNPAY_CHECKOUT_TTL:10m}
+      bank-code: ${VNPAY_BANK_CODE:}
     fake:
       default-mode: ${FAKE_PAYMENT_DEFAULT_MODE:success}
       max-stored-attempts: ${FAKE_PAYMENT_MAX_STORED_ATTEMPTS:10000}
@@ -142,6 +152,13 @@ app:
           bucket: ${MINIO_BUCKET:shop-product-images}
           auto-create-bucket: ${MINIO_AUTO_CREATE_BUCKET:false}
           presigned-url-ttl: ${MINIO_PRESIGNED_URL_TTL:15m}
+        s3:
+          region: ${S3_REGION:}
+          bucket: ${S3_BUCKET:}
+          presigned-url-ttl: ${S3_PRESIGNED_URL_TTL:15m}
+          connect-timeout: ${S3_CONNECT_TIMEOUT:2s}
+          read-timeout: ${S3_READ_TIMEOUT:5s}
+          call-timeout: ${S3_CALL_TIMEOUT:8s}
   identity:
     admin:
       bootstrap-enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}

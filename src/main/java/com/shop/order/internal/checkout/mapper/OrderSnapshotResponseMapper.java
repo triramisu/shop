@@ -2,12 +2,27 @@ package com.shop.order.internal.checkout.mapper;
 
 import com.shop.order.internal.checkout.dto.response.OrderItemSnapshotResponse;
 import com.shop.order.internal.checkout.dto.response.OrderSnapshotResponse;
+import com.shop.order.internal.checkout.dto.response.OrderSummaryResponse;
 import com.shop.order.internal.entity.CustomerOrder;
 import com.shop.order.internal.entity.OrderItemSnapshot;
 import org.springframework.stereotype.Component;
 
 @Component
 public class OrderSnapshotResponseMapper {
+
+    public OrderSummaryResponse toSummary(CustomerOrder order) {
+        return new OrderSummaryResponse(
+                order.getId(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                order.getCurrency(),
+                order.getGrandTotal(),
+                order.getItems().size(),
+                order.getItems().stream()
+                        .mapToInt(OrderItemSnapshot::getQuantity)
+                        .sum(),
+                order.getItems().getFirst().getProductName());
+    }
 
     public OrderSnapshotResponse toResponse(CustomerOrder order) {
         return OrderSnapshotResponse.builder()

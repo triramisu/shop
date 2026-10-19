@@ -90,6 +90,7 @@ public class CatalogImageProperties {
     public enum StorageType {
         FILESYSTEM,
         MINIO,
+        S3,
         MEMORY
     }
 

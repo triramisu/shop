@@ -1,0 +1,27 @@
+[
+  { "ParameterKey": "ProjectName", "ParameterValue": "shop" },
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "REPLACE_EXISTING_REGIONAL_KEY_PAIR"
+  },
+  { "ParameterKey": "AdminCidr", "ParameterValue": "203.0.113.10/32" },
+  { "ParameterKey": "LabClientIpv4", "ParameterValue": "" },
+  {
+    "ParameterKey": "CloudFrontPrefixListId",
+    "ParameterValue": "pl-REPLACE_REGIONAL_ID"
+  },
+  {
+    "ParameterKey": "ApiOriginDomainName",
+    "ParameterValue": "origin.aydibro.click"
+  },
+  {
+    "ParameterKey": "AlbCertificateArn",
+    "ParameterValue": "arn:aws:acm:ap-southeast-1:123456789012:certificate/REPLACE_ISSUED_CERTIFICATE"
+  },
+  { "ParameterKey": "DeploymentMode", "ParameterValue": "foundation" },
+  { "ParameterKey": "MySqlEngineVersion", "ParameterValue": "8.4.11" },
+  {
+    "ParameterKey": "LatestAmiId",
+    "ParameterValue": "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+  }
+]

@@ -4,6 +4,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shop.ShopApplication;
+import com.shop.payment.internal.refund.repository.RefundAttemptRepository;
+import com.shop.payment.internal.refund.repository.RefundBudgetRepository;
 import com.shop.payment.internal.repository.PaymentAttemptRepository;
 import com.shop.payment.internal.webhook.repository.PaymentWebhookEventRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -45,7 +47,7 @@ class PaymentLayerArchitectureTests {
                         .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.payment.internal"))
                         .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
                         .toList())
-                .hasSize(2)
+                .hasSize(4)
                 .allSatisfy(javaClass -> {
                     assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
                     assertThat(javaClass.getAnnotationOfType(Table.class).name())
@@ -68,6 +70,32 @@ class PaymentLayerArchitectureTests {
     void paymentRepositoriesDoNotExposeAggregateOrInboxDeletion() {
         assertDoesNotExposeDeletion(PaymentAttemptRepository.class);
         assertDoesNotExposeDeletion(PaymentWebhookEventRepository.class);
+        assertDoesNotExposeDeletion(RefundAttemptRepository.class);
+        assertDoesNotExposeDeletion(RefundBudgetRepository.class);
+    }
+
+    @Test
+    void refundControllerDoesNotUsePersistenceDirectly() {
+        noClasses()
+                .that()
+                .resideInAPackage("..payment.internal.refund.controller..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
+                        "..payment.internal.refund.entity..", "..payment.internal.refund.repository..",
+                        "..payment.internal.entity..", "..payment.internal.repository..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void refundDtosDoNotExposeEntities() {
+        noClasses()
+                .that()
+                .resideInAPackage("..payment.internal.refund.dto..")
+                .should()
+                .dependOnClassesThat()
+                .areAnnotatedWith(Entity.class)
+                .check(applicationClasses);
     }
 
     private void assertDoesNotExposeDeletion(Class<?> repositoryType) {
