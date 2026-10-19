@@ -64,7 +64,7 @@ jobs:
             --label "org.opencontainers.image.revision=$SOURCE_SHA" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --tag "$IMAGE" \
-            backend
+            .
 
       - name: Reject vulnerable runtime image
         env:
