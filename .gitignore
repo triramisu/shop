@@ -27,6 +27,9 @@ target/
 Thumbs.db
 .env
 **/.env.prod
+**/.env*
+!**/.env.example
+!**/.env.*.example
 *.log
 
 # Local runtime data

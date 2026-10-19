@@ -1,0 +1,6 @@
+parameters.local.json
+application.env
+application.*.env
+*.pem
+*.p12
+*.key

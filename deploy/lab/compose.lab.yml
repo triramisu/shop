@@ -71,7 +71,7 @@ services:
 
   app:
     build:
-      context: ../../backend
+      context: ../..
       dockerfile: Dockerfile
     image: shop:lab
     depends_on:
@@ -94,6 +94,14 @@ services:
       # Edge và app cùng origin qua nginx; cho phép origin của web container.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
       PAYMENT_PROVIDER_TYPE: ${PAYMENT_PROVIDER_TYPE:-fake}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_PREVIOUS_HASH_SECRETS: ${VNPAY_PREVIOUS_HASH_SECRETS:-}
+      VNPAY_PUBLIC_BASE_URL: ${VNPAY_PUBLIC_BASE_URL:-}
+      VNPAY_ALLOWED_HOSTS: ${VNPAY_ALLOWED_HOSTS:-}
+      VNPAY_CHECKOUT_TTL: ${VNPAY_CHECKOUT_TTL:-10m}
+      VNPAY_BANK_CODE: ${VNPAY_BANK_CODE:-}
+      PAYMENT_REFUND_ENABLED: ${PAYMENT_REFUND_ENABLED:-false}
       # Giữ rate limit tầng ứng dụng BẬT (mặc định của backend) — không hạ phòng vệ.
       AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
       AUTH_CAPTCHA_ENABLED: ${AUTH_CAPTCHA_ENABLED:-true}
@@ -116,7 +124,8 @@ services:
 
   web:
     build:
-      context: ../../frontend
+      # Đường dẫn tương đối tính từ deploy/lab/; mặc định hai project cạnh nhau.
+      context: ${SHOP_UI_CONTEXT:-../../../shop-ui}
       dockerfile: Dockerfile
     image: shop-frontend:lab
     depends_on:

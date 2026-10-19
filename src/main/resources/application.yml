@@ -1,0 +1,226 @@
+spring:
+  application:
+    name: shop
+  messages:
+    basename: message
+    encoding: UTF-8
+  datasource:
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:com.mysql.cj.jdbc.Driver}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/mysql}
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  servlet:
+    multipart:
+      max-file-size: ${CATALOG_IMAGE_MAX_FILE_SIZE:5MB}
+      max-request-size: ${CATALOG_IMAGE_MAX_REQUEST_SIZE:30MB}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  paths-to-match: /api/**
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
+  payment:
+    refund:
+      enabled: ${PAYMENT_REFUND_ENABLED:false}
+    provider:
+      type: ${PAYMENT_PROVIDER_TYPE:none}
+    vnpay:
+      tmn-code: ${VNPAY_TMN_CODE:}
+      hash-secret: ${VNPAY_HASH_SECRET:}
+      previous-hash-secrets: ${VNPAY_PREVIOUS_HASH_SECRETS:}
+      public-base-url: ${VNPAY_PUBLIC_BASE_URL:}
+      allowed-hosts: ${VNPAY_ALLOWED_HOSTS:}
+      checkout-ttl: ${VNPAY_CHECKOUT_TTL:10m}
+      bank-code: ${VNPAY_BANK_CODE:}
+    fake:
+      default-mode: ${FAKE_PAYMENT_DEFAULT_MODE:success}
+      max-stored-attempts: ${FAKE_PAYMENT_MAX_STORED_ATTEMPTS:10000}
+      max-callback-deliveries: ${FAKE_PAYMENT_MAX_CALLBACK_DELIVERIES:10}
+    stripe:
+      secret-key: ${STRIPE_SECRET_KEY:}
+      api-version: ${STRIPE_API_VERSION:2026-09-30.endive}
+      return-state-secret: ${STRIPE_RETURN_STATE_SECRET:}
+      success-url: ${STRIPE_SUCCESS_URL:}
+      cancel-url: ${STRIPE_CANCEL_URL:}
+      allowed-return-hosts: ${STRIPE_ALLOWED_RETURN_HOSTS:}
+      allowed-checkout-hosts: ${STRIPE_ALLOWED_CHECKOUT_HOSTS:checkout.stripe.com}
+      webhook-secrets: ${STRIPE_WEBHOOK_SECRETS:}
+      webhook-signature-tolerance: ${STRIPE_WEBHOOK_SIGNATURE_TOLERANCE:5m}
+      webhook-max-payload-bytes: ${STRIPE_WEBHOOK_MAX_PAYLOAD_BYTES:262144}
+      return-state-ttl: ${STRIPE_RETURN_STATE_TTL:24h}
+      connect-timeout: ${STRIPE_CONNECT_TIMEOUT:2s}
+      read-timeout: ${STRIPE_READ_TIMEOUT:5s}
+      call-timeout: ${STRIPE_CALL_TIMEOUT:8s}
+      retry:
+        max-attempts: ${STRIPE_RETRY_MAX_ATTEMPTS:2}
+        wait-duration: ${STRIPE_RETRY_WAIT_DURATION:200ms}
+      circuit-breaker:
+        sliding-window-size: ${STRIPE_CIRCUIT_BREAKER_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${STRIPE_CIRCUIT_BREAKER_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${STRIPE_CIRCUIT_BREAKER_FAILURE_RATE:50}
+        open-state-duration: ${STRIPE_CIRCUIT_BREAKER_OPEN_DURATION:30s}
+        permitted-calls-in-half-open-state: ${STRIPE_CIRCUIT_BREAKER_HALF_OPEN_CALLS:3}
+  order:
+    payment:
+      auto-initiation-enabled: ${ORDER_PAYMENT_AUTO_INITIATION_ENABLED:true}
+      event-consumption-enabled: ${ORDER_PAYMENT_EVENT_CONSUMPTION_ENABLED:true}
+      recovery:
+        enabled: ${ORDER_PAYMENT_RECOVERY_ENABLED:true}
+        stale-after: ${ORDER_PAYMENT_RECOVERY_STALE_AFTER:30s}
+        fixed-delay: ${ORDER_PAYMENT_RECOVERY_FIXED_DELAY:30s}
+        initial-delay: ${ORDER_PAYMENT_RECOVERY_INITIAL_DELAY:30s}
+        batch-size: ${ORDER_PAYMENT_RECOVERY_BATCH_SIZE:50}
+    checkout:
+      pricing:
+        discount-rate: ${CHECKOUT_DISCOUNT_RATE:0}
+        tax-rate: ${CHECKOUT_TAX_RATE:0}
+      inventory:
+        location-code: ${CHECKOUT_INVENTORY_LOCATION_CODE:MAIN}
+        reservation-duration: ${CHECKOUT_INVENTORY_RESERVATION_DURATION:15m}
+        reconciliation:
+          enabled: ${CHECKOUT_INVENTORY_RECONCILIATION_ENABLED:true}
+          stale-after: ${CHECKOUT_INVENTORY_RECONCILIATION_STALE_AFTER:30s}
+          fixed-delay: ${CHECKOUT_INVENTORY_RECONCILIATION_FIXED_DELAY:30s}
+          initial-delay: ${CHECKOUT_INVENTORY_RECONCILIATION_INITIAL_DELAY:30s}
+          batch-size: ${CHECKOUT_INVENTORY_RECONCILIATION_BATCH_SIZE:50}
+      idempotency:
+        retention: ${CHECKOUT_IDEMPOTENCY_RETENTION:24h}
+        cleanup:
+          enabled: ${CHECKOUT_IDEMPOTENCY_CLEANUP_ENABLED:true}
+          fixed-delay: ${CHECKOUT_IDEMPOTENCY_CLEANUP_FIXED_DELAY:1h}
+          initial-delay: ${CHECKOUT_IDEMPOTENCY_CLEANUP_INITIAL_DELAY:1h}
+  inventory:
+    reservation:
+      max-duration: ${INVENTORY_RESERVATION_MAX_DURATION:30m}
+      transaction-timeout: ${INVENTORY_RESERVATION_TRANSACTION_TIMEOUT:3s}
+      max-attempts: ${INVENTORY_RESERVATION_MAX_ATTEMPTS:3}
+      retry-backoff: ${INVENTORY_RESERVATION_RETRY_BACKOFF:25ms}
+      expiration:
+        enabled: ${INVENTORY_EXPIRATION_ENABLED:true}
+        fixed-delay: ${INVENTORY_EXPIRATION_FIXED_DELAY:30s}
+        initial-delay: ${INVENTORY_EXPIRATION_INITIAL_DELAY:30s}
+        batch-size: ${INVENTORY_EXPIRATION_BATCH_SIZE:100}
+  catalog:
+    search:
+      strategy: ${CATALOG_SEARCH_STRATEGY:mysql-fulltext}
+    images:
+      max-files-per-upload: ${CATALOG_IMAGE_MAX_FILES_PER_UPLOAD:5}
+      max-files-per-product: ${CATALOG_IMAGE_MAX_FILES_PER_PRODUCT:10}
+      max-file-size: ${CATALOG_IMAGE_MAX_FILE_SIZE:5MB}
+      max-pixels: ${CATALOG_IMAGE_MAX_PIXELS:40000000}
+      storage:
+        type: ${OBJECT_STORAGE_TYPE:filesystem}
+        filesystem-root: ${OBJECT_STORAGE_ROOT:./data/object-storage}
+        minio:
+          endpoint: ${MINIO_ENDPOINT:}
+          access-key: ${MINIO_ACCESS_KEY:}
+          secret-key: ${MINIO_SECRET_KEY:}
+          bucket: ${MINIO_BUCKET:shop-product-images}
+          auto-create-bucket: ${MINIO_AUTO_CREATE_BUCKET:false}
+          presigned-url-ttl: ${MINIO_PRESIGNED_URL_TTL:15m}
+        s3:
+          region: ${S3_REGION:}
+          bucket: ${S3_BUCKET:}
+          presigned-url-ttl: ${S3_PRESIGNED_URL_TTL:15m}
+          connect-timeout: ${S3_CONNECT_TIMEOUT:2s}
+          read-timeout: ${S3_READ_TIMEOUT:5s}
+          call-timeout: ${S3_CALL_TIMEOUT:8s}
+  identity:
+    admin:
+      bootstrap-enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+      username: ${ADMIN_USERNAME:}
+      email: ${ADMIN_EMAIL:}
+      password: ${ADMIN_PASSWORD:}
+  open-api:
+    info:
+      title: ${OPENAPI_TITLE:Shop API}
+      version: ${OPENAPI_VERSION:v1}
+      description: ${OPENAPI_DESCRIPTION:REST API cho hệ thống Shop dạng modular monolith}
+      contact:
+        name: ${OPENAPI_CONTACT_NAME:Nhóm phát triển Shop}
+        url: ${OPENAPI_CONTACT_URL:}
+        email: ${OPENAPI_CONTACT_EMAIL:}
+    server:
+      url: ${OPENAPI_SERVER_URL:/}
+      description: ${OPENAPI_SERVER_DESCRIPTION:Môi trường hiện tại}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  security:
+    rate-limit:
+      enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+      max-buckets: ${AUTH_RATE_LIMIT_MAX_BUCKETS:10000}
+      bucket-idle-time: ${AUTH_RATE_LIMIT_BUCKET_IDLE_TIME:10m}
+      cleanup-interval: ${AUTH_RATE_LIMIT_CLEANUP_INTERVAL:60000}
+      registration:
+        capacity: ${AUTH_RATE_LIMIT_REGISTRATION_CAPACITY:5}
+        refill-period: ${AUTH_RATE_LIMIT_REGISTRATION_REFILL:1m}
+      login:
+        capacity: ${AUTH_RATE_LIMIT_LOGIN_CAPACITY:10}
+        refill-period: ${AUTH_RATE_LIMIT_LOGIN_REFILL:1m}
+      captcha:
+        capacity: ${AUTH_RATE_LIMIT_CAPTCHA_CAPACITY:10}
+        refill-period: ${AUTH_RATE_LIMIT_CAPTCHA_REFILL:1m}
+      introspection:
+        capacity: ${AUTH_RATE_LIMIT_INTROSPECTION_CAPACITY:60}
+        refill-period: ${AUTH_RATE_LIMIT_INTROSPECTION_REFILL:1m}
+      refresh:
+        capacity: ${AUTH_RATE_LIMIT_REFRESH_CAPACITY:30}
+        refill-period: ${AUTH_RATE_LIMIT_REFRESH_REFILL:1m}
+      logout:
+        capacity: ${AUTH_RATE_LIMIT_LOGOUT_CAPACITY:30}
+        refill-period: ${AUTH_RATE_LIMIT_LOGOUT_REFILL:1m}
+    captcha:
+      enabled: ${AUTH_CAPTCHA_ENABLED:true}
+      failure-threshold: ${AUTH_CAPTCHA_FAILURE_THRESHOLD:3}
+      failure-window: ${AUTH_CAPTCHA_FAILURE_WINDOW:15m}
+      challenge-ttl: ${AUTH_CAPTCHA_CHALLENGE_TTL:2m}
+      max-active-challenges: ${AUTH_CAPTCHA_MAX_ACTIVE_CHALLENGES:10000}
+      cleanup-interval: ${AUTH_CAPTCHA_CLEANUP_INTERVAL:60000}
+      cleanup-initial-delay: ${AUTH_CAPTCHA_CLEANUP_INITIAL_DELAY:60000}
+
+logging:
+  pattern:
+    level: "%5p [correlationId:%X{correlationId:-none}]"
+
+jwt:
+  signerKey: ${JWT_SIGNER_KEY}
+  valid-duration: 3600 # in seconds
+  refreshable-duration: 36000 # in seconds
+  cleanup-interval: 3600000 # in milliseconds
+  cleanup-initial-delay: 3600000 # in milliseconds
+  issuer: ${JWT_ISSUER:shop}
+  audience: ${JWT_AUDIENCE:shop-api}

@@ -27,7 +27,7 @@ sát* hành vi hệ thống dưới tải và hiệu quả của các lớp gi�
 
 - `web` — nginx vừa phục vụ SPA React vừa là **edge** proxy `/api`. Đây là nơi
   đặt các lớp giảm thiểu để đo (`limit_req`, `limit_conn`, timeout).
-- `app` — backend Spring (image build từ `Dockerfile` gốc), chạy read-only,
+- `app` — backend Spring (image build từ `Dockerfile` ở gốc `shop/`), chạy read-only,
   `cap_drop: ALL`, `no-new-privileges`.
 - `mysql`, `minio` — phụ trợ, chỉ bind loopback của host.
 
@@ -35,6 +35,26 @@ Mỗi container có **giới hạn CPU/RAM/pids** để lab có biên rõ ràng,
 chiếm dụng hoàn toàn và kết quả đo lặp lại được.
 
 ## Khởi động
+
+Đặt source backend và UI cạnh nhau trước khi build cả stack:
+
+```text
+/home/ubuntu/                 # Windows: D:/
+├── shop/                    # repo backend; chạy Compose ở đây
+│   ├── src/
+│   ├── pom.xml
+│   ├── Dockerfile
+│   └── deploy/lab/
+└── shop-ui/                 # project UI riêng, có Dockerfile và nginx/
+```
+
+UI không còn được tải về cùng `git clone` repo backend. Cần chuyển/clone project
+UI riêng vào `shop-ui` trước; chưa có remote UI thì chuyển source của bạn, không
+dùng URL repo minh họa. Nếu đặt nơi khác, sửa `SHOP_UI_CONTEXT` trong `.env.lab`
+thành đường dẫn tuyệt đối của source UI **trên máy chạy Docker**. Đường dẫn tương
+đối được tính từ `deploy/lab/`, không phải thư mục terminal.
+
+Chạy các lệnh dưới đây tại gốc `shop/`:
 
 ```bash
 cp deploy/lab/.env.lab.example deploy/lab/.env.lab
@@ -44,6 +64,7 @@ cp deploy/lab/.env.lab.example deploy/lab/.env.lab
 sudo deploy/lab/setup-ubuntu.sh --lab-cidr 10.10.0.0/24
 
 # Hoặc thủ công nếu đã có Docker:
+docker compose --env-file deploy/lab/.env.lab -f deploy/lab/compose.lab.yml config --quiet
 docker compose --env-file deploy/lab/.env.lab -f deploy/lab/compose.lab.yml up -d --build
 ```
 

@@ -1,0 +1,108 @@
+package com.shop.payment;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.shop.ShopApplication;
+import com.shop.payment.internal.refund.repository.RefundAttemptRepository;
+import com.shop.payment.internal.refund.repository.RefundBudgetRepository;
+import com.shop.payment.internal.repository.PaymentAttemptRepository;
+import com.shop.payment.internal.webhook.repository.PaymentWebhookEventRepository;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+class PaymentLayerArchitectureTests {
+
+    private static JavaClasses applicationClasses;
+
+    @BeforeAll
+    static void importClasses() {
+        applicationClasses = new ClassFileImporter().importPackagesOf(ShopApplication.class);
+    }
+
+    @Test
+    void paymentDoesNotDependOnOtherModuleInternals() {
+        noClasses()
+                .that()
+                .resideInAPackage("com.shop.payment..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.shop.order.internal..",
+                        "com.shop.inventory.internal..",
+                        "com.shop.catalog.internal..",
+                        "com.shop.identity.internal..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void paymentEntitiesUseExplicitVietnameseModulePrefixedTableNames() {
+        assertThat(applicationClasses.stream()
+                        .filter(javaClass -> javaClass.getPackageName().startsWith("com.shop.payment.internal"))
+                        .filter(javaClass -> javaClass.isAnnotatedWith(Entity.class))
+                        .toList())
+                .hasSize(4)
+                .allSatisfy(javaClass -> {
+                    assertThat(javaClass.isAnnotatedWith(Table.class)).isTrue();
+                    assertThat(javaClass.getAnnotationOfType(Table.class).name())
+                            .startsWith("thanh_toan_");
+                });
+    }
+
+    @Test
+    void publishedProviderAndEventContractsDoNotExposePersistenceTypes() {
+        noClasses()
+                .that()
+                .resideInAnyPackage("com.shop.payment.provider..", "com.shop.payment.event..")
+                .should()
+                .dependOnClassesThat()
+                .areAnnotatedWith(Entity.class)
+                .check(applicationClasses);
+    }
+
+    @Test
+    void paymentRepositoriesDoNotExposeAggregateOrInboxDeletion() {
+        assertDoesNotExposeDeletion(PaymentAttemptRepository.class);
+        assertDoesNotExposeDeletion(PaymentWebhookEventRepository.class);
+        assertDoesNotExposeDeletion(RefundAttemptRepository.class);
+        assertDoesNotExposeDeletion(RefundBudgetRepository.class);
+    }
+
+    @Test
+    void refundControllerDoesNotUsePersistenceDirectly() {
+        noClasses()
+                .that()
+                .resideInAPackage("..payment.internal.refund.controller..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(
+                        "..payment.internal.refund.entity..", "..payment.internal.refund.repository..",
+                        "..payment.internal.entity..", "..payment.internal.repository..")
+                .check(applicationClasses);
+    }
+
+    @Test
+    void refundDtosDoNotExposeEntities() {
+        noClasses()
+                .that()
+                .resideInAPackage("..payment.internal.refund.dto..")
+                .should()
+                .dependOnClassesThat()
+                .areAnnotatedWith(Entity.class)
+                .check(applicationClasses);
+    }
+
+    private void assertDoesNotExposeDeletion(Class<?> repositoryType) {
+        assertThat(Arrays.stream(repositoryType.getMethods())
+                        .map(Method::getName)
+                        .filter(methodName -> methodName.startsWith("delete")))
+                .as("repository %s must keep payment records append-only", repositoryType.getSimpleName())
+                .isEmpty();
+    }
+}

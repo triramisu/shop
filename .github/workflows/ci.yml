@@ -30,10 +30,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: pom.xml
 
       - name: Resolve Maven dependencies
-        working-directory: backend
         run: |
           chmod +x mvnw
           ./mvnw --batch-mode dependency:go-offline
@@ -66,10 +65,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: pom.xml
 
       - name: Verify
-        working-directory: backend
         run: |
           chmod +x mvnw
           ./mvnw --batch-mode clean verify
