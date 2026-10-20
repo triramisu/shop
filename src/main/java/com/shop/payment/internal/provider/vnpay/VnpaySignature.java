@@ -41,10 +41,18 @@ public final class VnpaySignature {
     }
 
     public boolean verify(Map<String, String> fields) {
-        String data = canonical(fields);
-        boolean matches = equalHash(hmac(data), fields.get("vnp_SecureHash"));
+        return verifyData(canonical(fields), fields.get("vnp_SecureHash"));
+    }
+
+    /** Querydr signs pipe-delimited UTF-8 data, not the checkout URL canonical form. */
+    public String signData(String data) {
+        return hmac(data);
+    }
+
+    public boolean verifyData(String data, String suppliedHash) {
+        boolean matches = equalHash(hmac(data), suppliedHash);
         for (String previous : previousSecrets) {
-            matches |= equalHash(hmac(previous, data), fields.get("vnp_SecureHash"));
+            matches |= equalHash(hmac(previous, data), suppliedHash);
         }
         return matches;
     }
