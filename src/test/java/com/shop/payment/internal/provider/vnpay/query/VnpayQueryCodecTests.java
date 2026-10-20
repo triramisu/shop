@@ -242,13 +242,14 @@ class VnpayQueryCodecTests {
         }
         assertThatThrownBy(() -> new PaymentStatusQueryRequest(ATTEMPT, ORDER, BigDecimal.ONE, null, Instant.EPOCH))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() ->
-                        new PaymentStatusQueryResult(PaymentProviderStatus.REQUIRES_ACTION, "ref", "1", Instant.EPOCH))
+        assertThatThrownBy(() -> new PaymentStatusQueryResult(
+                        PaymentProviderStatus.REQUIRES_ACTION, "ref", "1", Instant.EPOCH, "response1", "a".repeat(64)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new PaymentStatusQueryResult(PaymentProviderStatus.UNKNOWN, null, "1", Instant.EPOCH))
+        assertThatThrownBy(() -> new PaymentStatusQueryResult(
+                        PaymentProviderStatus.UNKNOWN, null, "1", Instant.EPOCH, "response1", "a".repeat(64)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(
-                        () -> new PaymentStatusQueryResult(PaymentProviderStatus.UNKNOWN, "ref", null, Instant.EPOCH))
+        assertThatThrownBy(() -> new PaymentStatusQueryResult(
+                        PaymentProviderStatus.UNKNOWN, "ref", null, Instant.EPOCH, "response1", "a".repeat(64)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

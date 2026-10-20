@@ -7,6 +7,9 @@ import com.shop.payment.provider.PaymentProviderException;
 import com.shop.payment.provider.PaymentProviderStatus;
 import com.shop.payment.provider.PaymentStatusQueryRequest;
 import com.shop.payment.provider.PaymentStatusQueryResult;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
@@ -14,10 +17,10 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
@@ -74,7 +77,7 @@ final class VnpayQueryCodec {
             throw new PaymentProviderException(PaymentProviderErrorType.INVALID_REQUEST, "VNPAY_QUERY_DATE_INVALID");
         }
         Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("vnp_RequestId", UUID.randomUUID().toString().replace("-", ""));
+        fields.put("vnp_RequestId", request.queryId().toString().replace("-", ""));
         fields.put("vnp_Version", "2.1.0");
         fields.put("vnp_Command", "querydr");
         fields.put("vnp_TmnCode", tmnCode);
@@ -129,7 +132,21 @@ final class VnpayQueryCodec {
                     default -> PaymentProviderStatus.UNKNOWN;
                 };
         return new PaymentStatusQueryResult(
-                status, fields.get("vnp_TxnRef"), fields.get("vnp_TransactionNo"), clock.instant());
+                status,
+                fields.get("vnp_TxnRef"),
+                fields.get("vnp_TransactionNo"),
+                clock.instant(),
+                fields.get("vnp_ResponseId"),
+                fingerprint(data));
+    }
+
+    private static String fingerprint(String data) {
+        try {
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 
     private Map<String, String> parse(byte[] bytes) {

@@ -116,3 +116,8 @@ Nhiệm vụ kế tiếp là **M5.6B — worker đối soát**, với contract r
 rate limit giữa nhiều instance, retry/backoff/deadline, kết quả cũ, cạnh tranh IPN,
 inbox/audit/event và test MySQL trước khi cho phép cập nhật trạng thái. Chưa bắt
 đầu worker hoặc coi adapter đã nghiệm thu local là thanh toán sandbox end-to-end.
+
+Cập nhật trong lượt B ngày 20/10/2026: A được lưu thành commit local `9066cf5`,
+chưa push/merge. [M5.6B](vnpay-reconciliation.md) bổ sung worker và metadata
+request/receipt cho contract query; các mô tả “chưa commit/chưa bắt đầu worker” ở
+biên bản A phía trên là trạng thái tại lần nghiệm thu A, không phải trạng thái mới nhất.
