@@ -155,3 +155,26 @@ M5.6/M5 vẫn mở: refund/Stripe reconciliation, producer outbox M6.1, API manu
 resolution và HTTPS/SIT chưa thuộc nghiệm thu này. Bước tiếp theo đề xuất là
 provider refund theo ưu tiên VNPay, với contract riêng và flag mặc định tắt;
 không tự thực hiện hoàn tiền thật hoặc bỏ gate public HTTPS/IPN.
+
+## Xuất bản và kiểm tra lại — 23/10/2026
+
+- Docker Engine local 29.6.1, JDK 21.0.12.1; chạy lại `clean verify` trên B chứa A:
+  **689 test**, 0 failure/error/skipped, kết thúc 08:25:59 UTC+7. MySQL 8.0.46,
+  MinIO, Modulith/ArchUnit, Flyway fresh/upgrade và JaCoCo đạt; line 91,73%, branch
+  72,30%. Compose local `--profile app`, prod với env example và diff check đạt.
+- Đã push A/B bằng branch riêng, không force-push. [PR #43](https://github.com/triramisu/shop/pull/43)
+  đạt `verify`/`dependency-review`, merge commit `ca37e4c`. [PR #44](https://github.com/triramisu/shop/pull/44)
+  đạt hai check trên `2578867`; sau đổi base và cập nhật HEAD phải chờ gate mới,
+  không dùng kết quả HEAD cũ để bỏ qua bảo vệ `main`.
+- Đồng bộ `origin/main` vào B bằng merge commit (giữ lịch sử A, không rebase
+  nhánh đã publish). Tree production/test của lần đồng bộ trùng bản 689 test
+  đã kiểm; thay đổi bổ sung chỉ là biên bản. Hậu kiểm CI commit trên `main`
+  là gate riêng sau từng merge, không đồng nghĩa deploy.
+- GitHub Actions repository/environment variables đều chưa được cấu hình;
+  `CD_ENABLED` và `DEPLOY_ENABLED` không bật. Không cấp thêm quyền AWS, gọi
+  merchant, chạy SSM hay thay ASG/RDS/S3/DNS/secret; lab vẫn nghỉ.
+- `main` được khôi phục protection cho đúng nhánh: PR bắt buộc, hai check
+  GitHub Actions, strict up-to-date, không bypass kể cả admin, không force-push
+  hoặc xóa. Không yêu cầu approval của người thứ hai trên repo cá nhân.
+- Đây chỉ là xuất bản source. V26 chưa chạy trên RDS 8.4; chưa build/push image
+  mới, deploy, live USER/SIT hoặc bật query/worker. Không đóng M5.6/M5.
