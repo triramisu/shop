@@ -25,6 +25,15 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 - Kiến trúc triển khai hiện tại: một ứng dụng, một tiến trình, một MySQL.
 - Kiến trúc đích: Gateway + Identity + Catalog + Inventory + Order + Payment.
 
+- DEMO-01B.1 — Ma trận anonymous/USER/admin-denied và ownership local đã
+  nghiệm thu ngày 23/10/2026, tách riêng tại nhánh
+  `feature/security/user-ownership-matrix`. Full `clean verify` đạt 556 test,
+  0 failure/error/skipped; line 91,17%, branch 70,27% (chưa đạt >80%). Lượt đầu
+  bắt vị trí package của test; đã chuyển đúng internal.service và chạy lại đạt,
+  không sửa/nới ArchUnit. Chưa publish/merge/CI; không đổi production code/schema, tạo USER trên AWS,
+  bật máy/payment hoặc coi local là bằng chứng live. Xem
+  [hợp đồng, API matrix và kết quả](docs/demo-user-authorization-matrix.md).
+
 ### Ưu tiên hiện hành — hoàn thiện dự án trước CI/CD
 
 Theo quyết định ngày 18/10/2026, hoãn xây mới/mở rộng CI/CD, tự động
