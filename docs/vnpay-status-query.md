@@ -116,3 +116,14 @@ Nhiệm vụ kế tiếp là **M5.6B — worker đối soát**, với contract r
 rate limit giữa nhiều instance, retry/backoff/deadline, kết quả cũ, cạnh tranh IPN,
 inbox/audit/event và test MySQL trước khi cho phép cập nhật trạng thái. Chưa bắt
 đầu worker hoặc coi adapter đã nghiệm thu local là thanh toán sandbox end-to-end.
+
+Cập nhật trong lượt B ngày 20/10/2026: A được lưu thành commit local `9066cf5`,
+chưa push/merge. [M5.6B](vnpay-reconciliation.md) bổ sung worker và metadata
+request/receipt cho contract query; các mô tả “chưa commit/chưa bắt đầu worker” ở
+biên bản A phía trên là trạng thái tại lần nghiệm thu A, không phải trạng thái mới nhất.
+
+Cập nhật ngày 23/10/2026: A đã push và [PR #43](https://github.com/triramisu/shop/pull/43)
+đạt `verify`/`dependency-review`, merge vào `main` tại `ca37e4c`; CI của merge
+commit cần hậu kiểm riêng. B đã mở [PR #44](https://github.com/triramisu/shop/pull/44)
+và đang tích hợp theo [biên bản mới](vnpay-reconciliation.md). Không bật flag,
+deploy hoặc gọi VNPay từ việc merge source; các hạn chế SIT phía trên vẫn còn.

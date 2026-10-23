@@ -8,8 +8,14 @@ import java.util.UUID;
 
 /** Values must come from the persisted attempt, including the original checkout creation time. */
 public record PaymentStatusQueryRequest(
-        UUID paymentAttemptId, UUID orderId, BigDecimal amount, String currency, Instant createdAt) {
+        UUID paymentAttemptId, UUID orderId, BigDecimal amount, String currency, Instant createdAt, UUID queryId) {
+    public PaymentStatusQueryRequest(
+            UUID paymentAttemptId, UUID orderId, BigDecimal amount, String currency, Instant createdAt) {
+        this(paymentAttemptId, orderId, amount, currency, createdAt, UUID.randomUUID());
+    }
+
     public PaymentStatusQueryRequest {
+        Objects.requireNonNull(queryId, "query id is required");
         Objects.requireNonNull(paymentAttemptId, "payment attempt id is required");
         Objects.requireNonNull(orderId, "order id is required");
         Objects.requireNonNull(createdAt, "original checkout creation time is required");

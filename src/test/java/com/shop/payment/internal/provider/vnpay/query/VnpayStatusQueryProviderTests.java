@@ -135,6 +135,7 @@ class VnpayStatusQueryProviderTests {
     }
 
     private static PaymentStatusQueryResult result() {
-        return new PaymentStatusQueryResult(PaymentProviderStatus.UNKNOWN, "ref", "123456", CLOCK.instant());
+        return new PaymentStatusQueryResult(
+                PaymentProviderStatus.UNKNOWN, "ref", "123456", CLOCK.instant(), "response1", "a".repeat(64));
     }
 }
