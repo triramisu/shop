@@ -90,7 +90,7 @@ class OrderPaymentMigrationMySqlTests {
         assertThat(jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1 AND version IS NOT NULL",
                         Integer.class))
-                .isEqualTo(25);
+                .isEqualTo(26);
     }
 
     private Fixture insertExistingOrder(JdbcTemplate jdbcTemplate) {

@@ -66,6 +66,24 @@ app:
       allowed-hosts: ${VNPAY_ALLOWED_HOSTS:}
       checkout-ttl: ${VNPAY_CHECKOUT_TTL:10m}
       bank-code: ${VNPAY_BANK_CODE:}
+      query:
+        enabled: ${VNPAY_QUERY_ENABLED:false}
+        server-ip: ${VNPAY_QUERY_SERVER_IP:}
+        connect-timeout: ${VNPAY_QUERY_CONNECT_TIMEOUT:2s}
+        read-timeout: ${VNPAY_QUERY_READ_TIMEOUT:3s}
+        call-timeout: ${VNPAY_QUERY_CALL_TIMEOUT:5s}
+    reconciliation:
+      enabled: ${PAYMENT_RECONCILIATION_ENABLED:false}
+      batch-size: ${PAYMENT_RECONCILIATION_BATCH_SIZE:10}
+      max-attempts: ${PAYMENT_RECONCILIATION_MAX_ATTEMPTS:12}
+      minimum-age: ${PAYMENT_RECONCILIATION_MINIMUM_AGE:10m}
+      maximum-age: ${PAYMENT_RECONCILIATION_MAXIMUM_AGE:24h}
+      lease-duration: ${PAYMENT_RECONCILIATION_LEASE_DURATION:30s}
+      provider-interval: ${PAYMENT_RECONCILIATION_PROVIDER_INTERVAL:5s}
+      retry-base: ${PAYMENT_RECONCILIATION_RETRY_BASE:1m}
+      retry-max: ${PAYMENT_RECONCILIATION_RETRY_MAX:30m}
+      fixed-delay: ${PAYMENT_RECONCILIATION_FIXED_DELAY:10s}
+      initial-delay: ${PAYMENT_RECONCILIATION_INITIAL_DELAY:30s}
     fake:
       default-mode: ${FAKE_PAYMENT_DEFAULT_MODE:success}
       max-stored-attempts: ${FAKE_PAYMENT_MAX_STORED_ATTEMPTS:10000}
