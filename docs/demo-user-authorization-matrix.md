@@ -74,7 +74,8 @@ vẫn chưa đạt mục tiêu toàn dự án >80% branch. Baseline của nhánh
 `c54c1b3`, chưa chứa 133 test mới của hai PR VNPay; không cộng hai lần hay
 coi 556 là tổng sau tích hợp. Không lấy 555 ca qua trong lượt lỗi đầu làm
 bằng chứng full gate đã đạt.
-AWS vẫn ở trạng thái nghỉ đã kiểm kê; chưa có live USER200/admin403/IDOR evidence,
+Snapshot AWS lúc 08:06 ở trạng thái nghỉ; không coi đó là trạng thái hiện tại.
+Chưa có live USER200/admin403/IDOR evidence,
 chưa đăng ký hai USER trên web hoặc deploy/bật payment. Trạng thái xuất bản
 source được cập nhật riêng bên dưới, không lấy local làm bằng chứng live.
 
@@ -82,7 +83,7 @@ source được cập nhật riêng bên dưới, không lấy local làm bằng
 
 Sau khi [PR #43](https://github.com/triramisu/shop/pull/43) merge `ca37e4c`
 (CI main xanh, CD skipped) và [PR #44](https://github.com/triramisu/shop/pull/44)
-merge `d599416` (đang hậu kiểm CI main), nhánh USER được đồng bộ bằng merge
+merge `d599416` (CI main xanh, CD skipped), nhánh USER được đồng bộ bằng merge
 commit, không rebase/force-push. Diff so với main vẫn chỉ ba file test/docs của
 task này. Source production/test không đổi trong lúc đồng bộ merge commit B.
 
@@ -97,6 +98,13 @@ không cộng cơ học hai lượt test để tạo số liệu.
 phải chờ lại `verify` và `dependency-review`, sau merge kiểm CI của merge SHA.
 Theo dõi kết quả cuối tại PR/Actions; không coi việc đã push hoặc lượt CI của
 baseline cũ là nghiệm thu HEAD mới. M5 và live USER/SIT vẫn mở.
+
+Hậu kiểm xuất bản: PR #45 đạt hai check trên `eed3d6d`, merge tại `02da697`;
+[CI merge commit](https://github.com/triramisu/shop/actions/runs/39887323114)
+đã xanh. `git diff eed3d6d origin/main` rỗng tại merge SHA đó, không mất thay đổi.
+Phần hướng dẫn chờ gate phía trên là quy trình, không phải trạng thái pending
+mới nhất. Sau khi người dùng tự bật lại lab, GET UI/catalog đạt 200 và anonymous
+my-info 401 lúc 09:00 UTC+7; chưa dùng USER thật để suy ra ma trận live đã đạt.
 
 ## Quy trình GitHub đã dùng để xuất bản an toàn
 

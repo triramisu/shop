@@ -32,3 +32,56 @@ Nghiệm thu local hoàn tất ngày 19/10/2026. Chưa push/merge tại thời �
 - Full `mvnw.cmd --batch-mode clean verify` với Java 21.0.12.1 hoàn tất lúc 15:45:02 +07 ngày 19/10/2026: **537 test, 0 failure, 0 error, 0 skip**, 136 suite; Spotless và JaCoCo gate đạt. Bao gồm Testcontainers MySQL 8.0.46, MinIO, fresh/upgrade V25, security/OpenAPI và IPN đồng thời. Không exclusion, không hạ threshold.
 - JaCoCo full regression: line **91,21%** (6.437/7.057), branch **70,20%** (2.057/2.930). Đây là bằng chứng cho bản source xuất bản, chưa đạt mục tiêu branch >80% cuối dự án và không đóng milestone M5.
 - JAR được tạo lại ở `target/shop-0.0.1-SNAPSHOT.jar`; artifact build không thuộc Git. Việc push source không push Docker image, không chạy deployment hoặc gọi giao dịch thật.
+
+## Biên bản đóng xuất bản source — 23/10/2026
+
+Hợp đồng bổ sung cho tài liệu bàn giao:
+
+1. Mục tiêu: chốt bằng chứng PR/CI và phân biệt snapshot nghỉ với người dùng
+   tự bật lại AWS. Chỉ sửa README/docs, không đổi code, workflow hoặc hạ tầng.
+2. Đầu vào: main `02da697` chứa query #43, worker #44 và USER test #45; giữ
+   mọi thay đổi AWS/skill dirty trong `D:/shop` ngoài commit tài liệu.
+3. Mỗi trạng thái runtime phải có thời điểm; EC2 InService không thay ALB
+   Healthy, GET public không thay login/ownership hoặc payment SIT.
+4. Không đưa credential, raw log, financial report hoặc instance/account IDs
+   vào bản public này. Không đổi quyền, CD/deploy flags, IAM, secret hoặc DB.
+5. Đầu ra: README và biên bản query/worker/USER/publication cập nhật nhất quán.
+6. Đối chiếu đúng SHA/check/base và HTTP status; không suy diễn nguyên nhân
+   lỗi quá khứ nếu chưa có log/health reason tại thời điểm lỗi.
+7. Gate docs: diff check, Markdown fence/link nội bộ, diff không có file runtime;
+   PR vẫn phải đủ hai check và hậu kiểm main, không thay workflow để skip gate.
+8. Rollback bằng revert tài liệu; không tác động dữ liệu/runtime. Báo cáo chi
+   phí đầy đủ giữ local riêng, không gộp vào repo public.
+
+| Phần source | PR | Merge SHA | Required checks / CI main |
+|---|---|---|---|
+| VNPay query | [#43](https://github.com/triramisu/shop/pull/43) | ca37e4c | [CI main xanh](https://github.com/triramisu/shop/actions/runs/39885449276) |
+| VNPay worker/V26 | [#44](https://github.com/triramisu/shop/pull/44) | d599416 | [CI main xanh](https://github.com/triramisu/shop/actions/runs/39886151065) |
+| USER/token/ownership | [#45](https://github.com/triramisu/shop/pull/45) | 02da697 | [CI main xanh](https://github.com/triramisu/shop/actions/runs/39887323114) |
+
+Cả ba PR đều qua `verify` và `dependency-review` trên HEAD tương ứng trước
+merge. Dependency-review skipped ở push main là đúng điều kiện workflow;
+không phải đã bỏ required check của PR. Main được bảo vệ: PR, hai check từ
+GitHub Actions, strict up-to-date, enforce admin, không force-push/delete;
+không bắt người duyệt thứ hai. Chủ repo tự xác minh GitHub khi được yêu cầu.
+Quy trình từng thao tác ở [biên bản USER](demo-user-authorization-matrix.md#quy-trình-github-đã-dùng-để-xuất-bản-an-toàn).
+
+Full regression source kết hợp: **708 test**, 0 failure/error/skipped, kết thúc
+08:51:25 UTC+7; MySQL 8.0.46, MinIO, H2, V26 fresh/upgrade, Modulith/ArchUnit,
+Spotless/JaCoCo và Compose đạt. Line **91,73%**, branch **72,36%**; mục tiêu
+>80% branch vẫn mở, không hạ threshold. Tree `eed3d6d` trùng merge `02da697`.
+Không chạy lại Maven local chỉ cho sửa Markdown; CI vẫn kiểm đầy đủ theo rule.
+
+ASG nghỉ tại snapshot 08:06–08:12; người dùng xác nhận tự mở lại, activity ghi
+nhận 08:33:02. Lúc 09:00 UTC+7: ASG 2/2/4, hai app InService/SSM Online và
+hai ALB target Healthy; bastion running. Health check HTTP 8080, đường dẫn
+`/actuator/health`, matcher 200, timeout 5 giây. Ba GET HTTPS UI/catalog/my-info
+trả lần lượt **200/200/401**; 401 anonymous là mong đợi. Agent không bật/tắt,
+restart, gửi SSM command, thay health matcher hoặc deploy. Không có bằng chứng
+root cause cho Unhealthy trước đó; không đổi cấu hình khi trạng thái đã phục hồi.
+
+Source mới chưa build/push image hoặc rollout lên AWS; V26 chưa áp RDS 8.4,
+query/worker/payment vẫn tắt. Không đóng M5, live USER/IDOR, backup restore,
+VNPay SIT hoặc go-live. Trước deploy cần gate image/DB/runtime/rollback riêng;
+không trộn load/DDoS test với sandbox payment. Dữ liệu chi phí và credit có
+thời gian/phạm vi riêng ở báo cáo local, không công khai trong PR này.

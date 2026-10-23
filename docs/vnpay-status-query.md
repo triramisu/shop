@@ -124,6 +124,6 @@ biên bản A phía trên là trạng thái tại lần nghiệm thu A, không p
 
 Cập nhật ngày 23/10/2026: A đã push và [PR #43](https://github.com/triramisu/shop/pull/43)
 đạt `verify`/`dependency-review`, merge vào `main` tại `ca37e4c`; CI của merge
-commit cần hậu kiểm riêng. B đã mở [PR #44](https://github.com/triramisu/shop/pull/44)
-và đang tích hợp theo [biên bản mới](vnpay-reconciliation.md). Không bật flag,
+commit đã xanh, backend CD skipped. B đã merge [PR #44](https://github.com/triramisu/shop/pull/44)
+tại `d599416`, CI main xanh theo [biên bản mới](vnpay-reconciliation.md). Không bật flag,
 deploy hoặc gọi VNPay từ việc merge source; các hạn chế SIT phía trên vẫn còn.
