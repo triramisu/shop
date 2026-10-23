@@ -19,14 +19,15 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   (query) đã qua `verify`/`dependency-review` và merge vào `main` tại `ca37e4c`;
   hậu kiểm CI merge commit đã xanh và backend CD skipped. [PR #44](https://github.com/triramisu/shop/pull/44)
   (worker) đã cập nhật base về `main`, qua lại hai check trên `93d24ed` và merge
-  tại `d599416`; hậu kiểm CI merge commit được theo dõi riêng. Regression A+B
+  tại `d599416`; hậu kiểm CI merge commit xanh, backend CD skipped. Regression A+B
   đạt 689 test lúc 08:25:59 UTC+7, line 91,73%, branch 72,30% (chưa >80%). Các ghi
   chú “chưa push/CI” ngày 20/10 bên dưới là lịch sử nghiệm thu, không phải trạng
   thái xuất bản mới nhất. Chưa deploy/SIT, query/worker vẫn mặc định tắt.
 - Bảo vệ `main` đã được chủ repo duyệt và hậu kiểm: bắt buộc PR, hai check
   `verify`/`dependency-review` từ GitHub Actions và branch up-to-date, áp dụng
   cả admin, không force-push/xóa nhánh; không yêu cầu approval thứ hai.
-  Không đổi AWS hoặc bật backend CD; lab vẫn nghỉ. Quy trình chạy lại và giới
+  Agent không đổi AWS hoặc bật backend CD. Trạng thái nghỉ chỉ là snapshot
+  08:06; người dùng đã tự mở lab lúc 08:33, xem hậu kiểm bên dưới. Quy trình và giới
   hạn tại [biên bản worker](docs/vnpay-reconciliation.md).
 - M5.6B — Worker đối soát VNPay đạt gate source local ngày 20/10/2026 trên `feature/payment/vnpay-reconciliation`, phụ thuộc commit local A `9066cf5` (chưa push/merge). Full `clean verify` đạt **689 test**, 0 failure/error/skipped; backend line **91,73%**, branch **72,30%** (chưa >80%); riêng reconciliation line **98,59%**, branch **90%**. V26 thêm checkpoint/lease, lịch sử append-only và nhịp provider dùng chung; mặc định `PAYMENT_RECONCILIATION_ENABLED=false`. Xem [hợp đồng, bằng chứng và runbook](docs/vnpay-reconciliation.md). Không gọi merchant thật, không đổi AWS; chưa CI/merge/deploy/SIT hoặc đóng M5.6/M5.
 - M5.6A — VNPay status-query adapter đạt gate source local ngày 20/10/2026 trên `feature/payment/vnpay-query` theo [hợp đồng và bằng chứng](docs/vnpay-status-query.md): 90 test mới; full `clean verify` đạt 627 test, 0 failure/error/skipped, gồm MySQL 8.0.46, MinIO và IPN concurrency. Backend line 91,48%, branch 71,18% (chưa >80%); riêng package `vnpay.query` line 100%, branch 96,08%. A chỉ truy vấn/kiểm tra chữ ký và dữ liệu giao dịch; worker thuộc B. `VNPAY_QUERY_ENABLED=false` mặc định. Đã lưu commit local `9066cf5` trước khi bắt đầu B; chưa push/merge/CI/deploy hoặc gọi merchant thật. Không đóng M5.6/M5 từ phần adapter này.
@@ -47,10 +48,18 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   đạt 708 test lúc 08:51:25 UTC+7, 0 failure/error/skipped; line 91,73%, branch
   72,36% (chưa đạt >80%). Local/prod Compose và diff check đạt. Lượt đầu
   bắt vị trí package của test; đã chuyển đúng internal.service và chạy lại đạt,
-  không sửa/nới ArchUnit. Đã publish PR, chờ gate trên HEAD/base mới và hậu kiểm
-  sau merge; không đổi production code/schema, tạo USER trên AWS,
+  không sửa/nới ArchUnit. PR đạt hai check trên `eed3d6d`, đã merge `02da697`
+  và CI merge commit xanh; không đổi production code/schema, tạo USER trên AWS,
   bật máy/payment hoặc coi local là bằng chứng live. Xem
   [hợp đồng, API matrix và kết quả](docs/demo-user-authorization-matrix.md).
+- Hậu kiểm AWS/web lúc 09:00 ngày 23/10/2026 (UTC+7): người dùng xác nhận
+  đã bật ASG/bastion. ASG 2/2/4, hai app InService/SSM Online và hai ALB target
+  Healthy; UI/catalog HTTP 200, anonymous my-info 401. Agent chỉ đọc trạng thái
+  và gọi ba GET, không restart, thay matcher/secret, gửi SSM command hoặc deploy.
+  Chưa có bằng chứng root cause cho trạng thái Unhealthy trước đó; không suy
+  diễn từ Running/InService. Không phải USER/login/cart hay VNPay SIT. Phí
+  compute tiếp tục khi máy chạy; báo cáo chi phí tài khoản được giữ local.
+  Xem [biên bản xuất bản và hướng dẫn phân biệt các gate](docs/backend-publication.md).
 
 ### Ưu tiên hiện hành — hoàn thiện dự án trước CI/CD
 

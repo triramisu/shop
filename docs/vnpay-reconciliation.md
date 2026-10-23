@@ -164,15 +164,18 @@ không tự thực hiện hoàn tiền thật hoặc bỏ gate public HTTPS/IPN.
   72,30%. Compose local `--profile app`, prod với env example và diff check đạt.
 - Đã push A/B bằng branch riêng, không force-push. [PR #43](https://github.com/triramisu/shop/pull/43)
   đạt `verify`/`dependency-review`, merge commit `ca37e4c`. [PR #44](https://github.com/triramisu/shop/pull/44)
-  đạt hai check trên `2578867`; sau đổi base và cập nhật HEAD phải chờ gate mới,
-  không dùng kết quả HEAD cũ để bỏ qua bảo vệ `main`.
+  đạt hai check trên `2578867`; sau đổi base đã chờ lại hai check trên `93d24ed`,
+  merge `d599416` và CI merge commit xanh, backend CD skipped. Không dùng kết
+  quả HEAD cũ để bỏ qua bảo vệ `main`.
 - Đồng bộ `origin/main` vào B bằng merge commit (giữ lịch sử A, không rebase
   nhánh đã publish). Tree production/test của lần đồng bộ trùng bản 689 test
   đã kiểm; thay đổi bổ sung chỉ là biên bản. Hậu kiểm CI commit trên `main`
   là gate riêng sau từng merge, không đồng nghĩa deploy.
 - GitHub Actions repository/environment variables đều chưa được cấu hình;
   `CD_ENABLED` và `DEPLOY_ENABLED` không bật. Không cấp thêm quyền AWS, gọi
-  merchant, chạy SSM hay thay ASG/RDS/S3/DNS/secret; lab vẫn nghỉ.
+  merchant, chạy SSM hay thay ASG/RDS/S3/DNS/secret. Snapshot 08:06 ghi nhận lab
+  nghỉ; người dùng tự bật lại lúc 08:33, hậu kiểm 09:00 có hai ALB target Healthy
+  và UI/catalog 200. Đây không phải deploy source mới hoặc thanh toán SIT.
 - `main` được khôi phục protection cho đúng nhánh: PR bắt buộc, hai check
   GitHub Actions, strict up-to-date, không bypass kể cả admin, không force-push
   hoặc xóa. Không yêu cầu approval của người thứ hai trên repo cá nhân.
