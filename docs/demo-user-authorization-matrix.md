@@ -75,4 +75,62 @@ vẫn chưa đạt mục tiêu toàn dự án >80% branch. Baseline của nhánh
 coi 556 là tổng sau tích hợp. Không lấy 555 ca qua trong lượt lỗi đầu làm
 bằng chứng full gate đã đạt.
 AWS vẫn ở trạng thái nghỉ đã kiểm kê; chưa có live USER200/admin403/IDOR evidence,
-chưa đăng ký hai USER trên web, chưa merge/push/deploy hoặc bật payment.
+chưa đăng ký hai USER trên web hoặc deploy/bật payment. Trạng thái xuất bản
+source được cập nhật riêng bên dưới, không lấy local làm bằng chứng live.
+
+### Kiểm thử bản tích hợp trước PR gate
+
+Sau khi [PR #43](https://github.com/triramisu/shop/pull/43) merge `ca37e4c`
+(CI main xanh, CD skipped) và [PR #44](https://github.com/triramisu/shop/pull/44)
+merge `d599416` (đang hậu kiểm CI main), nhánh USER được đồng bộ bằng merge
+commit, không rebase/force-push. Diff so với main vẫn chỉ ba file test/docs của
+task này. Source production/test không đổi trong lúc đồng bộ merge commit B.
+
+Full `clean verify` trên source kết hợp kết thúc **08:51:25 UTC+7 ngày
+23/10/2026**, đạt **708 test**, 0 failure/error/skipped; H2, MySQL 8.0.46,
+MinIO, Modulith/ArchUnit, Flyway V26 fresh/upgrade, Spotless và JaCoCo đạt.
+Line 91,73%, branch 72,36%; >80% vẫn chưa đạt. Compose local `--profile app`,
+prod với env example và diff check đều đạt. Đây là tổng thực tế từ Surefire,
+không cộng cơ học hai lượt test để tạo số liệu.
+
+[PR #45](https://github.com/triramisu/shop/pull/45) đã mở; sau cập nhật HEAD
+phải chờ lại `verify` và `dependency-review`, sau merge kiểm CI của merge SHA.
+Theo dõi kết quả cuối tại PR/Actions; không coi việc đã push hoặc lượt CI của
+baseline cũ là nghiệm thu HEAD mới. M5 và live USER/SIT vẫn mở.
+
+## Quy trình GitHub đã dùng để xuất bản an toàn
+
+Thao tác ngày 23/10/2026 dưới đây là xuất bản source, không phải lệnh deploy:
+
+1. Kiểm tra `git status`, giữ mọi file AWS/secret/skill ngoài task; làm trong
+   worktree riêng từ main. Viết contract, test, README và chạy gate trước push.
+   Chỉ stage đúng file của nhiệm vụ, không `git add .` ở checkout đang dirty.
+2. Push nhánh task bình thường; mở PR vào `main`. Với PR phụ thuộc, merge A
+   trước, đổi base B về `main`, merge base vào nhánh đã publish và chạy lại CI;
+   không force-push hoặc coi check của HEAD cũ là check bản mới.
+3. Kiểm tra Settings → Secrets and variables → Actions → Variables: backend
+   chưa có repository/environment variables bật `CD_ENABLED`/`DEPLOY_ENABLED`.
+   Đối chiếu `.github/workflows/cd.yml`: không tự thêm biến hoặc credential.
+4. Chủ repo đã duyệt khôi phục bảo vệ main. Settings → Branches → Add classic
+   branch protection rule, pattern đúng `main`: bật Require a pull request,
+   Require status checks, chọn `verify` và `dependency-review` (nguồn GitHub
+   Actions), bật Require branches to be up to date và Do not allow bypassing.
+   Giữ Allow force pushes/Allow deletions tắt. Repo cá nhân không bắt approval
+   thứ hai; không thêm rule signed commit/merge queue/code owner ngoài phạm vi.
+5. Create/Save; nếu GitHub hiện Confirm access, chủ tài khoản tự xác minh email,
+   không gửi mã cho người vận hành. Sau đó mở lại rule để kiểm đủ các checkbox;
+   API `branches/main` phải báo protected=true, enforcement_level=everyone và
+   đúng hai context. Không chỉ dựa vào việc đã bấm Save.
+6. Chờ `verify` và `dependency-review` thành công trên đúng HEAD/base; xử lý
+   conflict hoặc lỗi thật trước merge. Không dùng quyền admin để bỏ qua gate.
+   Merge commit giữ lịch sử cho chuỗi PR A/B. Sau merge kiểm workflow CI của
+   chính merge SHA trên `main`; dependency-review có thể skipped ở push vì
+   workflow chỉ chạy job đó cho pull_request. Backend CD phải vẫn skipped.
+7. Chỉ đồng bộ local main/cleanup nhánh khi main CI xanh và không còn PR phụ
+   thuộc. Không ép checkout hoặc xóa worktree dirty. README phải phân biệt
+   local gate, PR CI, merge CI, image build và deploy/live test; không suy ra
+   bước sau đã đạt từ bước trước. Lưu báo cáo chi phí tài khoản ở local riêng.
+
+GitHub connector từng trả 403 khi tạo PR; đã dùng phiên trình duyệt đúng chủ
+repo, không mở rộng quyền app hoặc trích xuất token/cookie. Quy trình bảo vệ
+không đổi IAM, AWS, dữ liệu, payment hoặc yêu cầu thêm dịch vụ trả phí.

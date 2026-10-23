@@ -17,10 +17,10 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 - Giai đoạn hiện tại: `M5 — Payment`.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)
   (query) đã qua `verify`/`dependency-review` và merge vào `main` tại `ca37e4c`;
-  hậu kiểm CI merge commit được theo dõi riêng. [PR #44](https://github.com/triramisu/shop/pull/44)
-  (worker) đã qua hai check trên bản đầu, đang cập nhật base về `main` và phải
-  qua lại gate trên HEAD mới trước merge. Full regression local mới nhất đạt
-  689 test lúc 08:25:59 UTC+7, line 91,73%, branch 72,30% (chưa >80%). Các ghi
+  hậu kiểm CI merge commit đã xanh và backend CD skipped. [PR #44](https://github.com/triramisu/shop/pull/44)
+  (worker) đã cập nhật base về `main`, qua lại hai check trên `93d24ed` và merge
+  tại `d599416`; hậu kiểm CI merge commit được theo dõi riêng. Regression A+B
+  đạt 689 test lúc 08:25:59 UTC+7, line 91,73%, branch 72,30% (chưa >80%). Các ghi
   chú “chưa push/CI” ngày 20/10 bên dưới là lịch sử nghiệm thu, không phải trạng
   thái xuất bản mới nhất. Chưa deploy/SIT, query/worker vẫn mặc định tắt.
 - Bảo vệ `main` đã được chủ repo duyệt và hậu kiểm: bắt buộc PR, hai check
@@ -42,10 +42,13 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - DEMO-01B.1 — Ma trận anonymous/USER/admin-denied và ownership local đã
   nghiệm thu ngày 23/10/2026, tách riêng tại nhánh
-  `feature/security/user-ownership-matrix`. Full `clean verify` đạt 556 test,
-  0 failure/error/skipped; line 91,17%, branch 70,27% (chưa đạt >80%). Lượt đầu
+  `feature/security/user-ownership-matrix`, [PR #45](https://github.com/triramisu/shop/pull/45).
+  Baseline riêng đạt 556 test; sau đồng bộ hai PR VNPay, full `clean verify`
+  đạt 708 test lúc 08:51:25 UTC+7, 0 failure/error/skipped; line 91,73%, branch
+  72,36% (chưa đạt >80%). Local/prod Compose và diff check đạt. Lượt đầu
   bắt vị trí package của test; đã chuyển đúng internal.service và chạy lại đạt,
-  không sửa/nới ArchUnit. Chưa publish/merge/CI; không đổi production code/schema, tạo USER trên AWS,
+  không sửa/nới ArchUnit. Đã publish PR, chờ gate trên HEAD/base mới và hậu kiểm
+  sau merge; không đổi production code/schema, tạo USER trên AWS,
   bật máy/payment hoặc coi local là bằng chứng live. Xem
   [hợp đồng, API matrix và kết quả](docs/demo-user-authorization-matrix.md).
 
