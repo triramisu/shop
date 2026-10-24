@@ -15,6 +15,17 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
+- PAY-SIT-01A — Preflight VNPay HTTPS ngày 24/10/2026: công cụ read-only và
+  [hướng dẫn chuẩn bị secret/rollout/SIT](docs/vnpay-sandbox-preflight.md).
+  AWS đã đăng nhập đúng tài khoản; stack application ổn định, ASG 2/2/4 và
+  hai target Healthy. **Chưa thể SIT**: bootstrap đang ép provider=none;
+  cấu hình merchant/URL/allowlist chưa đạt, hai switch event/recovery cần
+  explicit false ở giai đoạn staging. Không đổi secret, AWS, Java/schema,
+  UI/WAF/DNS hoặc bật payment. Chủ merchant cần rotation khóa đã lộ và tự
+  cập nhật Plaintext theo hướng dẫn; Execute rollout cần review riêng.
+  52 test Node của helper, syntax và diff check đạt local; chưa CI/push.
+  Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
+  tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)
   (query) đã qua `verify`/`dependency-review` và merge vào `main` tại `ca37e4c`;
   hậu kiểm CI merge commit đã xanh và backend CD skipped. [PR #44](https://github.com/triramisu/shop/pull/44)
