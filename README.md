@@ -17,12 +17,22 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 - Giai đoạn hiện tại: `M5 — Payment`.
 - PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
   CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
-  **Chưa Execute** change set `trusted-proxy-20261024T101541Z`; live vẫn là
-  baseline sandbox LT6 bên dưới. Local đạt 94 test Node, 88 test Java đúng
+  **Đã Execute và hậu kiểm triển khai đạt** change set
+  `trusted-proxy-20261024T101541Z` sau duyệt riêng của người dùng. Execute
+  19:35:53 UTC+7; snapshot 20:13:20 xác nhận stack UPDATE_COMPLETE, refresh
+  Successful100%, hai AZ cùng LT7/targets Healthy, ASG giữ2/2/4. Hậu kiểm
+  20:23–20:24 xác nhận container Healthy/restart0, đủ8 native flags,
+  merchant/JWT/DB khớp AWSCURRENT trong RAM; giữ nguyên AMI/image, secret
+  version, ranh giới SG/origin, WAF và API forwarding. Function LIVE đã qua
+  sáu ca synthetic IPv4/IPv6, spoof và route. UI/Catalog200 (12 sản phẩm),
+  private anonymous401; IPN giả97/query rỗng99 và no-store. **Chưa SIT thật**,
+  không tạo USER/order/transaction. Local đạt 94 test Node, 88 test Java đúng
   phạm vi, Spotless và cfn-lint; Guard vẫn 34 failed Rule ID, chưa có durable
   CloudTrail. AWS preflight không có validation error; plan mặc định 5 Modify
   (ASG/policy Conditional), enhanced 3 Modify; không Add/Remove. Candidate
-  52.108 byte dùng artifact S3 private, không gửi inline. Người dùng đã trả
+  Source đã deploy khớp SHA candidate; 52.108 byte dùng artifact S3 private,
+  không gửi inline. Có lúc4 EC2 gồm1 máy đang terminate; không đổi policy/
+  capacity hoặc terminate thủ công. Người dùng đã trả
   lời email đăng ký IPN, chưa có bằng chứng VNPay xác nhận hoặc giao dịch SIT.
   Xem [thiết kế, bằng chứng, từng lệnh rollout và rollback](docs/trusted-proxy.md).
   Không đổi Java production/schema/image/AMI/secret hoặc tự push/merge.
@@ -45,8 +55,8 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   Guard vẫn 34 failed Rule ID như Original, CloudTrail đọc lại vẫn 0 trail.
   UI/Catalog200 (12 sản phẩm), private my-info401; IPN checksum giả trả97,
   query rỗng trả99, no-store. Không tạo giao dịch hoặc đăng ký merchant IPN.
-  Chưa CI/push hoặc approval go-live; candidate trusted-proxy hiện được chuẩn
-  bị riêng ở PAY-SIT-01B phía trên, còn chờ rollout và SIT thật.
+  Chưa CI/push hoặc approval go-live; trusted-proxy đã được triển khai riêng
+  ở PAY-SIT-01B phía trên, còn chờ xác nhận IPN từ merchant và SIT thật.
   Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
   tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)

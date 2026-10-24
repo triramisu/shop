@@ -419,6 +419,13 @@ chưa đạt/ngoài phạm vi Execute:
    được khắc phục trong task này. Khóa hiện hành được dùng theo quyết định
    ngoại lệ chỉ cho sandbox; phải xử lý credential trước thanh toán thật.
 
+Cập nhật20:24 UTC+7 ngày24/10: phần trusted-proxy ở mục1 đã được triển khai
+riêng theo [PAY-SIT-01B](trusted-proxy.md): LT7, hai target/container Healthy,
+native flags và origin boundary được hậu kiểm. `none` trong biên bản16:46
+phía trên là lịch sử, không phải cấu hình runtime mới nhất. Người dùng đã
+trả lời email đăng ký IPN; vẫn chưa có bằng chứng merchant xác nhận hoặc
+giao dịch sandbox E2E. Không tự đóng PAY-SIT/M5 từ rollout cấu hình.
+
 Rollback không được thực hiện trong lượt này. Nếu sau này đã có giao dịch
 pending, **không** chuyển none/xóa key hoặc endpoint để tắt gấp: giữ IPN,
 drain/đối chiếu và review change set riêng. Không hạ Flyway/xóa RDS/S3.

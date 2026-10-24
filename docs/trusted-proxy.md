@@ -39,9 +39,11 @@
 
 ## Trạng thái
 
-Đã qua các gate chuẩn bị bên dưới; **chưa Execute hoặc thay runtime AWS** ở
-nhiệm vụ này. Người dùng đã gửi email đăng ký IPN; chưa có bằng chứng VNPay
-xác nhận. Không có USER/order/payment transaction mới được tạo từ nhiệm vụ.
+Đã qua các gate chuẩn bị bên dưới; **đã Execute và hậu kiểm triển khai đạt**.
+Đủ hai runtime LT7 Healthy, native flags và sandbox/secret parity đã kiểm
+tra. Đây là nghiệm thu cấu hình proxy, **chưa phải VNPay E2E/SIT**. Người dùng
+đã gửi email đăng ký IPN; chưa có bằng chứng VNPay xác nhận. Không có
+USER/order/payment transaction mới được tạo từ nhiệm vụ.
 
 ## Cấu hình cụ thể và lý do
 
@@ -143,7 +145,7 @@ Các thư mục Temp ở trên là tool đã có trên máy này; dự án khác
 tool hợp lệ của chính máy, không giả định các thư mục luôn tồn tại. Không
 download/install lại hoặc tắt kiểm tra nếu thiếu tool mà chưa báo người dùng.
 
-## Artifact và change set đang chờ duyệt
+## Artifact và change set đã duyệt
 
 Candidate `deploy/aws/shop-prod.yaml`:
 
@@ -165,8 +167,8 @@ arn:aws:cloudformation:ap-southeast-1:233377400170:changeSet/trusted-proxy-20261
 ```
 
 Revision mới `trusted-proxy-sit-20261024-01`; các parameter khác dùng previous
-value. Đã CREATE_COMPLETE/AVAILABLE; `describe-events` không có
-VALIDATION_ERROR hoặc pagination chưa xử lý.
+value. Trước Execute đã CREATE_COMPLETE/AVAILABLE; `describe-events` không
+có VALIDATION_ERROR hoặc pagination chưa xử lý.
 
 | Resource | Mặc định | Enhanced property view |
 | --- | --- | --- |
@@ -181,7 +183,88 @@ thay đổi hoặc chắc chắn không replacement từ enhanced view. ASG/poli
 Conditional do dependency LT/group; không phải yêu cầu terminate hiện tại.
 AMI/image, sandbox switches, DB, secret, IAM, SG, S3, UI, DNS và WAF giữ nguyên.
 
+### Nhật ký Execute và hậu kiểm
+
+Người dùng duyệt đúng plan5 Modify. Recheck lúc 19:35 UTC+7 xác nhận source
+live19ef…, artifact/candidate319e…, mọi parameter khác giữ nguyên, secret
+AWSCURRENT hợp lệ và ổn định, LT6, hai target Healthy, không active refresh.
+Execute được AWS nhận lúc **19:35:53 ngày 24/10/2026 (UTC+7)** với client
+token `trusted-proxy-approved-20261024T1235Z`; không retry/Execute lần hai.
+
+Refresh `8a2e9ac8-32ae-43c9-8c97-da0d44c8a475` bắt đầu 19:37:04, LT mới7;
+thời điểm đầu hai LT6 vẫn Healthy, một LT7 đang bootstrap. Target mới chưa
+healthy trong bootstrap không đồng nghĩa app lỗi; phải chờ readiness thực.
+Không tự terminate/force refresh. CFN có cặp event Database UPDATE khoảng
+19:36:46–47, không có diff Database trong hai view plan; CloudTrail Event
+History lookup ModifyDBInstance cửa sổ19:35–19:40 trả0 tại thời điểm kiểm
+tra. Không coi resource event này là migration hay bằng chứng dữ liệu đã đổi;
+tiếp tục hậu kiểm và không kết luận Event History thay durable trail.
+
+Sáu AWS `test-function --stage LIVE` lúc 19:39:46 đều đạt: `/api`, login,
+IPN, Catalog IPv6, SPA và static. IP/header giả bị ghi đè hoặc xóa, query/
+cookie/Authorization synthetic giữ nguyên; compute7–8. Đây chỉ là event
+synthetic, **không có request thanh toán thật**. Lượt harness đầu đọc nhầm
+`FunctionOutput` như request trực tiếp, assertion thất bại; inspect payload
+synthetic cho thấy AWS bọc `{request: ...}`. Đã sửa harness đọc đúng wrapper
+và chạy lại đủ6 đạt, không sửa Function/template hoặc hạ tiêu chí kiểm tra.
+
+SSM readiness đầu tiên `fc6776b7-2ad6-42aa-834b-b95c868d9822` Success trên
+LT7 AZ B; Docker daemon active, đang bootstrap, chưa có container/truststore
+hoàn chỉnh và chưa có failure signal. Không dùng trạng thái InService/SSM
+Success thay cho app health.
+
+### Kết quả cuối — 24/10/2026, UTC+7
+
+- Snapshot20:13:20: stack **UPDATE_COMPLETE**, refresh nêu trên **Successful**,
+  100%, remaining0. ASG physical ID không đổi, min/desired/max2/2/4, numeric
+  LT7. CloudFront đã Deployed; Source Original đúng52.108 byte/hash319e… đã
+  duyệt, không có candidate khác được thay giữa chừng.
+- Máy cuối: `i-0b96a5f0f09eddf30` AZ A và `i-0b4c26e8a0eda5c53` AZ B,
+  InService/Healthy, đúng hai target Healthy. Hai LT6 cũ được ASG tự thay/
+  terminate; agent không terminate, register target hoặc ép refresh bằng tay.
+  Root volume/log local của máy cũ là dữ liệu tạm và không còn dùng được;
+  dữ liệu bền vững RDS/S3 không bị xóa/restore trong task.
+- Có lúc thấy **4 EC2 gồm1 máy đang Terminating/draining**: MaxHealthy150%
+  tính máy khỏe, không bảo đảm tổng dòng EC2 kể cả máy đang rút luôn≤3.
+  Policy và max4 không đổi; máy đang drain vẫn có thể tính phí. Ước lượng
+  “tạm3 máy” trước triển khai không phải trần hóa đơn tuyệt đối. Kết thúc
+  trở lại đúng2 máy app, không để builder/canary mới.
+- Hậu kiểm infra20:24:20: AMI `ami-0080f2c6aa4e378b7` giữ nguyên;
+  so sánh LT6/LT7 cho thấy **mọi LaunchTemplateData ngoài UserData giống
+  nhau**. Hai EC2 không publicIP, IMDSv2 required/hop2, SG app chỉ có ALB8080
+  và SSH từ bastion. ALB443 vẫn chỉ CloudFront prefix list, default403,
+  origin-secret parity đúng trong RAM, HTTPS-only, WAF ARN giữ nguyên.
+  Hai API behaviors vẫn caching disabled, all cookies/query và mọi header
+  trừ Host; Function ARN/association giữ nguyên. AWSCURRENT secret version
+  không đổi từ trước Execute. Không dump raw config chứa origin secret.
+- Probe cuối `5bfbebe3-886e-408d-bf9b-e1616e1d98d2` Success trên **cả hai**
+  máy: cloud-init done, local healthUP, container running/healthy, restart0,
+  image đúng digest đã ghim. Tám native flags đúng; prod/vnpay, Order
+  initiation/consumer=true; refund/query/reconciliation/recovery=false,
+  bootstrapADMIN off. Merchant/JWT/runtime DB/Flyway DB khớp secret trong
+  RAM trên từng máy; không có failure signal, không xuất credential.
+- HTTP GET smoke20:23:28: UI200, Catalog200/totalElements12, anonymous
+  `/api/auth/my-info`401. IPN query rỗng HTTP200/RspCode99; query synthetic
+  có checksum giả HTTP200/RspCode97; cả hai no-store. Không dùng merchant
+  key để giả callback thành công, không tạo order hoặc gọi VNPay thu tiền.
+  **HTTP200 của IPN không đồng nghĩa thanh toán thành công.**
+- Không đổi Java production/migration/image/AMI/IAM/SG/DB/secret/UI/DNS/WAF,
+  không load test/DDoS, không bật refund/query/worker. Các gate local giữ
+  như trên; chỉ tài liệu hậu kiểm thay sau source commit `47206b9`. Chưa
+  push/PR/CI/merge và không đóng M5 từ kết quả vận hành này.
+
+Giới hạn nghiệm thu: test Function LIVE, native env, valve tests và socket
+trust chứng minh cấu hình boundary trong phạm vi đã kiểm tra; chưa quan sát
+IP trong **handoff thật** hoặc IPN thực từ VNPay. Không suy diễn giao dịch đã
+được xác nhận hoặc chính xác-once kho/đơn từ smoke sai chữ ký. Guard vẫn34
+failed Rule ID, chưa có durable CloudTrail và chưa diễn tập restore RDS;
+chưa phải phê duyệt thanh toán thật/go-live.
+
 ## Quy trình rollout sau khi được duyệt
+
+Lệnh Execute bên dưới là ghi lại bước đã làm, **không chạy lại** plan đã
+Execute. Với lần triển khai/dự án khác phải tạo, kiểm tra và duyệt plan mới,
+dùng đúng account/region/resource của lần đó thay vì copy các ID hiện tại.
 
 1. Kiểm lại đúng account/profile/region, live source vẫn19ef…, PaymentMode
    sandbox, revision cũ, LT6, AMI/image không đổi, secret version không đổi,

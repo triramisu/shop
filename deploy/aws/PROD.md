@@ -2,8 +2,8 @@
 
 `shop-prod.yaml` được khôi phục từ Original template của stack đang chạy,
 không sao chép bản draft trong checkout vận hành. Bản nền VNPay sandbox đã
-deploy; **candidate trusted-proxy hiện tại chưa Execute**. File tồn tại trong
-Git không chứng minh AWS đã áp dụng chính bản đó hoặc SIT đạt.
+deploy; **trusted-proxy đã Execute và hậu kiểm triển khai đạt**. Source AWS
+đã đối chiếu đúng SHA bên dưới; việc này không chứng minh SIT đạt.
 
 Ngày 24/10/2026 khoảng 16:46 UTC+7, bản nền SHA-256 `19ef36d981b748db7975ca52ae161af40571891a87fdd7070bf1b0f63e3c6d19` đã được Execute với
 `PaymentMode=vnpay-sandbox`: stack UPDATE_COMPLETE, refresh Successful,
@@ -15,11 +15,16 @@ chưa go-live. Bằng chứng và lệnh nằm trong runbook.
 Candidate PAY-SIT-01B hiện tại có SHA-256
 `319e79f59c257c20c7d4fb2d12f70d82b9dedafe0e78e19c04e703d209d6e7b9`,
 52.108 byte; đã upload đúng checksum lên artifact bucket CloudFormation
-private/mã hóa sẵn có, chưa thay runtime. Change set
-`trusted-proxy-20261024T101541Z` đang AVAILABLE, chờ duyệt Execute. Plan
+private/mã hóa sẵn có. Change set `trusted-proxy-20261024T101541Z` đã được
+người dùng duyệt và Execute lúc 19:35:53 UTC+7 ngày 24/10. Snapshot20:13:20
+xác nhận UPDATE_COMPLETE/refresh Successful, hai máy LT7/targets Healthy.
+Hậu kiểm20:23–20:24 xác nhận container/native flags/payment flags/secret
+parity, AMI và mọi LT data ngoài UserData giữ nguyên, SG/origin/WAF/API
+forwarding giữ nguyên. Chưa có giao dịch SIT thật. Plan
 mặc định 5 Modify (ASG/policy Conditional), enhanced 3 Modify; không
 Add/Remove. Không được hiểu kết quả enhanced là bỏ qua rủi ro của plan mặc định.
-Đọc [runbook trusted-proxy](../../docs/trusted-proxy.md) trước rollout.
+Đọc [runbook trusted-proxy](../../docs/trusted-proxy.md) trước lần thay đổi
+tiếp theo; không Execute lại change set đã dùng.
 
 Xem [hợp đồng, kết quả và từng bước triển khai VNPay](../../docs/vnpay-sandbox-preflight.md)
 và [trạng thái dự án](../../README.md).
