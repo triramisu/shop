@@ -1,0 +1,1207 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Shop prod-profile deployment on Ubuntu 24.04: two AZs, one NAT, private ASG,
+  Single-AZ RDS MySQL, HTTPS ALB, private S3 UI and shared product images.
+  Cost-bounded, restricted access, not HA. Foundation does not start Shop.
+  Read deploy/aws/PROD.md; service admission and regional prerequisites apply.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    ref: [{ at: README.md, has: deployment decisions and detailed prod runbook links }]
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Edge WAF association only" }
+        Parameters: [EdgeWebAclArn]
+      - Label: { default: "1 - Network, SSH and origin HTTPS" }
+        Parameters: [ProjectName, KeyPairName, AdminCidr, AdditionalClientIpv4, CloudFrontPrefixListId, ApiOriginDomainName, AlbCertificateArn]
+      - Label: { default: "2 - Ubuntu, bounded scaling and Single-AZ RDS" }
+        Parameters: [LatestAmiId, AppInstanceType, MaxAppInstances, CpuTargetPercent, MySqlEngineVersion, DbInstanceClass]
+      - Label: { default: "3 - Infrastructure first, then prod application" }
+        Parameters: [DeploymentMode, PaymentMode, ApplicationImage, ApplicationEnvSecretArn, ConfigurationRevision]
+      - Label: { default: "4 - Viewer HTTPS (certificate in us-east-1)" }
+        Parameters: [ViewerDomainName, ViewerCertificateArn]
+    ParameterLabels:
+      AdditionalClientIpv4: { default: "Additional authorized client IPv4 (optional)" }
+      DeploymentMode: { default: "CloudFormation phase, NOT a Spring profile" }
+
+Parameters:
+  ViewerAccessMode:
+    Type: String
+    Default: restricted
+    AllowedValues: [restricted, public]
+    Description: Website viewer access only; public never opens SSH, S3 or RDS or bypasses backend authentication.
+  EdgeWebAclArn:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^arn:aws:wafv2:us-east-1:[0-9]{12}:global/webacl/[A-Za-z0-9_-]{1,128}/[a-f0-9-]{36}$'
+    Description: Same-account CloudFront WAF ARN from the separate edge stack; empty preserves the unassociated baseline.
+  ProjectName:
+    Type: String
+    Default: shop
+    AllowedPattern: "[a-z][a-z0-9-]{1,11}"
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing regional key pair; keep its private key on your computer.
+  AdminCidr:
+    Type: String
+    AllowedPattern: '(?!0\.0\.0\.0/32$)(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/32'
+    Description: Your public IPv4 /32; never 0.0.0.0/0.
+  AdditionalClientIpv4:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^(?!0\.0\.0\.0$)(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
+    Description: Optional second public IPv4 allowed at CloudFront; no CIDR suffix.
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: "pl-[a-f0-9]+"
+    Description: Regional ID of com.amazonaws.global.cloudfront.origin-facing.
+  ApiOriginDomainName:
+    Type: String
+    AllowedPattern: '[a-z0-9][a-z0-9.-]+\.[a-z]{2,63}'
+    Description: Owned origin hostname, e.g. origin.example.com; DNS must point to ALB.
+  AlbCertificateArn:
+    Type: String
+    AllowedPattern: "arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-zA-Z0-9-]+"
+    Description: ISSUED ACM certificate for ApiOriginDomainName in this stack region.
+  ViewerDomainName:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
+    Description: Owned UI hostname, different from the ALB origin. Required with ViewerCertificateArn before application mode.
+  ViewerCertificateArn:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+    Description: Same-account ISSUED ACM certificate in us-east-1 covering ViewerDomainName; never the regional ALB certificate.
+  LatestAmiId:
+    Type: AWS::EC2::Image::Id
+    Description: Explicit pinned Ubuntu 24.04 amd64 AMI ID, not an SSM path. Preserve the deployed app/bastion AMI on payment rollout.
+  AppInstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium]
+  MaxAppInstances:
+    Type: Number
+    Default: 4
+    AllowedValues: [2, 3, 4]
+  CpuTargetPercent:
+    Type: Number
+    Default: 60
+    MinValue: 40
+    MaxValue: 75
+  MySqlEngineVersion:
+    Type: String
+    AllowedPattern: '8\.4\.[0-9]+'
+    Description: Required supported MySQL 8.4 minor in this region/account; verify in RDS before submit. No guessed default.
+    ConstraintDescription: Enter a supported 8.4.x engine version, matching the mysql8.4 parameter group.
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues: [db.t4g.micro, db.t4g.small]
+  DeploymentMode:
+    Type: String
+    Default: foundation
+    AllowedValues: [foundation, application]
+  PaymentMode:
+    Type: String
+    Default: none
+    AllowedValues: [none, vnpay-sandbox]
+    Description: Explicit sandbox opt-in; none disables payment. Never live money; refund/query/workers stay off.
+  ApplicationImage:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$"
+    Description: Public Docker Hub image pinned by digest, not latest; application mode only.
+  ApplicationEnvSecretArn:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[a-zA-Z0-9/_+=.@-]+$"
+    Description: Same-region, AWS-managed-key secret containing Docker env-file text, not JSON.
+  ConfigurationRevision:
+    Type: String
+    Default: "1"
+    AllowedPattern: "[a-zA-Z0-9._-]{1,32}"
+    Description: Bump to roll every instance after rotating application secret contents.
+
+Rules:
+  SandboxRequiresApplication:
+    RuleCondition: !Equals [!Ref PaymentMode, vnpay-sandbox]
+    Assertions:
+      - Assert: !Equals [!Ref DeploymentMode, application]
+        AssertDescription: VNPay sandbox requires application mode and prepared merchant configuration.
+  ViewerCertificatePair:
+    Assertions:
+      - Assert: !Or
+          - !And
+            - !Equals [!Ref ViewerDomainName, ""]
+            - !Equals [!Ref ViewerCertificateArn, ""]
+          - !And
+            - !Not [!Equals [!Ref ViewerDomainName, ""]]
+            - !Not [!Equals [!Ref ViewerCertificateArn, ""]]
+        AssertDescription: Provide both viewer hostname and certificate, or leave both empty for infrastructure-only foundation.
+  ViewerDomainMustDifferFromOrigin:
+    RuleCondition: !Not [!Equals [!Ref ViewerDomainName, ""]]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ViewerDomainName, !Ref ApiOriginDomainName]]
+        AssertDescription: Viewer hostname must differ from the ALB origin to prevent a CloudFront origin loop.
+  ApplicationRequiresSecureViewer:
+    RuleCondition: !Equals [!Ref DeploymentMode, application]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ViewerDomainName, ""]]
+        AssertDescription: Application mode requires a custom viewer hostname and modern minimum TLS policy.
+      - Assert: !Not [!Equals [!Ref ViewerCertificateArn, ""]]
+        AssertDescription: Application mode requires an issued us-east-1 viewer certificate.
+  ApplicationRequiresArtifacts:
+    RuleCondition: !Equals [!Ref DeploymentMode, application]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref ApplicationImage, ""]]
+        AssertDescription: Application mode requires an immutable image digest.
+      - Assert: !Not [!Equals [!Ref ApplicationEnvSecretArn, ""]]
+        AssertDescription: Application mode requires a prepared environment secret.
+
+Conditions:
+  HasEdgeWebAcl: !Not [!Equals [!Ref EdgeWebAclArn, ""]]
+  UseCustomViewerCertificate: !And
+    - !Not [!Equals [!Ref ViewerDomainName, ""]]
+    - !Not [!Equals [!Ref ViewerCertificateArn, ""]]
+  StartApplication: !Equals [!Ref DeploymentMode, application]
+  ReadApplicationSecret: !And
+    - !Equals [!Ref DeploymentMode, application]
+    - !Not [!Equals [!Ref ApplicationEnvSecretArn, ""]]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-vpc" }]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-igw" }]
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-public-a" }]
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-public-b" }]
+  AppSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-a" }]
+  AppSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: 10.0.4.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-b" }]
+  DbSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.0.5.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-db-a" }]
+  DbSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: 10.0.6.0/24
+      MapPublicIpOnLaunch: false
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-db-b" }]
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-public-rt" }]
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      { SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable }
+  PublicRouteAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      { SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable }
+  NatElasticIp:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties: { Domain: vpc }
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: [PublicDefaultRoute, PublicRouteAssociationA]
+    Properties:
+      AllocationId: !GetAtt NatElasticIp.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-nat-a" }]
+  AppRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-rt-a" }]
+  AppRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-rt-b" }]
+  AppDefaultRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AppRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+  AppDefaultRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AppRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+  AppRouteAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref AppSubnetA, RouteTableId: !Ref AppRouteTableA }
+  AppRouteAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref AppSubnetB, RouteTableId: !Ref AppRouteTableB }
+  DbRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-db-isolated-rt" }]
+  DbRouteAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref DbSubnetA, RouteTableId: !Ref DbRouteTable }
+  DbRouteAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref DbSubnetB, RouteTableId: !Ref DbRouteTable }
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      RouteTableIds:
+        [!Ref AppRouteTableA, !Ref AppRouteTableB, !Ref PublicRouteTable]
+      # Default endpoint policy does not grant IAM/S3 permissions. IAM and
+      # bucket policies still control access. Ubuntu APT uses HTTPS via NAT.
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SSH from administrator IPv4 only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref AdminCidr }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: 10.0.0.0/16 }
+        - { IpProtocol: tcp, FromPort: 3306, ToPort: 3306, CidrIp: 10.0.0.0/16 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-bastion-sg" }]
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS only from CloudFront origin-facing prefix list
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 8080, ToPort: 8080, CidrIp: 10.0.0.0/16 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-alb-sg" }]
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Spring only from ALB; SSH only from bastion
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {
+            IpProtocol: tcp,
+            FromPort: 8080,
+            ToPort: 8080,
+            SourceSecurityGroupId: !Ref AlbSecurityGroup,
+          }
+        - {
+            IpProtocol: tcp,
+            FromPort: 22,
+            ToPort: 22,
+            SourceSecurityGroupId: !Ref BastionSecurityGroup,
+          }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 3306, ToPort: 3306, CidrIp: 10.0.0.0/16 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-sg" }]
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MySQL only from application and administrator bastion
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {
+            IpProtocol: tcp,
+            FromPort: 3306,
+            ToPort: 3306,
+            SourceSecurityGroupId: !Ref AppSecurityGroup,
+          }
+        - {
+            IpProtocol: tcp,
+            FromPort: 3306,
+            ToPort: 3306,
+            SourceSecurityGroupId: !Ref BastionSecurityGroup,
+          }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 127.0.0.1/32 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-db-sg" }]
+
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref BastionRole] }
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: [PublicDefaultRoute, PublicRouteAssociationA]
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: t3.micro
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      CreditSpecification: { CPUCredits: standard }
+      MetadataOptions:
+        {
+          HttpTokens: required,
+          HttpEndpoint: enabled,
+          HttpPutResponseHopLimit: 1,
+        }
+      NetworkInterfaces:
+        - DeviceIndex: "0"
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref PublicSubnetA
+          GroupSet: [!Ref BastionSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            {
+              Encrypted: true,
+              VolumeType: gp3,
+              VolumeSize: 8,
+              DeleteOnTermination: true,
+            }
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -Eeuo pipefail
+          # BEGIN UBUNTU OS GUARD
+          . /etc/os-release
+          if [ "$ID" != ubuntu ] || [ "$VERSION_ID" != 24.04 ]; then
+            echo 'This bootstrap requires Ubuntu Server 24.04 LTS.' >&2
+            exit 1
+          fi
+          # END UBUNTU OS GUARD
+          # BEGIN UBUNTU APT HTTPS
+          for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ ! -f "$source_file" ]; then continue; fi
+            sed -i -E \
+              -e 's|https?://[^/[:space:]]*\.ec2\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+              -e 's#http://(archive|security)\.ubuntu\.com/ubuntu#https://\1.ubuntu.com/ubuntu#g' "$source_file"
+            if grep -Eq '^[[:space:]]*(URIs:|deb(-src)?[[:space:]]).*http://' "$source_file"; then
+              echo 'APT source still uses HTTP; review the Ubuntu AMI sources.' >&2
+              exit 1
+            fi
+          done
+          # END UBUNTU APT HTTPS
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-bastion" }]
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Isolated database subnets across two AZs
+      SubnetIds: [!Ref DbSubnetA, !Ref DbSubnetB]
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Shop MySQL 8.4 TLS required
+      Family: mysql8.4
+      Parameters: { require_secure_transport: "1" }
+  Database:
+    Type: AWS::RDS::DBInstance
+    # Do not start a slow DB create while CloudFront can still reject the account.
+    # Keep Snapshot below; removing recovery protection is not a rollback fix.
+    DependsOn: UiDistribution
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: mysql
+      EngineVersion: !Ref MySqlEngineVersion
+      EngineLifecycleSupport: open-source-rds-extended-support-disabled
+      DBInstanceClass: !Ref DbInstanceClass
+      DBName: shop
+      MasterUsername: shopadmin
+      ManageMasterUserPassword: true
+      AllocatedStorage: "20"
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups: [!Ref DbSecurityGroup]
+      Port: "3306"
+      # Minimal nonzero recovery window for the selected economy deployment; do not disable automated backups.
+      BackupRetentionPeriod: 1
+      CopyTagsToSnapshot: true
+      AutoMinorVersionUpgrade: true
+      AllowMajorVersionUpgrade: false
+      # Guard accidental deletion without dropping Snapshot recovery or changing DB identity.
+      # Disable deliberately through a reviewed update before an authorized DB deletion.
+      DeletionProtection: true
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-mysql" }]
+
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties: { RetentionInDays: 3 }
+  ApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      Policies:
+        - PolicyName: ProductImagesOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ProductImagesBucket.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub "${ProductImagesBucket.Arn}/catalog/products/*"
+        - PolicyName: BootstrapAndApplicationLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Ref AWS::StackId
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ApplicationLogGroup.Arn
+        - !If
+          - ReadApplicationSecret
+          - PolicyName: ReadOnlyApplicationEnvironment
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref ApplicationEnvSecretArn
+          - !Ref AWS::NoValue
+  ApplicationInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref ApplicationRole] }
+
+  OriginVerificationSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: CloudFront to ALB shared origin verification value; never log or output
+      GenerateSecretString: { PasswordLength: 48, ExcludePunctuation: true }
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: [InternetGatewayAttachment, PublicDefaultRoute]
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      IpAddressType: ipv4
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      LoadBalancerAttributes:
+        # Preserve the origin boundary; intentional stack teardown must disable this first.
+        - { Key: deletion_protection.enabled, Value: "true" }
+        - { Key: idle_timeout.timeout_seconds, Value: "30" }
+        - {
+            Key: routing.http.drop_invalid_header_fields.enabled,
+            Value: "true",
+          }
+        - { Key: routing.http.desync_mitigation_mode, Value: strictest }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-alb" }]
+  ApplicationTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref Vpc
+      TargetType: instance
+      Protocol: HTTP
+      Port: 8080
+      HealthCheckPath: /actuator/health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: { HttpCode: "200" }
+      TargetGroupAttributes:
+        - { Key: deregistration_delay.timeout_seconds, Value: "30" }
+        - { Key: stickiness.enabled, Value: "false" }
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates: [{ CertificateArn: !Ref AlbCertificateArn }]
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            {
+              StatusCode: "403",
+              ContentType: text/plain,
+              MessageBody: Forbidden,
+            }
+  VerifiedOriginListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 1
+      Conditions:
+        - Field: http-header
+          HttpHeaderConfig:
+            HttpHeaderName: X-Shop-Origin-Verify
+            Values:
+              [
+                !Sub "{{resolve:secretsmanager:${OriginVerificationSecret}:SecretString}}",
+              ]
+      Actions: [{ Type: forward, TargetGroupArn: !Ref ApplicationTargetGroup }]
+
+  ApplicationLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Boot immutable Shop artifact; controlled payment mode overrides env-file switches without exposing merchant keys.
+        must:
+          - Sandbox only by PaymentMode opt-in; none stays safe default.
+          - Fetch merchant keys from existing secret; never embed keys in user data.
+          - Refund/query/reconciliation/recovery stay off; do not remove IPN while payments are pending.
+        mutable: review-required
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref AppInstanceType
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile: { Arn: !GetAtt ApplicationInstanceProfile.Arn }
+        CreditSpecification: { CpuCredits: standard }
+        Monitoring: { Enabled: true }
+        MetadataOptions:
+          {
+            HttpTokens: required,
+            HttpEndpoint: enabled,
+            HttpPutResponseHopLimit: 2,
+          }
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: false
+            Groups: [!Ref AppSecurityGroup]
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              {
+                Encrypted: true,
+                VolumeType: gp3,
+                VolumeSize: 20,
+                DeleteOnTermination: true,
+              }
+        TagSpecifications:
+          - ResourceType: instance
+            Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app" }]
+          - ResourceType: volume
+            Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-app-ebs" }]
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -Eeuo pipefail
+            # ConfigurationRevision=${ConfigurationRevision}
+            # BEGIN UBUNTU OS GUARD
+            . /etc/os-release
+            if [ "$ID" != ubuntu ] || [ "$VERSION_ID" != 24.04 ]; then
+              echo 'This bootstrap requires Ubuntu Server 24.04 LTS.' >&2
+              exit 1
+            fi
+            # END UBUNTU OS GUARD
+            export AWS_DEFAULT_REGION='${AWS::Region}' AWS_PAGER=''
+            export AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=5
+            export PATH='/snap/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+            export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+            token=$(curl --fail --silent --show-error --noproxy '*' -X PUT \
+              -H 'X-aws-ec2-metadata-token-ttl-seconds: 300' http://169.254.169.254/latest/api/token)
+            instance_id=$(curl --fail --silent --show-error --noproxy '*' \
+              -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)
+            finish() {
+              result=$?
+              trap - EXIT
+              status=FAILURE
+              if [ "$result" -eq 0 ]; then status=SUCCESS; fi
+              if command -v aws >/dev/null 2>&1; then
+                aws cloudformation signal-resource --stack-name '${AWS::StackName}' \
+                  --logical-resource-id ApplicationAutoScalingGroup --unique-id "$instance_id" \
+                  --status "$status" || true
+              else
+                echo 'AWS CLI unavailable; CloudFormation will time out waiting for a signal.' >&2
+              fi
+              exit "$result"
+            }
+            trap finish EXIT
+            # Ubuntu AMIs do not guarantee a preinstalled AWS CLI. Use the
+            # official AWS snap rather than assuming the awscli APT package.
+            if ! command -v aws >/dev/null 2>&1 || ! aws --version 2>&1 | grep -q '^aws-cli/2\.'; then
+              snap install aws-cli --classic
+            fi
+            aws --version 2>&1 | grep -q '^aws-cli/2\.'
+            # BEGIN UBUNTU APT HTTPS
+            for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+              if [ ! -f "$source_file" ]; then continue; fi
+              sed -i -E \
+                -e 's|https?://[^/[:space:]]*\.ec2\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+                -e 's#http://(archive|security)\.ubuntu\.com/ubuntu#https://\1.ubuntu.com/ubuntu#g' "$source_file"
+              if grep -Eq '^[[:space:]]*(URIs:|deb(-src)?[[:space:]]).*http://' "$source_file"; then
+                echo 'APT source still uses HTTP; review the Ubuntu AMI sources.' >&2
+                exit 1
+              fi
+            done
+            # END UBUNTU APT HTTPS
+            apt-get -o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
+            apt-get -o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 install -y --no-install-recommends \
+              docker.io ca-certificates curl python3
+            systemctl enable --now docker
+            if [ '${DeploymentMode}' = foundation ]; then
+              echo 'Foundation ready; no Shop application or fake health server was started.'
+              exit 0
+            fi
+            apt-get -o DPkg::Lock::Timeout=180 -o Acquire::Retries=3 install -y --no-install-recommends \
+              openjdk-21-jre-headless openssl
+            install -d -m 0755 /etc/shop
+            install -d -m 0700 /run/shop
+            umask 077
+            aws secretsmanager get-secret-value --secret-id '${ApplicationEnvSecretArn}' \
+              --query SecretString --output text > /run/shop/application.env
+            # Validate without printing credentials; secret is Docker env text, NOT JSON.
+            python3 - <<'PY'
+            from pathlib import Path
+            import re
+            from urllib.parse import urlsplit, parse_qs
+            values = {}
+            for line in Path('/run/shop/application.env').read_text().splitlines():
+                if not line or line.startswith('#'):
+                    continue
+                key, sep, value = line.partition('=')
+                optional_empty = key in ('VNPAY_BANK_CODE', 'VNPAY_PREVIOUS_HASH_SECRETS')
+                if not sep or key in values or (not value and not optional_empty) or not re.fullmatch(r'[A-Z][A-Z0-9_]*', key):
+                    raise SystemExit('Invalid, duplicate or empty environment entry')
+                values[key] = value
+            required = ['SPRING_DATASOURCE_URL', 'SPRING_DATASOURCE_USERNAME',
+                        'SPRING_DATASOURCE_PASSWORD', 'SPRING_FLYWAY_URL',
+                        'SPRING_FLYWAY_USERNAME', 'SPRING_FLYWAY_PASSWORD',
+                        'JWT_SIGNER_KEY', 'CORS_ALLOWED_ORIGINS']
+            if any(not values.get(key) for key in required):
+                raise SystemExit('Missing required application configuration')
+            users = [values['SPRING_DATASOURCE_USERNAME'], values['SPRING_FLYWAY_USERNAME']]
+            if len(set(users)) != 2 or any(user.lower() in ('root', 'shopadmin') for user in users):
+                raise SystemExit('Separate non-master runtime and migration users are required')
+            for key in ('SPRING_DATASOURCE_URL', 'SPRING_FLYWAY_URL'):
+                url = values[key]
+                if not url.startswith('jdbc:mysql://${Database.Endpoint.Address}:3306/shop?'):
+                    raise SystemExit('JDBC URL must use this stack RDS endpoint and shop database')
+                options = parse_qs(urlsplit(url[5:]).query, keep_blank_values=True)
+                expected = {'sslMode': 'VERIFY_IDENTITY',
+                            'trustCertificateKeyStoreUrl': 'file:/run/rds-truststore.p12',
+                            'trustCertificateKeyStorePassword': 'changeit',
+                            'trustCertificateKeyStoreType': 'PKCS12'}
+                if any(options.get(key) != [value] for key, value in expected.items()):
+                    raise SystemExit('RDS TLS identity verification and mounted truststore are required')
+            # IAM credentials come from the EC2 role. Storage identity is stack-owned.
+            if any(key.startswith(('AWS_', 'MINIO_', 'APP_CATALOG_IMAGES_STORAGE'))
+                   or key in ('OBJECT_STORAGE_TYPE', 'S3_REGION', 'S3_BUCKET') for key in values):
+                raise SystemExit('Storage and AWS credential overrides are not accepted in the application secret')
+            if len(values['JWT_SIGNER_KEY']) < 64:
+                raise SystemExit('Use a strong shared JWT signing key, at least 64 characters')
+            forbidden = ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', 'JAVA_OPTS', 'SPRING_APPLICATION_JSON', 'SPRING_CONFIG_IMPORT')
+            if any(key in values for key in forbidden):
+                raise SystemExit('Runtime command/config overrides are not accepted in this application secret')
+            PY
+            curl --fail --silent --show-error --retry 3 --proto '=https' \
+              https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o /run/shop/rds-ca.pem
+            awk '/-----BEGIN CERTIFICATE-----/{n++} n{print > ("/run/shop/rds-ca-" n ".pem")}' /run/shop/rds-ca.pem
+            for cert in /run/shop/rds-ca-*.pem; do
+              subject=$(openssl x509 -in "$cert" -noout -subject -nameopt RFC2253 | sed 's/^subject=//')
+              issuer=$(openssl x509 -in "$cert" -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')
+              if [ "$subject" != "$issuer" ]; then continue; fi
+              keytool -importcert -noprompt -alias "$(basename "$cert")" -file "$cert" \
+                -keystore /etc/shop/rds-truststore.p12 -storetype PKCS12 -storepass changeit
+            done
+            chmod 0644 /etc/shop/rds-truststore.p12
+            # BEGIN PAYMENT MODE
+            case '${PaymentMode}' in
+              none) payment_provider=none; order_payment_enabled=false ;;
+              vnpay-sandbox) payment_provider=vnpay; order_payment_enabled=true ;;
+              *) echo 'Unsupported payment mode.' >&2; exit 1 ;;
+            esac
+            # END PAYMENT MODE
+            docker pull '${ApplicationImage}'
+            docker run -d --name shop --restart unless-stopped \
+              --memory 1536m --memory-swap 1536m --cpus 1.5 \
+              --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+              --cap-drop ALL --security-opt no-new-privileges:true \
+              --mount type=bind,source=/etc/shop/rds-truststore.p12,target=/run/rds-truststore.p12,readonly \
+              --env-file /run/shop/application.env \
+              -e SPRING_PROFILES_ACTIVE=prod -e PAYMENT_PROVIDER_TYPE="$payment_provider" \
+              -e PAYMENT_REFUND_ENABLED=false -e VNPAY_QUERY_ENABLED=false \
+              -e PAYMENT_RECONCILIATION_ENABLED=false -e ORDER_PAYMENT_RECOVERY_ENABLED=false \
+              -e ORDER_PAYMENT_AUTO_INITIATION_ENABLED="$order_payment_enabled" \
+              -e ORDER_PAYMENT_EVENT_CONSUMPTION_ENABLED="$order_payment_enabled" \
+              -e OBJECT_STORAGE_TYPE=s3 -e S3_REGION='${AWS::Region}' \
+              -e S3_BUCKET='${ProductImagesBucket}' \
+              -e OPENAPI_ENABLED=false -e SWAGGER_UI_ENABLED=false \
+              -e SERVER_FORWARD_HEADERS_STRATEGY=none \
+              -e SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5 \
+              -e SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1 \
+              --log-driver awslogs --log-opt awslogs-region='${AWS::Region}' \
+              --log-opt mode=non-blocking --log-opt max-buffer-size=4m \
+              --log-opt awslogs-group='${ApplicationLogGroup}' --log-opt awslogs-stream="$instance_id" \
+              -p 8080:8080 '${ApplicationImage}'
+            rm -f /run/shop/application.env
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --max-time 3 http://127.0.0.1:8080/actuator/health | grep -q '"status":"UP"'; then
+                echo 'Shop local health is UP.'
+                exit 0
+              fi
+              sleep 5
+            done
+            echo 'Shop did not become healthy; inspect application logs without disclosing secrets.' >&2
+            exit 1
+
+  ApplicationAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - AppDefaultRouteA
+      - AppDefaultRouteB
+      - AppRouteAssociationA
+      - AppRouteAssociationB
+      - S3GatewayEndpoint
+      - VerifiedOriginListenerRule
+      - Database
+      - ProductImagesBucketPolicy
+    CreationPolicy:
+      ResourceSignal: { Count: 2, Timeout: PT20M }
+    UpdatePolicy:
+      # Launch-before-terminate preserves the serving host. Readiness is ELB
+      # health + warmup, not cfn-signal. Never run a second manual refresh.
+      AutoScalingInstanceRefresh:
+        Strategy: Rolling
+        Preferences:
+          MinHealthyPercentage: 100
+          MaxHealthyPercentage: 150
+          InstanceWarmup: 180
+          BakeTime: 180
+          SkipMatching: true
+          ScaleInProtectedInstances: Wait
+          StandbyInstances: Wait
+    Properties:
+      MinSize: "2"
+      DesiredCapacity: "2"
+      MaxSize: !Ref MaxAppInstances
+      VPCZoneIdentifier: [!Ref AppSubnetA, !Ref AppSubnetB]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ApplicationLaunchTemplate
+        Version: !GetAtt ApplicationLaunchTemplate.LatestVersionNumber
+      TargetGroupARNs: [!Ref ApplicationTargetGroup]
+      HealthCheckType: !If [StartApplication, ELB, EC2]
+      # Existing cold bootstrap exceeded 600s. Golden AMI removes package setup;
+      # retain bounded initialization time without disabling ELB health checks.
+      HealthCheckGracePeriod: 1200
+      DefaultInstanceWarmup: 300
+      Tags:
+        - {
+            Key: Name,
+            Value: !Sub "${ProjectName}-prod-app",
+            PropagateAtLaunch: true,
+          }
+        - { Key: Environment, Value: prod, PropagateAtLaunch: true }
+        # Desired revision only; verify actual LT version and health after rollout.
+        - { Key: DesiredConfigurationRevision, Value: !Ref ConfigurationRevision, PropagateAtLaunch: true }
+  CpuTargetTrackingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Condition: StartApplication
+    Properties:
+      AutoScalingGroupName: !Ref ApplicationAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        TargetValue: !Ref CpuTargetPercent
+        DisableScaleIn: false
+        PredefinedMetricSpecification:
+          { PredefinedMetricType: ASGAverageCPUUtilization }
+  UnhealthyTargetsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: StartApplication
+    Properties:
+      AlarmDescription: One or more application targets unhealthy; view alarm in CloudWatch (no email configured).
+      Namespace: AWS/ApplicationELB
+      MetricName: UnHealthyHostCount
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      Dimensions:
+        - {
+            Name: LoadBalancer,
+            Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName,
+          }
+        - {
+            Name: TargetGroup,
+            Value: !GetAtt ApplicationTargetGroup.TargetGroupFullName,
+          }
+  DbLowStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: RDS has less than 3 GiB free; fixed 20 GiB storage does not auto-grow.
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 3221225472
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: missing
+      Dimensions: [{ Name: DBInstanceIdentifier, Value: !Ref Database }]
+
+  ProductImagesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          - Id: ProductImageHistory
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-product-images" }]
+  ProductImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ProductImagesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # No SourceVpce-only deny: external browsers need signed GET access.
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt ProductImagesBucket.Arn
+              - !Sub "${ProductImagesBucket.Arn}/*"
+            Condition: { Bool: { aws:SecureTransport: "false" } }
+
+  UiBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireNoncurrentUiVersions
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: 7 }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+      Tags: [{ Key: Name, Value: !Sub "${ProjectName}-prod-ui" }]
+  UiOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name:
+          !Join [
+            "-",
+            [
+              !Ref ProjectName,
+              !Select [2, !Split ["/", !Ref AWS::StackId]],
+              ui-oac,
+            ],
+          ]
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  ViewerRequestFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name:
+        !Join [
+          "-",
+          [
+            !Ref ProjectName,
+            !Select [2, !Split ["/", !Ref AWS::StackId]],
+            prod-edge,
+          ],
+        ]
+      AutoPublish: true
+      FunctionConfig:
+        {
+          Comment: Viewer access mode and non-API SPA routing,
+          Runtime: cloudfront-js-2.0,
+        }
+      # Public only skips viewer IP checks; preserve API paths, backend auth and private origins.
+      # restricted is the safe default and parameter-only rollback.
+      FunctionCode: !Sub |
+        function handler(event) {
+          var allowed = ['${AdminCidr}'.split('/')[0], '${AdditionalClientIpv4}'];
+          if ('${ViewerAccessMode}' !== 'public' && allowed.indexOf(event.viewer.ip) === -1) {
+            return {statusCode: 403, statusDescription: 'Forbidden',
+              headers: {'cache-control': {value: 'no-store'}}, body: 'Restricted deployment'};
+          }
+          var request = event.request;
+          var uri = request.uri;
+          if (uri !== '/api' && uri.indexOf('/api/') !== 0) {
+            var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
+            if (lastSegment.indexOf('.') === -1) request.uri = '/index.html';
+          }
+          return request;
+        }
+  ApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name:
+          !Join [
+            "-",
+            [
+              !Ref ProjectName,
+              !Select [2, !Split ["/", !Ref AWS::StackId]],
+              api-origin,
+            ],
+          ]
+        Comment: Forward authorization, cookies and query strings without viewer Host
+        CookiesConfig: { CookieBehavior: all }
+        QueryStringsConfig: { QueryStringBehavior: all }
+        HeadersConfig: { HeaderBehavior: allExcept, Headers: [host] }
+  UiCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name:
+          !Join [
+            "-",
+            [
+              !Ref ProjectName,
+              !Select [2, !Split ["/", !Ref AWS::StackId]],
+              ui-cache,
+            ],
+          ]
+        MinTTL: 0
+        DefaultTTL: 3600
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig: { CookieBehavior: none }
+          HeadersConfig: { HeaderBehavior: none }
+          QueryStringsConfig: { QueryStringBehavior: none }
+  UiDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: VerifiedOriginListenerRule
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        WebACLId: !If [HasEdgeWebAcl, !Ref EdgeWebAclArn, !Ref AWS::NoValue]
+        Comment: !Sub "${ProjectName} prod deployment; viewer access: ${ViewerAccessMode}"
+        IPV6Enabled: false
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        # Never use the ALB origin hostname as an alias. Viewer ACM must be in us-east-1.
+        # The default certificate is infrastructure-only; application Rules reject it.
+        Aliases: !If [UseCustomViewerCertificate, [!Ref ViewerDomainName], !Ref AWS::NoValue]
+        ViewerCertificate: !If
+          - UseCustomViewerCertificate
+          - AcmCertificateArn: !Ref ViewerCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+        Origins:
+          - Id: ui-s3
+            DomainName: !GetAtt UiBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt UiOriginAccessControl.Id
+            S3OriginConfig: { OriginAccessIdentity: "" }
+          - Id: shop-api
+            DomainName: !Ref ApiOriginDomainName
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+              OriginReadTimeout: 30
+            OriginCustomHeaders:
+              - HeaderName: X-Shop-Origin-Verify
+                HeaderValue: !Sub "{{resolve:secretsmanager:${OriginVerificationSecret}:SecretString}}"
+        DefaultCacheBehavior:
+          TargetOriginId: ui-s3
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: !Ref UiCachePolicy
+          FunctionAssociations:
+            - {
+                EventType: viewer-request,
+                FunctionARN: !GetAtt ViewerRequestFunction.FunctionARN,
+              }
+        CacheBehaviors:
+          - PathPattern: /api
+            TargetOriginId: shop-api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: !Ref ApiOriginRequestPolicy
+            FunctionAssociations:
+              - {
+                  EventType: viewer-request,
+                  FunctionARN: !GetAtt ViewerRequestFunction.FunctionARN,
+                }
+          - PathPattern: /api/*
+            TargetOriginId: shop-api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: !Ref ApiOriginRequestPolicy
+            FunctionAssociations:
+              - {
+                  EventType: viewer-request,
+                  FunctionARN: !GetAtt ViewerRequestFunction.FunctionARN,
+                }
+  UiBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UiBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub "${UiBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${UiDistribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource: [!GetAtt UiBucket.Arn, !Sub "${UiBucket.Arn}/*"]
+            Condition: { Bool: { aws:SecureTransport: "false" } }
+
+Outputs:
+  DeploymentMode:
+    Value: !Ref DeploymentMode
+    Description: Foundation is infrastructure only; it is not an application acceptance test.
+  BastionPublicIp:
+    Value: !GetAtt BastionInstance.PublicIp
+    Description: Termius jump host; Ubuntu Server 24.04 SSH user is ubuntu.
+  AutoScalingGroupName:
+    Value: !Ref ApplicationAutoScalingGroup
+  ApplicationTargetGroupArn:
+    Value: !Ref ApplicationTargetGroup
+  AlbDnsName:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: Create a DNS-only CNAME from ApiOriginDomainName to this hostname.
+  RdsEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  RdsMasterSecretArn:
+    Value: !GetAtt Database.MasterUserSecret.SecretArn
+    Description: Administrator only; do not grant this secret to application instances.
+  UiBucketName:
+    Value: !Ref UiBucket
+  ProductImagesBucketName:
+    Value: !Ref ProductImagesBucket
+    Description: Private shared Catalog images; EC2 role and presigned GET, not the UI bucket.
+  CloudFrontDistributionId:
+    Value: !Ref UiDistribution
+  UiUrl:
+    Description: Canonical UI origin for CORS; update application secret before the first application rollout.
+    Value: !If [UseCustomViewerCertificate, !Sub "https://${ViewerDomainName}", !Sub "https://${UiDistribution.DomainName}"]
+  CloudFrontUrl:
+    Description: Distribution hostname for operational checks; not a substitute for the canonical UI CORS origin.
+    Value: !Sub "https://${UiDistribution.DomainName}"
+  ApplicationLogGroupName:
+    Value: !Ref ApplicationLogGroup

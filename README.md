@@ -17,13 +17,17 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 - Giai đoạn hiện tại: `M5 — Payment`.
 - PAY-SIT-01A — Preflight VNPay HTTPS ngày 24/10/2026: công cụ read-only và
   [hướng dẫn chuẩn bị secret/rollout/SIT](docs/vnpay-sandbox-preflight.md).
-  AWS đã đăng nhập đúng tài khoản; stack application ổn định, ASG 2/2/4 và
-  hai target Healthy. **Chưa thể SIT**: bootstrap đang ép provider=none;
-  cấu hình merchant/URL/allowlist chưa đạt, hai switch event/recovery cần
-  explicit false ở giai đoạn staging. Không đổi secret, AWS, Java/schema,
-  UI/WAF/DNS hoặc bật payment. Chủ merchant cần rotation khóa đã lộ và tự
-  cập nhật Plaintext theo hướng dẫn; Execute rollout cần review riêng.
-  52 test Node của helper, syntax và diff check đạt local; chưa CI/push.
+  AWS đã đăng nhập đúng tài khoản; người dùng đã tự Store merchant và hai
+  switch event/recovery=false, qua kiểm tra cấu hình trong RAM. Người dùng
+  chọn giữ khóa hiện hành chỉ cho sandbox sau cảnh báo; không chép khóa từ chat.
+  **Chưa SIT/Execute**: stack đang chạy vẫn ép provider=none. Candidate
+  [prod YAML](deploy/aws/shop-prod.yaml) bật sandbox có kiểm soát, sửa optional
+  bank-code rỗng và ghim AMI hiện hành thay vì tự lấy SSM latest đã đổi.
+  Thêm tag desired revision ASG để plan thể hiện group tham gia update;
+  tag không chứng minh runtime đã rollout. Không đổi image/IAM/DB/SG/DNS/UI/WAF
+  hoặc update policy. 75 test Node/bootstrap, cfn-lint và diff check đạt local;
+  Guard vẫn 34 failed Rule ID như Original, CloudTrail đọc lại vẫn 0 trail.
+  Chưa CI/push hoặc approval go-live; Execute cần review đúng plan mới nhất.
   Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
   tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)
