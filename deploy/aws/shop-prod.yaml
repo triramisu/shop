@@ -624,6 +624,7 @@ Resources:
 
   ApplicationLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
+    DependsOn: ViewerRequestFunction
     Metadata:
       com.aws.cloudformation.Context:
         why: Boot immutable Shop artifact; controlled payment mode overrides env-file switches without exposing merchant keys.
@@ -631,6 +632,7 @@ Resources:
           - Sandbox only by PaymentMode opt-in; none stays safe default.
           - Fetch merchant keys from existing secret; never embed keys in user data.
           - Refund/query/reconciliation/recovery stay off; do not remove IPN while payments are pending.
+          - Trust only ALB subnet peers and edge-overwritten client IP; never arbitrary XFF.
         mutable: review-required
     Properties:
       LaunchTemplateData:
@@ -809,7 +811,12 @@ Resources:
               -e OBJECT_STORAGE_TYPE=s3 -e S3_REGION='${AWS::Region}' \
               -e S3_BUCKET='${ProductImagesBucket}' \
               -e OPENAPI_ENABLED=false -e SWAGGER_UI_ENABLED=false \
-              -e SERVER_FORWARD_HEADERS_STRATEGY=none \
+              -e SERVER_FORWARDHEADERSSTRATEGY=native -e SERVER_FORWARD_HEADERS_STRATEGY=native \
+              -e SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER=x-shop-client-ip \
+              -e SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES='^10[.]0[.](1|3)[.][0-9]{1,3}$' \
+              -e SERVER_TOMCAT_REMOTEIP_TRUSTEDPROXIES='^$' \
+              -e SERVER_TOMCAT_REMOTEIP_PROTOCOLHEADER=x-forwarded-proto \
+              -e SERVER_TOMCAT_REMOTEIP_HOSTHEADER= -e SERVER_TOMCAT_REMOTEIP_PORTHEADER= \
               -e SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5 \
               -e SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1 \
               --log-driver awslogs --log-opt awslogs-region='${AWS::Region}' \
@@ -1020,6 +1027,8 @@ Resources:
         }
       # Public only skips viewer IP checks; preserve API paths, backend auth and private origins.
       # restricted is the safe default and parameter-only rollback.
+      # Trust contract: overwrite viewer IP headers; ALB must still verify origin secret.
+      # App native proxy trust is restricted to the two ALB subnet CIDRs, not all private IPs.
       FunctionCode: !Sub |
         function handler(event) {
           var allowed = ['${AdminCidr}'.split('/')[0], '${AdditionalClientIpv4}'];
@@ -1029,7 +1038,13 @@ Resources:
           }
           var request = event.request;
           var uri = request.uri;
-          if (uri !== '/api' && uri.indexOf('/api/') !== 0) {
+          delete request.headers['x-shop-client-ip'];
+          delete request.headers['forwarded'];
+          delete request.headers['x-forwarded-host'];
+          delete request.headers['x-forwarded-prefix'];
+          if (uri === '/api' || uri.indexOf('/api/') === 0) {
+            request.headers['x-shop-client-ip'] = {value: event.viewer.ip};
+          } else {
             var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
             if (lastSegment.indexOf('.') === -1) request.uri = '/index.html';
           }

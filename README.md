@@ -15,6 +15,17 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
+- PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
+  CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
+  **Chưa Execute** change set `trusted-proxy-20261024T101541Z`; live vẫn là
+  baseline sandbox LT6 bên dưới. Local đạt 94 test Node, 88 test Java đúng
+  phạm vi, Spotless và cfn-lint; Guard vẫn 34 failed Rule ID, chưa có durable
+  CloudTrail. AWS preflight không có validation error; plan mặc định 5 Modify
+  (ASG/policy Conditional), enhanced 3 Modify; không Add/Remove. Candidate
+  52.108 byte dùng artifact S3 private, không gửi inline. Người dùng đã trả
+  lời email đăng ký IPN, chưa có bằng chứng VNPay xác nhận hoặc giao dịch SIT.
+  Xem [thiết kế, bằng chứng, từng lệnh rollout và rollback](docs/trusted-proxy.md).
+  Không đổi Java production/schema/image/AMI/secret hoặc tự push/merge.
 - PAY-SIT-01A — Preflight VNPay HTTPS ngày 24/10/2026: công cụ read-only và
   [hướng dẫn chuẩn bị secret/rollout/SIT](docs/vnpay-sandbox-preflight.md).
   AWS đã đăng nhập đúng tài khoản; người dùng đã tự Store merchant và hai
@@ -25,7 +36,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   Khoảng 16:46 UTC+7: stack UPDATE_COMPLETE, native refresh Successful,
   hai EC2/target Healthy ở hai AZ cùng LT version 6. Container probe đã xác
   minh sandbox, image giữ nguyên và merchant/JWT/DB khớp secret trong RAM. Bản
-  [prod YAML](deploy/aws/shop-prod.yaml) bật sandbox có kiểm soát, sửa optional
+  Bản nền [prod YAML](deploy/aws/shop-prod.yaml) đã bật sandbox có kiểm soát, sửa optional
   bank-code rỗng và ghim AMI hiện hành thay vì tự lấy SSM latest đã đổi.
   Thêm tag desired revision ASG để plan thể hiện group tham gia update;
   tag không chứng minh runtime đã rollout. Không đổi image/IAM/DB/SG/DNS/UI/WAF
@@ -34,7 +45,8 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   Guard vẫn 34 failed Rule ID như Original, CloudTrail đọc lại vẫn 0 trail.
   UI/Catalog200 (12 sản phẩm), private my-info401; IPN checksum giả trả97,
   query rỗng trả99, no-store. Không tạo giao dịch hoặc đăng ký merchant IPN.
-  Chưa CI/push hoặc approval go-live; còn trusted-proxy/client IP và SIT thật.
+  Chưa CI/push hoặc approval go-live; candidate trusted-proxy hiện được chuẩn
+  bị riêng ở PAY-SIT-01B phía trên, còn chờ rollout và SIT thật.
   Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
   tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)

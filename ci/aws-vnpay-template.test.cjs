@@ -21,8 +21,33 @@ function replaceOnce(text, from, to) {
   assert.equal(parts.length, 2, "Expected exactly one reviewed fragment");
   return parts[0] + to + parts[1];
 }
-function restoreOriginal() {
+function restoreProxyBaseline() {
   let text = source;
+  text = replaceOnce(text, "    DependsOn: ViewerRequestFunction\n", "");
+  text = replaceOnce(text, "          - Trust only ALB subnet peers and edge-overwritten client IP; never arbitrary XFF.\n", "");
+  text = replaceOnce(text, [
+    "              -e SERVER_FORWARDHEADERSSTRATEGY=native -e SERVER_FORWARD_HEADERS_STRATEGY=native \\",
+    "              -e SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER=x-shop-client-ip \\",
+    "              -e SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES='^10[.]0[.](1|3)[.][0-9]{1,3}$' \\",
+    "              -e SERVER_TOMCAT_REMOTEIP_TRUSTEDPROXIES='^$' \\",
+    "              -e SERVER_TOMCAT_REMOTEIP_PROTOCOLHEADER=x-forwarded-proto \\",
+    "              -e SERVER_TOMCAT_REMOTEIP_HOSTHEADER= -e SERVER_TOMCAT_REMOTEIP_PORTHEADER= \\", "",
+  ].join("\n"), "              -e SERVER_FORWARD_HEADERS_STRATEGY=none \\\n");
+  text = replaceOnce(text,
+    "      # Trust contract: overwrite viewer IP headers; ALB must still verify origin secret.\n      # App native proxy trust is restricted to the two ALB subnet CIDRs, not all private IPs.\n", "");
+  text = replaceOnce(text, [
+    "          delete request.headers['x-shop-client-ip'];",
+    "          delete request.headers['forwarded'];",
+    "          delete request.headers['x-forwarded-host'];",
+    "          delete request.headers['x-forwarded-prefix'];", "",
+  ].join("\n"), "");
+  text = replaceOnce(text,
+    "          if (uri === '/api' || uri.indexOf('/api/') === 0) {\n            request.headers['x-shop-client-ip'] = {value: event.viewer.ip};\n          } else {",
+    "          if (uri !== '/api' && uri.indexOf('/api/') !== 0) {");
+  return text;
+}
+function restoreOriginal() {
+  let text = restoreProxyBaseline();
   text = replaceOnce(text, "DeploymentMode, PaymentMode, ApplicationImage", "DeploymentMode, ApplicationImage");
   const mode = /^  PaymentMode:\n(?:    .*\n)+/m.exec(text)?.[0];
   assert.ok(mode); text = replaceOnce(text, mode, "");
@@ -54,8 +79,13 @@ test("reversing only reviewed edits reconstructs exact deployed Original SHA256"
   assert.equal(createHash("sha256").update(restoreOriginal()).digest("hex"),
     "ce6b948680b10693eb807cac5d42ce2c7caeff506ed42733fb06e7a96642a8cb");
 });
-test("inline size, resource count and attribution stay bounded", () => {
-  assert.ok(Buffer.byteLength(source) <= 51200);
+test("trusted proxy edits alone reverse to exact sandbox LT6 baseline", () => {
+  assert.equal(createHash("sha256").update(restoreProxyBaseline()).digest("hex"),
+    "19ef36d981b748db7975ca52ae161af40571891a87fdd7070bf1b0f63e3c6d19");
+});
+test("S3 template size, resource count and attribution stay bounded", () => {
+  assert.ok(Buffer.byteLength(source) > 51200, "Deployment now requires private S3 TemplateURL, not inline body");
+  assert.ok(Buffer.byteLength(source) <= 1048576);
   assert.ok(Buffer.byteLength(script) < 16384);
   assert.equal(Object.keys(template.Resources).length, 57);
   assert.equal(template.Metadata.AWSToolsMetrics.AWSAgentToolkit, "aws-cloudformation@3");
