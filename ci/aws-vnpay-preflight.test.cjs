@@ -170,6 +170,18 @@ test("even passing metadata is not a real sandbox transaction or runtime proof",
   assert.equal(result.readyForSit, false);
   assert.ok(result.notValidated.includes("RUNNING_CONTAINER_ENV"));
 });
+for (const mode of ["none", "vnpay-sandbox", "unsupported-mode"]) {
+  test(`variable-based bootstrap still checks stack PaymentMode=${mode}`, () => {
+    const data = fixtures({ provider: '"$payment_provider"' });
+    data["cloudformation/describe-stacks"].Stacks[0].Parameters
+      .push({ ParameterKey: "PaymentMode", ParameterValue: mode });
+    const result = runPreflight(options, reader(data));
+    assert.deepEqual(result.blockers, mode === "vnpay-sandbox" ? [] : ["STACK_PAYMENT_MODE_SANDBOX"]);
+    assert.equal(result.readyForSit, false);
+    assert.ok(result.notValidated.includes("RUNNING_CONTAINER_ENV"));
+    assert.ok(!JSON.stringify(result).includes(env.VNPAY_HASH_SECRET));
+  });
+}
 test("foreign secret ARN is rejected before any secret read", () => {
   const data = fixtures(), calls = [];
   data["cloudformation/describe-stacks"].Stacks[0].Parameters.find(p => p.ParameterKey === "ApplicationEnvSecretArn").ParameterValue = "arn:aws:secretsmanager:ap-southeast-1:222222222222:secret:other";

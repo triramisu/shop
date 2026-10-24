@@ -141,6 +141,10 @@ function runPreflight(options, read) {
       || stack.StackId?.split(":")[4] !== options.account) fail();
   const p = Object.fromEntries((stack.Parameters || []).map(x => [x.ParameterKey, x.ParameterValue]));
   checks.push(check("STACK_APPLICATION_STABLE", ["CREATE_COMPLETE", "UPDATE_COMPLETE"].includes(stack.StackStatus) && p.DeploymentMode === "application"));
+  // A variable provider override alone does not prove that sandbox is selected.
+  if (Object.hasOwn(p, "PaymentMode")) {
+    checks.push(check("STACK_PAYMENT_MODE_SANDBOX", p.PaymentMode === "vnpay-sandbox"));
+  }
   checks.push(check("IMAGE_PINNED", /^[\w./:-]+@sha256:[a-f0-9]{64}$/.test(p.ApplicationImage || "")));
   if (!/^(?=.{1,200}$)[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(p.ViewerDomainName || "")) fail();
   // The secret must belong to this deployed stack, region and account; no arbitrary ARN input.

@@ -259,3 +259,166 @@ current secret version/shape còn đạt, image/AMI/bastion không đổi và kh
 Add/Remove hay resource ngoài LT/ASG/policy phụ thuộc. Giữ ASG 2/2/4, launch
 before terminate 100%/150%, warmup/bake180s. Không checkout/thanh toán trong
 rollout; chỉ chạy SIT sau khi hai instance/targets mới được hậu kiểm.
+
+### Đối chiếu hai chế độ xem change set trước Execute
+
+Cùng ARN `vnpay-activate-20261024T052438Z` được đọc lại bằng cả hai chế độ;
+source candidate vẫn có SHA-256 nêu trên, plan CREATE_COMPLETE/AVAILABLE.
+Không kết luận hạ tầng drift chỉ vì hai chế độ trả số dòng khác nhau:
+
+| Chế độ describe-change-set | Kết quả quan sát |
+| --- | --- |
+| Mặc định | 3 Modify: Launch Template=False; ASG và CPU policy=Conditional |
+| `--include-property-values` | 2 Modify: Launch Template và ASG=False; ASG chỉ hiện tag revision |
+
+Chi tiết mặc định: ASG phụ thuộc
+`ApplicationLaunchTemplate.LatestVersionNumber`; CPU policy phụ thuộc
+`ApplicationAutoScalingGroup`. Không có Add/Remove hoặc resource ngoài ba
+logical ID này. AWS mô tả chế độ enhanced có thể resolve reference trước
+deploy và giảm dự đoán replacement mang tính bảo thủ; đây là lời giải thích
+phù hợp với dữ liệu đã đọc, không phải bảo đảm việc refresh sẽ xảy ra.
+Xem [AWS enhanced change visibility](https://aws.amazon.com/about-aws/whats-new/2024/04/aws-cloudformation-changesets-enhanced-change-visibility-deployments/).
+
+Guard pre-Execute đầu tiên yêu cầu đúng 2 Modify/False nên đã dừng **trước
+khi gửi Execute** (`ExecuteAttempted=false`). Không có rollout, terminate,
+thay secret hay xóa draft từ lần thử này. Không retry mù hoặc đổi template
+chỉ để làm đẹp plan. Agent đã yêu cầu duyệt lại phạm vi thận trọng gồm
+3 Modify/Conditional; người dùng đã xác nhận phạm vi này trước khi Execute.
+
+Execute được AWS tiếp nhận ngày 24/10/2026, khoảng **16:12 UTC+7**, client
+request token `vnpay-activate-20261024T052438Z-execute`. Guard ngay trước đó:
+30/31 check preflight đạt, chỉ còn forced-none đúng kỳ vọng; Original/candidate
+SHA khớp, merchant secret version không đổi, đúng 2 instance/TG Healthy,
+AMI hiện hành và image digest không đổi, không refresh cạnh tranh; service
+validation không có VALIDATION_ERROR. Bản mặc định đúng 3 Modify phụ thuộc,
+bản enhanced đúng 2; không gọi API bỏ validation.
+
+Lần đọc sau Execute xác minh ASG vẫn cùng physical ID, min/desired/max=2/2/4,
+trỏ numeric LT version 6. CloudFormation đã khởi tạo native refresh
+`22704ce8-981f-481b-a7a6-dadd3b1234ee`; máy mới đầu tiên version 6 đang boot
+trong khi hai máy version 5 tiếp tục Healthy. Chưa tự gọi manual refresh,
+terminate, chỉnh desired capacity hay tạo payment. Đây là tiến độ giữa
+rollout, chưa phải kết luận nghiệm thu cuối.
+
+Khoảng **16:26 UTC+7**, máy mới đầu tiên `i-04b67f818b3361c16` đã
+cloud-init done, container và local/ALB health đều Healthy. Probe SSM chỉ
+đọc, dùng `docker inspect`/log trong RAM và chỉ trả boolean/chỉ số hữu hạn:
+profile prod, provider vnpay, Order initiation/consumer=true; refund/query/
+reconciliation/recovery=false, ADMIN bootstrap off, image digest khớp,
+restartCount=0. File env tạm không còn tồn tại sau khởi động. Không xuất
+credential, raw inspect hoặc log thô vào output/Git.
+
+Độ trễ boot quan sát chủ yếu ở vòng nhập CA: 114 certificate được nhập vào
+truststore, file vẫn được cập nhật khi theo dõi; không có các tín hiệu lỗi
+bootstrap/DB/Flyway/startup trong probe đã lọc. Không nhầm Unhealthy trong
+giai đoạn này với app đã fail sau boot. Việc tối ưu dựng truststore/Golden
+AMI là bước sau có review riêng, không đổi image/AMI/UserData giữa rollout.
+Đây mới là một máy; chưa kết luận fleet/SIT hoàn tất.
+
+Khoảng 16:28 UTC+7, refresh đã thay máy cũ AZ A và tạo máy version 6 kế
+tiếp `i-01d20e0b56d80b493` ở AZ B; vẫn có hai target Healthy phục vụ trong
+khi máy thứ hai boot. Không tự điều chỉnh ASG hay đăng ký target bằng tay.
+
+Trong thời gian hậu kiểm, helper đọc-only được bổ sung check
+`STACK_PAYMENT_MODE_SANDBOX` khi stack đã có parameter `PaymentMode`.
+Bootstrap dùng biến `$payment_provider` không còn khiến mode none hoặc
+mode lạ bị hiểu nhầm là đã chọn sandbox chỉ vì thiếu literal provider=none.
+Ba test synthetic mới kiểm cả none/sandbox/unsupported; metadata đạt vẫn
+luôn `readyForSit=false`, không thay thế container probe/giao dịch thật.
+Kết quả local mới nhất: **55 test helper + 23 test template = 78 test đạt**,
+0 failure/skipped. Helper line 100%, branch 86,11% theo Node experimental
+coverage, không phải coverage Java/backend. YAML đã duyệt giữ nguyên SHA;
+không tạo plan mới, không sửa runtime/image hoặc rerun full bootstrap.
+
+Hậu kiểm bắt buộc phải dựa trên numeric LT version của ASG, refresh thực tế,
+LT version/health từng instance và các switch được lọc từ container. Tag
+revision hoặc `UPDATE_COMPLETE` riêng lẻ không đủ chứng minh sandbox hoạt
+động. Không serialize toàn bộ `docker inspect`, environment hoặc secret.
+
+### Cách theo dõi rollout ở các lần triển khai sau
+
+Các lệnh dưới đây chỉ đọc; mỗi lệnh là **một dòng** dùng được trong Bash
+hoặc PowerShell khi profile `shop-prod` còn phiên. Đổi tên stack/ASG/target
+group theo Outputs/Resources của dự án khác, không tái dùng ID mù.
+
+```text
+aws cloudformation describe-stacks --profile shop-prod --region ap-southeast-1 --stack-name shop-aydibro-prod --query "Stacks[0].StackStatus" --output text
+aws autoscaling describe-instance-refreshes --profile shop-prod --region ap-southeast-1 --auto-scaling-group-name shop-aydibro-prod-ApplicationAutoScalingGroup-vGFBGIo2wDtZ --max-records 2 --query "InstanceRefreshes[].{Status:Status,Percent:PercentageComplete,Remaining:InstancesToUpdate}" --output table
+aws autoscaling describe-auto-scaling-groups --profile shop-prod --region ap-southeast-1 --auto-scaling-group-names shop-aydibro-prod-ApplicationAutoScalingGroup-vGFBGIo2wDtZ --query "AutoScalingGroups[0].{Desired:DesiredCapacity,Version:LaunchTemplate.Version,Instances:Instances[].{Id:InstanceId,Version:LaunchTemplate.Version,Life:LifecycleState,Health:HealthStatus}}" --output json
+aws elbv2 describe-target-health --profile shop-prod --region ap-southeast-1 --target-group-arn arn:aws:elasticloadbalancing:ap-southeast-1:233377400170:targetgroup/shop-a-Appli-HDHO5KCE8IDU/9bc51ef52208fc8b --query "TargetHealthDescriptions[].{Id:Target.Id,State:TargetHealth.State,Reason:TargetHealth.Reason}" --output table
+```
+
+Luồng cần quan sát: LT mới → thêm một EC2 mới → bootstrap/container và
+health đạt → warmup → máy cũ drain rồi terminate → thay máy kế tiếp → bake
+→ refresh Successful/stack UPDATE_COMPLETE. Launch-before-terminate có thể
+tạm thấy 3 máy dù desired=2. EC2/ASG Healthy không đồng nghĩa application
+target đã Healthy. Target mới có thể Unhealthy khi bootstrap chưa hoàn tất;
+đọc trạng thái cloud-init/container trước khi kết luận lỗi hoặc ép restart.
+Health grace 20 phút không biến một target Unhealthy thành Healthy.
+
+Hậu kiểm chỉ gọi GET nhỏ: website và Catalog phải HTTP200, dữ liệu mẫu vẫn
+12 sản phẩm; private API vô danh phải HTTP401. IPN có query hợp lệ nhưng
+checksum sai phải trả receipt `97`; query rỗng bị parser từ chối bằng `99`.
+Cả hai phải có `Cache-Control: no-store` sau khi **toàn bộ** fleet
+đã sang sandbox. Không dùng kết quả của một request vào mixed fleet để
+kết luận rollout xong; không tạo order/giao dịch nhằm kiểm tra health.
+
+## Kết quả cuối phần kích hoạt — 24/10/2026, khoảng 16:46 UTC+7
+
+- Stack `shop-aydibro-prod`: **UPDATE_COMPLETE**. Native refresh
+  `22704ce8-981f-481b-a7a6-dadd3b1234ee`: **Successful**, 100%, remaining=0.
+  ASG physical ID giữ nguyên; min/desired/max vẫn 2/2/4, numeric LT version 6.
+- Hai instance `i-04b67f818b3361c16` (AZ A), `i-01d20e0b56d80b493` (AZ B)
+  cùng version 6, InService/Healthy; đúng hai target ALB Healthy. ASG đã tự
+  thay/terminate hai máy version 5 theo policy được duyệt; không ép refresh,
+  terminate, register target hoặc sửa capacity bằng tay. Dữ liệu bền vững
+  ở RDS/S3, không ở root volume của các máy đã thay.
+- EC2 hậu kiểm: giữ AMI hiện hành, private IP-only, IMDSv2 required/hop2,
+  instance profile và security group giống baseline. Image digest của hai
+  container khớp parameter, container Healthy, restartCount=0; cloud-init done.
+- Cả hai container đã xác minh profile prod, provider vnpay,
+  Order auto-initiation/event consumer=true; refund/query/reconciliation/
+  recovery=false, ADMIN bootstrap off. Đọc đúng AWSCURRENT từ secret của
+  stack trong RAM trên mỗi máy: merchant/JWT/runtime DB/Flyway DB đều khớp
+  container, chỉ xuất boolean. Một lượt đọc secret trên máy thứ hai chưa
+  trả được kết quả; thử lại có giới hạn 30 giây đã đạt, không đổi IAM/network.
+  Không lưu lại key/password/secret content hoặc raw Docker environment.
+- HTTP smoke qua `https://aydibro.click`: UI200; `/api/catalog/products`
+  200, totalElements=12; `/api/auth/my-info` không token401. IPN GET query
+  rỗng trả HTTP200/RspCode99 theo parser hiện hành; query hợp lệ với checksum
+  giả trả HTTP200/RspCode97. Hai trường hợp đều no-store; không gọi giao
+  dịch thật, không tạo order hoặc dùng merchant key để giả IPN thành công.
+  **HTTP200 của IPN không có nghĩa đã thanh toán**: phải đọc receipt code.
+- `list-change-sets` sau Execute trả danh sách rỗng. Bước kiểm tra dọn hai
+  draft dừng ở read/verify vì không còn change set để thao tác; agent không
+  gửi delete-stack hay xóa resource để dọn chúng.
+- 78 test Node/bootstrap, syntax checks và diff check đạt local. Template
+  đã triển khai giữ đúng SHA candidate ở trên; không thay Java/schema/image,
+  không tự chạy lại Maven để lấy credit coverage, không push/PR/merge.
+- Preflight live sau UPDATE_COMPLETE: **32/32 check đạt**, blockers trống,
+  PREFLIGHT_ONLY/readyForSit=false; Original từ AWS đúng SHA candidate,
+  51.052 byte. Giới hạn RUNNING_CONTAINER_ENV của helper được kiểm tra bằng
+  probe SSM riêng ở trên, không sửa helper thành công cụ Execute hay coi
+  metadata xanh là đã có giao dịch thành công.
+
+Phần triển khai mode sandbox đã đạt các kiểm tra nêu trên; **PAY-SIT chưa
+hoàn thành**. Helper vẫn chủ đích không xác nhận giao dịch thật. Các việc
+chưa đạt/ngoài phạm vi Execute:
+
+1. `SERVER_FORWARD_HEADERS_STRATEGY=none` vẫn được giữ nguyên. Phải review
+   trusted proxy/client IP cho CloudFront → ALB → app trước khi thử checkout;
+   không bật tin mọi X-Forwarded-For hoặc mở ingress để sửa nhanh.
+2. Chưa đăng ký merchant IPN. URL backend đã sẵn sàng về mặt HTTPS/route:
+   `https://aydibro.click/api/payments/webhooks/vnpay`. Gửi đúng URL này cho
+   VNPay qua kênh merchant chính thức; không gửi HashSecret. Đăng nhập portal
+   là bước chủ merchant tự nhập mật khẩu/OTP, không đưa vào chat/README.
+3. Chưa có IPN thực từ VNPay, browser handoff/return E2E, Order PAID,
+   confirm kho đúng một lần hoặc bằng chứng duplicate/failure/late path.
+   Không coi các probe sai chữ ký là SIT đã đạt.
+4. Guard 34 failed Rule ID theo baseline và thiếu durable CloudTrail chưa
+   được khắc phục trong task này. Khóa hiện hành được dùng theo quyết định
+   ngoại lệ chỉ cho sandbox; phải xử lý credential trước thanh toán thật.
+
+Rollback không được thực hiện trong lượt này. Nếu sau này đã có giao dịch
+pending, **không** chuyển none/xóa key hoặc endpoint để tắt gấp: giữ IPN,
+drain/đối chiếu và review change set riêng. Không hạ Flyway/xóa RDS/S3.

@@ -20,14 +20,21 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   AWS đã đăng nhập đúng tài khoản; người dùng đã tự Store merchant và hai
   switch event/recovery=false, qua kiểm tra cấu hình trong RAM. Người dùng
   chọn giữ khóa hiện hành chỉ cho sandbox sau cảnh báo; không chép khóa từ chat.
-  **Chưa SIT/Execute**: stack đang chạy vẫn ép provider=none. Candidate
+  **Đã bật sandbox và hậu kiểm rollout; chưa SIT**: ngày 24/10 người dùng duyệt phạm vi
+  thận trọng 3 Modify và agent gửi Execute đúng plan `vnpay-activate-20261024T052438Z`.
+  Khoảng 16:46 UTC+7: stack UPDATE_COMPLETE, native refresh Successful,
+  hai EC2/target Healthy ở hai AZ cùng LT version 6. Container probe đã xác
+  minh sandbox, image giữ nguyên và merchant/JWT/DB khớp secret trong RAM. Bản
   [prod YAML](deploy/aws/shop-prod.yaml) bật sandbox có kiểm soát, sửa optional
   bank-code rỗng và ghim AMI hiện hành thay vì tự lấy SSM latest đã đổi.
   Thêm tag desired revision ASG để plan thể hiện group tham gia update;
   tag không chứng minh runtime đã rollout. Không đổi image/IAM/DB/SG/DNS/UI/WAF
-  hoặc update policy. 75 test Node/bootstrap, cfn-lint và diff check đạt local;
+  hoặc update policy. 78 test Node/bootstrap và diff check đạt local;
+  cfn-lint của đúng template đã duyệt cũng đạt;
   Guard vẫn 34 failed Rule ID như Original, CloudTrail đọc lại vẫn 0 trail.
-  Chưa CI/push hoặc approval go-live; Execute cần review đúng plan mới nhất.
+  UI/Catalog200 (12 sản phẩm), private my-info401; IPN checksum giả trả97,
+  query rỗng trả99, no-store. Không tạo giao dịch hoặc đăng ký merchant IPN.
+  Chưa CI/push hoặc approval go-live; còn trusted-proxy/client IP và SIT thật.
   Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
   tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)

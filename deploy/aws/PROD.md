@@ -4,6 +4,12 @@
 không sao chép bản draft trong checkout vận hành. Đây là candidate VNPay
 sandbox; file tồn tại trong Git không chứng minh AWS đã Execute hoặc SIT đạt.
 
+Ngày 24/10/2026 khoảng 16:46 UTC+7, bản này đã được Execute với
+`PaymentMode=vnpay-sandbox`: stack UPDATE_COMPLETE, refresh Successful,
+hai instance LT version 6 và hai ALB target Healthy. Container/secret parity
+và IPN từ chối checksum giả đã được kiểm tra; chưa đăng ký IPN với merchant
+hoặc làm giao dịch sandbox, chưa go-live. Bằng chứng và lệnh nằm trong runbook.
+
 Xem [hợp đồng, kết quả và từng bước triển khai VNPay](../../docs/vnpay-sandbox-preflight.md)
 và [trạng thái dự án](../../README.md).
 
