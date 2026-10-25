@@ -15,6 +15,16 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
+- PAY-SIT-01C — Chuẩn bị nghiệm thu sandbox ngày25/10/2026: đã gia hạn AWS
+  theo duyệt của người dùng, xác minh đúng account và hai target LT7 Healthy;
+  UI/Catalog200 (12 sản phẩm), private anonymous401. Kiểm tra Gmail phát hiện
+  thư yêu cầu IPN gửi tới no-reply và một thư khác bị trả550 5.1.1; chưa có
+  xác nhận IPN mới. Chủ merchant đã đăng nhập; các mục đã kiểm tra chưa có
+  bằng chứng URL IPN của Shop, mục thông báo chỉ là email; không sửa merchant
+  hoặc xem chi tiết website khác. Chưa tạo order/transaction, gửi email hoặc
+  đổi AWS/secret. Cần xác minh với kênh hỗ trợ sandbox chính thức. Xem
+  [hợp đồng, bằng chứng và từng bước SIT](docs/vnpay-sit.md). Không coi email
+  đã gửi hoặc HTTP200 là đã nghiệm thu callback/payment; chưa push/merge.
 - PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
   CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
   **Đã Execute và hậu kiểm triển khai đạt** change set
@@ -29,7 +39,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   không tạo USER/order/transaction. Local đạt 94 test Node, 88 test Java đúng
   phạm vi, Spotless và cfn-lint; Guard vẫn 34 failed Rule ID, chưa có durable
   CloudTrail. AWS preflight không có validation error; plan mặc định 5 Modify
-  (ASG/policy Conditional), enhanced 3 Modify; không Add/Remove. Candidate
+  (ASG/policy Conditional), enhanced 3 Modify; không Add/Remove.
   Source đã deploy khớp SHA candidate; 52.108 byte dùng artifact S3 private,
   không gửi inline. Có lúc4 EC2 gồm1 máy đang terminate; không đổi policy/
   capacity hoặc terminate thủ công. Người dùng đã trả
@@ -45,7 +55,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   thận trọng 3 Modify và agent gửi Execute đúng plan `vnpay-activate-20261024T052438Z`.
   Khoảng 16:46 UTC+7: stack UPDATE_COMPLETE, native refresh Successful,
   hai EC2/target Healthy ở hai AZ cùng LT version 6. Container probe đã xác
-  minh sandbox, image giữ nguyên và merchant/JWT/DB khớp secret trong RAM. Bản
+  minh sandbox, image giữ nguyên và merchant/JWT/DB khớp secret trong RAM.
   Bản nền [prod YAML](deploy/aws/shop-prod.yaml) đã bật sandbox có kiểm soát, sửa optional
   bank-code rỗng và ghim AMI hiện hành thay vì tự lấy SSM latest đã đổi.
   Thêm tag desired revision ASG để plan thể hiện group tham gia update;
