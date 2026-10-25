@@ -10,6 +10,8 @@
    Inventory sở hữu giữ/confirm/release kho; Payment sở hữu attempt và IPN
    inbox. Dùng API/public contract hiện hành, không SQL mutation xuyên module.
    Phải có đăng ký IPN được xác minh, runtime prod/vnpay và đúng UI đã deploy.
+   Được cấu hình đúng URL IPN trên website merchant Shop đã xác định; giữ
+   nguyên mã merchant, khóa, GET và HMACSHA512, rồi đọc lại sau khi lưu.
    Baseline deployed LT7 từ `570922c`; nhánh task xếp trên baseline vận hành
    chưa merge, không lấy `origin/main` làm bằng chứng đã chứa thay đổi đó.
 3. **Luồng/bất biến:** Order/giá/currency do server tính. Payment chỉ thành
@@ -35,7 +37,9 @@
    và kho confirm đúng một lần; ca thất bại giải phóng đúng một lần khi provider
    thực sự báo trạng thái final. Cần evidence theo order/attempt trong API/DB
    read-only, không chỉ screenshot Return00 hoặc HTTP200 của callback.
-8. **Rollout/rollback/cleanup:** task chưa yêu cầu rollout. Giữ PaymentMode
+8. **Rollout/rollback/cleanup:** phạm vi ban đầu chưa yêu cầu rollout; lỗi
+   phát hiện khi SIT có hợp đồng F1 và plan được duyệt riêng bên dưới.
+   Giữ PaymentMode
    sandbox và endpoint IPN khi còn pending; không đổi none/xóa order/hạ Flyway/
    reset DB. Dọn cart/test session qua API hợp lệ sau khi ghi evidence, không
    xóa lịch sử tài chính/kho hoặc sửa tay trạng thái pending. Không push/merge
@@ -81,9 +85,199 @@
   `https://vnpay.vn/dang-ky-tu-van/`. Cần xác minh đúng nơi tiếp nhận sandbox
   trước khi truyền thông tin; không tự chọn người nhận từ danh sách website.
 
-**Chưa nghiệm thu PAY-SIT-01C:** chưa xác minh đăng ký IPN, chưa có USER
-session USER dùng test, chưa tạo order/attempt/giao dịch sandbox trong task này.
-Không đóng M5 hoặc coi health/receipt97 là E2E thành công.
+Các ghi nhận email/portal ở trên là lần kiểm tra ban đầu. Kết quả kiểm tra
+tiếp theo dưới đây thay thế blocker chưa xác minh URL IPN; không xóa lịch sử
+thư bounce hoặc coi việc đã gửi email là bằng chứng callback.
+
+### Tiếp tục buổi tối — cấu hình merchant và regression
+
+- Chủ merchant tự đăng nhập lại đúng tài khoản Shop. Trong **Thông tin tài
+  khoản**, tìm chính xác dòng website bằng mã terminal của Shop và tên
+  `shop aydibro`; chỉ mở link cấu hình của dòng đó. Không mở website khác,
+  thay ID trong URL hoặc lưu danh sách merchant sandbox vào repo.
+- Màn hình **Thông tin cấu hình** ban đầu có IPN URL là `#`; giao thức đã là
+  **GET** và kiểu mã hóa **HMACSHA512**. Chỉ sửa IPN URL thành
+  `https://aydibro.click/api/payments/webhooks/vnpay` và bấm **Hoàn thành**.
+  Lượt bấm bị timeout ở công cụ nhưng máy chủ đã lưu; không bấm lại mù.
+- Mở lại trang cấu hình của chính website đã chọn bằng GET mới, đọc lại
+  được URL chính xác, GET và HMACSHA512. **Gate đăng ký IPN qua merchant
+  đã đạt**; không cần đợi email hỗ trợ để thực hiện bước SIT tiếp theo.
+  Chưa bấm Test call IPN hoặc tạo giao dịch. Không đọc/đổi khóa merchant,
+  mật khẩu, quyền hoặc cấu hình của website khác.
+- Ảnh chứng minh chỉ chứa cấu hình IPN, được lưu ngoài Git tại
+  `%TEMP%/shop-vnpay-sit-20261025/merchant-ipn-config.jpg`; không chứa
+  password, HashSecret, token hoặc URL thanh toán đã ký.
+- Docker Engine ban đầu chưa chạy; khởi động Docker Desktop đã cài sẵn,
+  không cài lại, reset hoặc xóa volume. Engine báo `29.6.1`.
+- Tái sử dụng nguyên suite `VnpayPurchaseFlowMySqlTests` từ commit local
+  `43522e6` vào nhánh SIT hiện tại; chỉ lấy file test, không ghi đè README
+  hoặc nhập cả nhánh cũ. Blob hai bên khớp
+  `96ec731ddc85275fcd5d0ecb34c686e68d9f04fe`. Không đổi Java production,
+  schema, dependency, backend image, secret hoặc hạ tầng.
+- Gate riêng lúc **21:04:46 UTC+7 ngày 25/10**: 16 test mua hàng PASS,
+  0 failure/error/skipped trên MySQL **8.4.11**; Flyway V1–V26 và Hibernate
+  validate đạt. Callback ở suite này dùng chữ ký fixture độc lập; vẫn là
+  regression local, không phải callback thật của VNPay.
+- 94 test Node preflight/template/trusted-proxy PASS. Lượt chạy đầu thiếu
+  module YAML; chạy lại với `SHOP_YAML_MODULE`, `SHOP_BASH`, `SHOP_PYTHON`
+  trỏ tới các công cụ đã cài theo runbook trusted-proxy. Không cài package
+  mới, đổi PATH toàn máy, skip test hoặc sửa template để né kiểm tra.
+- AWS preflight read-only: **32/32 check đạt**, blocker rỗng; fleet hai AZ
+  cùng LT7, hai target Healthy, ASG2/2/4, không refresh đang chạy. Cấu hình
+  merchant/switch trong AWSCURRENT đúng định dạng và version ổn định; không
+  xuất nội dung secret. `PREFLIGHT_ONLY/readyForSit=false` là kết quả đúng
+  của công cụ kiểm cấu hình, không được sửa thành bằng chứng giao dịch.
+- Full `clean verify` kết thúc **21:19:55 UTC+7 ngày 25/10**, thời lượng
+  10:06: **736 test PASS**, 0 failure/error/skipped; Spotless và JaCoCo gate
+  hiện hành đạt. Backend line **91,73%** (6946/7572), branch **72,42%**
+  (2345/3238), vẫn chưa đạt mục tiêu trên 80%. Không đổi ngưỡng hoặc loại
+  code khỏi báo cáo. Website đang chờ chủ tài khoản tự đăng nhập USER riêng.
+- Chủ tài khoản đã tự đăng nhập USER trong tab Shop của Codex; không lấy
+  token/password từ browser storage. Probe SSM riêng trên hai EC2 LT7 chỉ
+  xuất boolean: prod/vnpay, initiation/consumer=true, refund/query/worker/
+  recovery=false, image khớp stack, container Healthy/restart0, có cấu hình
+  merchant, không còn credential bootstrap ADMIN. Cả hai máy đạt 12 check.
+- Baseline RDS qua JDBC read-only trong container: đúng MySQL8.4.11/schema
+  Shop/runtime user, `sslMode=VERIFY_IDENTITY` và TLS cipher đạt; 3 danh mục,
+  12 sản phẩm/24 SKU. Riêng `DEMO-AIR01-SILVER` có **onHand20/reserved0**
+  trên đúng một stock row. Helper chẩn đoán tái dùng driver có sẵn trong JAR,
+  chỉ SELECT/metadata, rollback giao dịch đọc; class tạm trong `/tmp` được
+  xóa sau probe. Không cài driver/package, lấy master credential hoặc sửa DB.
+- Giỏ USER ban đầu có cùng SKU quantity2; giảm qua UI thành quantity1,
+  xác minh tổng server **490.000 VND** trước khi bấm xác nhận một lần.
+
+**Chưa nghiệm thu PAY-SIT-01C:** URL IPN đã lưu và đọc lại thành công,
+USER đã đăng nhập và tạo một đơn DEMO. Đơn bị hủy do sai location trước
+payment; chưa có attempt/giao dịch/IPN thật. Đang sửa cấu hình kho theo F1
+bên dưới. Không đóng M5 hoặc coi cấu hình, health/receipt97 là E2E thành công.
+
+### Lỗi phát hiện khi chạy website — PAY-SIT-01C-F1
+
+Đơn DEMO tạo lúc **21:25:18 UTC+7 ngày 25/10** tự chuyển CANCELLED trước
+handoff. Evidence read-only theo đúng một order: orchestration và line đều
+`FAILED/STOCK_ITEM_NOT_FOUND`, 0 payment attempt, 0 webhook, 0 payment event,
+0 reservation và 0 movement. SKU vẫn onHand20/reserved0, location `DEMO-LAB`.
+Checkout mặc định cấu hình location `MAIN`; không tìm kho khác để tự lấy hàng.
+Đây là dữ liệu mẫu chưa khớp cấu hình checkout, chưa phải lỗi gateway VNPay.
+Không sửa trạng thái hoặc xóa đơn đã hủy; không tạo đơn khác trước khi sửa.
+
+Hợp đồng sửa cấu hình trước khi tiếp tục:
+
+1. **Mục tiêu:** checkout sandbox dùng đúng kho của dữ liệu DEMO hiện hành;
+   không đổi thuật toán thanh toán hoặc bật tính năng ngoài phạm vi.
+2. **Đầu vào/ownership:** `application.yml` đã hỗ trợ
+   `CHECKOUT_INVENTORY_LOCATION_CODE` (mặc định `MAIN`). Chủ tài khoản thêm
+   `CHECKOUT_INVENTORY_LOCATION_CODE=DEMO-LAB` trong Plaintext secret ứng dụng;
+   giữ các key khác. Không nhập `APP_ORDER...` nếu dùng biến đã được tài liệu hóa.
+3. **Bất biến:** lookup giữ đúng variant/SKU/location; không fallback sang
+   kho bất kỳ, sửa trực tiếp stock row hoặc giả xác nhận thanh toán.
+4. **An toàn:** so sánh secret version/diff trong RAM, chỉ chấp nhận một key
+   location thay đổi; không xuất nội dung secret. Giữ USER session và không
+   dùng lại credential bootstrap ADMIN từ version cũ.
+5. **Đầu ra:** tăng ConfigurationRevision bằng template đã deploy không sửa
+   resource; plan mới cần thể hiện đúng phạm vi LT/ASG và phụ thuộc trước
+   Execute. Cập nhật env example/runbook và regression non-default location.
+6. **Kiểm tra:** location DEMO-LAB tạo reservation/payment được; location
+   khác bị từ chối, không tạo attempt/giữ kho. Local dùng MySQL8.4, không
+   dùng RDS/merchant thật để thay regression.
+7. **Nghiệm thu sửa cấu hình:** hai EC2/target Healthy cùng LT mới, đọc đúng
+   biến location và sandbox flags; dữ liệu kho chưa đổi. Sau đó mới tạo
+   một đơn SIT mới và quan sát IPN thực; đơn bị hủy cũ giữ nguyên.
+8. **Rollout/rollback:** rollout tuần tự do CloudFormation quản lý, có thể
+   tạm ba EC2 tính phí. Không restart/terminate tay hoặc chạy tải đồng thời.
+   Nếu cần rollback: phục hồi key location qua secret, revision mới và plan
+   riêng; không hạ Flyway, tắt sandbox khi còn pending hoặc reset dữ liệu.
+
+F1 đã kiểm trước Execute:
+
+- Người dùng tự Store biến kho, agent không sửa nội dung secret. So sánh
+  AWSCURRENT trong RAM với từng container: tất cả key hiện hành ngoài các
+  override cố định của launch template khớp, chỉ location cần reload.
+  Version ổn định ở cả hai probe; không in giá trị hoặc diff secret.
+- Thêm regression non-default location qua chính biến
+  `CHECKOUT_INVENTORY_LOCATION_CODE=DEMO-LAB`; 16 ca purchase hiện hữu dùng
+  đúng kho đó, thêm một ca tồn kho ở `MAIN` bị từ chối mà không tạo attempt,
+  reservation hoặc stock movement. **17/17 PASS** trên MySQL8.4.11 lúc
+  **21:33:33 UTC+7**; Spotless chỉ format file test mới. Full regression
+  sau thay đổi kết thúc **21:44:56 UTC+7** (10:31): **737 test PASS**,
+  0 failure/error/skipped, Spotless/JaCoCo gate đạt. Line **91,69%**
+  (6943/7572), branch **72,42%** (2345/3238); chưa đạt mục tiêu >80%.
+  Đây là số đo mới, không lấy91,73% của lần736 test để thay thế.
+- `.env.example`, env example prod/AWS và Compose dev/prod ghi rõ biến kho,
+  truyền vào container với default MAIN giữ tương thích. Không copy tên kho
+  DEMO vào default production của dự án khác; luôn đối chiếu stock thực tế.
+- Sau cập nhật env example/Compose, chạy lại 94 test Node preflight/template/
+  trusted-proxy PASS và `docker compose config --quiet` cho cả dev/prod với
+  file example; không đọc `.env` thật, tạo container hoặc đổi runtime AWS
+  bằng Compose. `git diff --check` đạt.
+- Template source vẫn **52.108 byte**, SHA256
+  `319e79f59c257c20c7d4fb2d12f70d82b9dedafe0e78e19c04e703d209d6e7b9`,
+  khớp Original đang deploy; dùng `--use-previous-template`, không tải lại
+  template khác/không sửa resource. cfn-lint1.57.2 không error/warning/info.
+  Guard3.2.1/registry7f7340c: 34 failed Rule ID như baseline (32 report FAIL,
+  44 PASS, 117 SKIP); giữ nguyên finding, không đổi rule để làm xanh.
+  CloudTrail vẫn0 durable trail nên khả năng lưu audit dài hạn còn hạn chế.
+- Bản nháp đầu dùng revision dài hơn32 ký tự bị AWS từ chối trước khi tạo
+  change set; đã rút gọn `checkout-loc-20261025-01` và kiểm regex/độ dài trước
+  khi tạo lại. Không có resource nào bị thay đổi từ bản nháp lỗi đó.
+- Plan `checkout-location-20261025T143210Z`: AWS validation không có lỗi;
+  default view3 Modify LT/ASG/scaling policy (ASG/policy Conditional), enhanced
+  view2 Modify LT/ASG không replacement. Không Add/Remove; AMI/image vẫn ghim
+  hiện hành. Người dùng duyệt plan cụ thể, agent kiểm lại stack/template,
+  secret version, fleet/target, không refresh khác và plan không đổi rồi gửi
+  Execute đúng một lần. Hiện stack UPDATE_IN_PROGRESS, LT8, native refresh
+  InProgress; hai target LT7 cũ vẫn Healthy. Chưa nghiệm thu rollout.
+
+Mốc theo dõi rollout F1 (UTC+7, không phải lệnh cần chạy lại):
+
+- **21:35:50:** Execute được gửi một lần, client request token riêng; LT8
+  và native refresh mới được tạo qua CloudFormation.
+- **21:48–21:50:** EC2 mới AZ B nhập114 RDS CA, container khởi động hoàn tất,
+  local health200/UP, Docker/ALB Healthy, restart0/OOM=false, location đúng
+  DEMO-LAB, không có exception trong probe startup đã lọc. Chưa kết luận
+  fleet hoàn tất chỉ từ một máy hoặc trạng thái ASG InService.
+- **21:51:** ASG drain/terminate máy LT7 tại AZ B rồi khởi tạo LT8 ở AZ A;
+  hai target phục vụ vẫn Healthy. Snapshot có4 instance ID gồm1 Terminating,
+  không sửa capacity/policy hoặc terminate thủ công. Chưa tạo đơn SIT mới.
+
+Quy trình tái sử dụng khi kho/dữ liệu mẫu chưa khớp:
+
+1. DataGrip qua SSM hoặc probe read-only, kiểm đúng SKU/location/balance:
+
+   ```sql
+   SELECT sku, location_code, on_hand, reserved_quantity
+   FROM ton_kho_mat_hang
+   WHERE sku = 'SKU_CAN_KIEM_TRA';
+   ```
+
+2. Secrets Manager đúng region → secret ứng dụng → Retrieve secret value →
+   Edit → Plaintext. Thêm/sửa **một dòng** theo location thực, không trùng key:
+
+   ```dotenv
+   CHECKOUT_INVENTORY_LOCATION_CODE=DEMO-LAB
+   ```
+
+   Đây là giá trị cho dữ liệu DEMO hiện tại. Kho thực MAIN thì dùng MAIN.
+   Giữ nguyên DB/JWT/merchant/các switch khác, bấm Store. Không commit secret
+   hoặc chụp màn hình Plaintext. Store chưa đổi environment của container cũ.
+3. Tạo change set UPDATE bằng template đang deploy, giữ các parameter khác,
+   chỉ tăng ConfigurationRevision (1–32 ký tự `a-zA-Z0-9._-`). Kiểm AMI vẫn
+   ghim và không có refresh đang chạy. Chạy lint/Guard và AWS validation;
+   review cả hai chế độ plan trước khi duyệt Execute riêng cho lần đó.
+4. Execute đúng một lần sau duyệt. Không chạy lại plan dưới đây; lệnh này
+   ghi lại lần đã được duyệt, không phải lệnh cần dùng lại cho dự án khác:
+
+   ```text
+   aws cloudformation execute-change-set --stack-name shop-aydibro-prod --change-set-name checkout-location-20261025T143210Z --profile shop-prod --region ap-southeast-1 --no-cli-pager
+   ```
+
+5. Chờ native refresh Successful, hai target Healthy cùng LT mới và runtime
+   đọc đúng location. Bootstrap nhập RDS CA nên có thể mất30–35 phút cả đợt;
+   không stop/start/terminate tay. Theo dõi bằng lệnh read-only trong
+   [runbook trusted proxy](trusted-proxy.md#quy-trình-rollout-sau-khi-được-duyệt).
+6. Sau hậu kiểm mới tạo một đơn test mới. Đơn cũ CANCELLED phải giữ nguyên;
+   không sửa DB để hồi sinh đơn hoặc ghi đè ledger. Chỉ kết quả IPN hợp lệ
+   mới xác nhận thanh toán; cấu hình đúng kho chưa phải SIT thành công.
 
 ## Trình tự tiếp tục
 
@@ -91,12 +285,19 @@ Không đóng M5 hoặc coi health/receipt97 là E2E thành công.
    [VNPay Merchant sandbox](https://sandbox.vnpayment.vn/merchantv2/Users/Login.htm)
    trong trình duyệt ứng dụng. Khi phiên hết hạn, tự đăng nhập lại; không gửi
    mật khẩu/OTP/ảnh credential vào chat.
-2. Agent kiểm tra màn hình thực tế theo quyền chỉ đọc. Chỉ xác nhận IPN nếu
+2. Agent kiểm tra đúng website của Shop trên màn hình thực tế. Chỉ xác nhận IPN nếu
    có cấu hình hoặc phản hồi rõ ràng khớp URL:
 
    ```text
    https://aydibro.click/api/payments/webhooks/vnpay
    ```
+
+   Trong portal hiện tại: **Thông tin tài khoản → dòng website Shop → tên
+   website → Thông tin cấu hình**. Điền **IPN Url**, giữ **GET** và
+   **HMACSHA512**, bấm **Hoàn thành** một lần, mở lại đúng cấu hình để kiểm
+   tra đã lưu. Nếu nút báo timeout, đọc lại trước khi cân nhắc bấm lần nữa.
+   Bước này đã thực hiện thành công ngày 25/10; không phải cấu hình trong
+   mục thông báo email và không nhập HashSecret vào URL IPN.
 
    Nếu portal không có chức năng đó, dùng kênh hỗ trợ **đã xác minh hiện hành**.
    Không tiếp tục gửi vào địa chỉ bounce hoặc mặc định Reply tới no-reply sẽ
@@ -115,6 +316,7 @@ Không đóng M5 hoặc coi health/receipt97 là E2E thành công.
 
 | Kịch bản | Bằng chứng cần có | Trạng thái |
 | --- | --- | --- |
+| Sai location kho | Checkout hủy trước payment, không giữ/xuất kho, không tạo attempt | Đã quan sát trên website/RDS; đang sửa F1 |
 | Success | IPN thực, đúng chữ ký/amount/reference; Payment SUCCEEDED; Order PAID; một confirm kho | Chưa chạy |
 | Failure/cancel | Provider báo final failure, Order/kho chuyển đúng policy; không suy diễn từ đóng tab | Chưa chạy |
 | Duplicate | Retry do provider/SIT thực, không thêm transition/inbox/movement | Chưa chạy |
@@ -135,7 +337,7 @@ Không đóng M5 hoặc coi health/receipt97 là E2E thành công.
 - **Go-live:** còn gate bảo mật/backup/outbox/credential và tiền thật riêng.
 
 Guard34 finding và thiếu durable CloudTrail là baseline chưa được sửa;
-coverage branch backend chưa được đo lại ở task tài liệu/readiness này và
-chưa có bằng chứng đạt mục tiêu >80%. Không tạo thêm tài nguyên AWS.
+coverage branch backend được đo lại ở lượt regression tối 25/10 là 72,42%,
+chưa đạt mục tiêu >80%. Không tạo thêm tài nguyên AWS.
 
 Nguồn giao thức: [VNPay PAY — IPN server-to-server](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).

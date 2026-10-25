@@ -15,16 +15,22 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
-- PAY-SIT-01C — Chuẩn bị nghiệm thu sandbox ngày25/10/2026: đã gia hạn AWS
-  theo duyệt của người dùng, xác minh đúng account và hai target LT7 Healthy;
-  UI/Catalog200 (12 sản phẩm), private anonymous401. Kiểm tra Gmail phát hiện
-  thư yêu cầu IPN gửi tới no-reply và một thư khác bị trả550 5.1.1; chưa có
-  xác nhận IPN mới. Chủ merchant đã đăng nhập; các mục đã kiểm tra chưa có
-  bằng chứng URL IPN của Shop, mục thông báo chỉ là email; không sửa merchant
-  hoặc xem chi tiết website khác. Chưa tạo order/transaction, gửi email hoặc
-  đổi AWS/secret. Cần xác minh với kênh hỗ trợ sandbox chính thức. Xem
-  [hợp đồng, bằng chứng và từng bước SIT](docs/vnpay-sit.md). Không coi email
-  đã gửi hoặc HTTP200 là đã nghiệm thu callback/payment; chưa push/merge.
+- PAY-SIT-01C — Nghiệm thu sandbox ngày25/10/2026 đang làm: đã tìm đúng
+  website Shop trong merchant, sửa IPN URL từ `#` sang endpoint HTTPS và
+  đọc lại **GET/HMACSHA512** thành công; blocker đăng ký IPN đã gỡ. USER đã
+  tự đăng nhập; một đơn DEMO490.000 VND bị CANCELLED trước payment vì stock
+  ở `DEMO-LAB` nhưng checkout tìm `MAIN` (`STOCK_ITEM_NOT_FOUND`). RDS xác nhận
+  chưa tạo attempt/webhook/reservation/movement, stock giữ20/reserved0.
+  Chủ tài khoản đã Store biến kho và duyệt Execute plan
+  `checkout-location-20261025T143210Z`; rollout revision bằng template/image
+  cũ đang được theo dõi, chưa tạo đơn mới hoặc giao dịch VNPay. Regression
+  ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
+  0 failure/error/skipped, line**91,69%**/branch**72,42%**; 17 ca purchase
+  trên MySQL8.4 gồm ca sai kho. Spotless/JaCoCo gate, 94 test Node và kiểm
+  Compose dev/prod đều đạt. Xem
+  [hợp đồng, bằng chứng, cách cấu hình merchant/kho và từng bước SIT](docs/vnpay-sit.md).
+  Guard vẫn34 finding, chưa có durable CloudTrail; chưa nghiệm thu IPN thực,
+  đóng M5, push/merge hoặc duyệt thanh toán thật.
 - PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
   CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
   **Đã Execute và hậu kiểm triển khai đạt** change set
