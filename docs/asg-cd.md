@@ -1,5 +1,7 @@
 # CD-ASG-01 — Backend CD qua CloudFormation và Instance Refresh
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần
 
 1. **Mục tiêu/actor/phạm vi:** chủ repo phát hành backend đã qua CI trên main

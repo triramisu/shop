@@ -11,6 +11,16 @@ Cách làm này giúp phát triển và debug nhanh ở giai đoạn đầu như
 
 README là tài liệu chính thức được theo dõi bằng Git từ M4.7. Các ghi chú cũ nói README chỉ lưu local phản ánh đúng quy trình lịch sử trước thời điểm này.
 
+## Tra cứu nhanh
+
+| Bạn cần tìm | Mở tài liệu |
+| --- | --- |
+| Hiểu code/nghiệp vụ, payment, kiểm thử và cách vận hành | [Mục lục `docs/`](docs/README.md) |
+| Hiểu từng folder deploy, chọn AWS/Compose/lab và đúng cấu hình | [Mục lục `deploy/`](deploy/README.md) |
+
+Các mục lục phân biệt hướng dẫn hiện hành với hồ sơ lịch sử; giữ nguyên đường
+dẫn template/script/runbook đang được CI/CD và tài liệu tham chiếu.
+
 ## 2. Trạng thái hiện tại
 
 - CD-ASG-01 — Đã nghiệm thu rollout backend qua image-only CloudFormation và

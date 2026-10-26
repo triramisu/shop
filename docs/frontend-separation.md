@@ -1,5 +1,7 @@
 # UI-STRUCTURE — Tách frontend ra thư mục riêng
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 Đây là biên bản task tách UI ngày 15/10/2026. Vị trí backend `shop/backend` và context backend trong biên bản này đã được thay thế bởi [ROOT-01](backend-root-layout.md): backend hiện ở thẳng `D:/shop`. Kết quả kiểm tra lịch sử bên dưới không được dùng như bằng chứng cho layout mới.
 
 ## 1. Mục tiêu, actor và phạm vi

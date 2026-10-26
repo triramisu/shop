@@ -1,5 +1,7 @@
 # M5.6B — VNPay reconciliation worker
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu, actor và phạm vi
 
 System job đối soát payment VNPay sandbox REQUIRES_ACTION/PENDING/UNKNOWN bị mất

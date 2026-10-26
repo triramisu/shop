@@ -1,5 +1,7 @@
 # PUB-BE-01 — Xuất bản backend độc lập
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần — 19/10/2026
 
 1. **Phạm vi:** theo ủy quyền hiện hành, rà soát và xuất bản thay đổi backend local lên `triramisu/shop`, thông qua nhánh/PR và CI trước khi merge `main`. Không tự triển khai AWS, push Docker Hub, mở thanh toán thật hoặc xuất bản repo UI trong lượt này.

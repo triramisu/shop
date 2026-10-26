@@ -1,5 +1,7 @@
 # PAY-SIT-01A — Preflight VNPay sandbox qua HTTPS
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần — 24/10/2026
 
 ### Bổ sung phạm vi theo yêu cầu tiếp tục cùng ngày

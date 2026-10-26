@@ -1,5 +1,10 @@
 # Lab chống chịu tải / DDoS — Shop target
 
+[Mục lục triển khai](../README.md) · [Mục lục tài liệu](../../docs/README.md)
+
+Đây là **lab Docker trên một host**, khác template hạ tầng AWS tại `../aws/`.
+Mô hình AWS ASG/RDS/S3 hiện tại xem [runbook ASG CD](../../docs/asg-cd.md).
+
 Thư mục này dựng **Shop** thành một *target* để nghiên cứu khả năng chống chịu
 tải và DDoS trong **mạng lab cô lập, đã được phép**. Mục tiêu là *đo và quan
 sát* hành vi hệ thống dưới tải và hiệu quả của các lớp giảm thiểu — không phải

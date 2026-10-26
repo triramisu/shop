@@ -1,5 +1,7 @@
 # M5.5B.1 — Lõi hoàn tiền có kiểm soát
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu, actor, ngoài phạm vi
 
 Actor có capability `PAYMENT_REFUND` yêu cầu hoàn một phần hoặc toàn bộ phần

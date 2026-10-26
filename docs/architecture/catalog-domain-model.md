@@ -1,5 +1,7 @@
 # Mô hình domain Catalog
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Phạm vi M2.1
 
 M2.1 chỉ tạo domain model, persistence mapping, repository contract và Flyway migration. Controller, request/response DTO, service CRUD, phân trang, tìm kiếm và ảnh thuộc các nhiệm vụ M2.2–M2.6.

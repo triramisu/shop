@@ -1,5 +1,7 @@
 # Kế hoạch hoàn thiện website Shop
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Quyết định và phạm vi
 
 Backend tiếp tục modular monolith ngay tại gốc `shop/` (`src/`, `pom.xml`, Maven wrapper, Dockerfile); UI là project riêng `shop-ui/` đặt cạnh `shop/`. Không còn lớp `backend/`. Đây là tách source/build frontend, không phải tách microservices. Mô hình triển khai dưới đây là đề xuất cho quy mô hiện tại, không phải chứng nhận tuân thủ hoặc một kiến trúc bắt buộc cho mọi doanh nghiệp. Chưa dùng Kubernetes; không public cổng MySQL hay dùng payment fake để nhận đơn thật.

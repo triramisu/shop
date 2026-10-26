@@ -1,5 +1,7 @@
 # ROOT-01 — Backend chạy trực tiếp từ gốc repo
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu và phạm vi
 
 Theo yêu cầu người dùng, bỏ lớp thư mục `D:/shop/backend` bằng cách chuyển toàn bộ Spring project về `D:/shop`. UI vẫn độc lập tại `D:/shop-ui`. Task này chỉ đổi layout, đường dẫn build/deploy và tài liệu; không đổi nghiệp vụ, API, schema, dependency version hoặc dữ liệu.

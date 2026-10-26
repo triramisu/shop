@@ -1,5 +1,7 @@
 # M5.6A — VNPay sandbox status query
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu và phạm vi
 
 Thêm outbound adapter `querydr` cho Payment, để một use case đối soát phía server

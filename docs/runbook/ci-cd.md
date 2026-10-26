@@ -1,5 +1,7 @@
 # CI/CD single-host lịch sử
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 **Luồng AWS production hiện tại dùng RDS/S3 + ASG:** xem
 [CD-ASG-01](../asg-cd.md). Không dùng deploy.sh/Compose dưới đây cho ASG.
 Nội dung còn lại là hướng dẫn single-host trước đây, không phải workflow CD hiện hành.

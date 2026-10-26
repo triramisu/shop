@@ -1,5 +1,7 @@
 # Danh mục sự kiện audit và lịch sử truy cập
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## 1. Trạng thái tài liệu
 
 - Phiên bản: `1.0`

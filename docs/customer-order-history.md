@@ -1,5 +1,7 @@
 # WEB-01 — Lịch sử và chi tiết đơn của khách
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu, actor, phạm vi
 
 Khách đã đăng nhập đọc lại danh sách/chi tiết đơn của chính mình sau reload hoặc đăng nhập lại. Chỉ làm API đọc và UI tương ứng; không thêm quyền xem đơn người khác cho ADMIN, hủy đơn, refund, retry payment, shipping hay sửa giỏ sau checkout.

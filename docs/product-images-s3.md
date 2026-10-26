@@ -1,5 +1,7 @@
 # S3-01 — Kho ảnh sản phẩm trên AWS
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu và phạm vi
 
 Thêm S3 adapter cho Catalog để mọi EC2 trong ASG dùng cùng kho ảnh private;

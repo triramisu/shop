@@ -1,4 +1,28 @@
-# AWSLAB-01 — Hạ tầng lab Shop tiết kiệm
+# AWS — chọn cấu hình hạ tầng
+
+[Mục lục triển khai](../README.md) · [Mục lục tài liệu](../../docs/README.md)
+
+## Đọc trước khi chọn file
+
+| File/thư mục | Dùng để làm gì? | Phạm vi |
+| --- | --- | --- |
+| [`shop-prod.yaml`](shop-prod.yaml) | Baseline CloudFormation prod-profile, RDS/S3 và app private trong ASG | Điểm bắt đầu cho mô hình AWS hiện tại; đọc [PROD.md](PROD.md) |
+| [`shop-lab.yaml`](shop-lab.yaml) | Template lab AWS trước đây | Giữ cho lịch sử/test; không mặc định dùng để update stack prod |
+| [`application.env.example`](application.env.example) | Mẫu env-file text cho application secret trên AWS | Điền kín theo môi trường, không phải JSON parameters |
+| [`parameters.example.json`](parameters.example.json) | Parameters mẫu của template lab cũ | Có tên key/AMI khác prod; không truyền nguyên trạng vào prod |
+| [`.gitignore`](.gitignore) | Quy tắc bỏ qua env/parameters local và key/certificate riêng | Không thay cho việc kiểm tra secret trước commit |
+| `iam/` | [Trust policy](iam/backend-github-trust.json) và [permissions](iam/backend-github-permissions.json) của role CD backend | Dùng cùng [ASG CD](../../docs/asg-cd.md) |
+
+Các file mẫu không chứa secret đang chạy. Trước update phải đối chiếu source,
+Original deployed template, parameters và phạm vi change set của đúng stack.
+Trạng thái AWS live cần được kiểm tra riêng trước khi áp dụng kế hoạch.
+
+## AWSLAB-01 — Hạ tầng lab Shop tiết kiệm
+
+Phần dưới lưu thiết kế và các biên bản lab có ngày. Những câu như “chưa deploy”
+hoặc engine/AMI/stack ID ở một biên bản chỉ phản ánh thời điểm đó. Trạng thái
+mới hơn xem ở [README dự án](../../README.md#2-trạng-thái-hiện-tại),
+[hồ sơ prod](PROD.md) và [ASG CD](../../docs/asg-cd.md).
 
 ## S3-01 — Cập nhật kho ảnh AWS
 

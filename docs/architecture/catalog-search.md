@@ -1,5 +1,7 @@
 # Thiết kế tìm kiếm Catalog
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Phạm vi và contract
 
 `GET /api/admin/catalog/products` hỗ trợ `keyword`, `categoryId`, `status`, `page`, `size`, `sortBy`, `direction`. `GET /api/catalog/products` dùng cùng query engine nhưng không công bố filter `status` và luôn cưỡng chế `PUBLISHED`. Sort chỉ nhận `CREATED_AT`, `UPDATED_AT`, `NAME` và luôn thêm `id ASC` làm tie-breaker.

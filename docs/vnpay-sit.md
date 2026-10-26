@@ -1,5 +1,7 @@
 # PAY-SIT-01C — Nghiệm thu VNPay sandbox qua website
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần — 25/10/2026
 
 1. **Mục tiêu/actor/phạm vi:** kiểm chứng khách USER mua sản phẩm DEMO qua
