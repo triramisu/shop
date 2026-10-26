@@ -13,8 +13,10 @@ test("installed AWS CLI accepts the real DescribeEvents arguments without an AWS
     AWS_SHARED_CREDENTIALS_FILE: path.join(os.tmpdir(), "shop-cli-contract-no-credentials") };
   delete env.AWS_PROFILE; delete env.AWS_DEFAULT_PROFILE;
   const arn = "arn:aws:cloudformation:ap-southeast-1:111111111111:changeSet/asg-cd-fixture/id";
+  const stack = "arn:aws:cloudformation:ap-southeast-1:111111111111:stack/shop-fixture/id";
+  assert.deepEqual(validationEventArgs(stack, arn), ["--stack-name", stack, "--change-set-name", arn]);
   // AWS CLI validates input against its own installed service model; no real credentials/network call.
-  const result = execFileSync("aws", ["cloudformation", "describe-events", ...validationEventArgs(arn),
+  const result = execFileSync("aws", ["cloudformation", "describe-events", ...validationEventArgs(stack, arn),
     "--generate-cli-skeleton", "output", "--output", "json"], { env, encoding: "utf8", timeout: 30000,
     stdio: ["ignore", "pipe", "pipe"] });
   assert.ok(Array.isArray(JSON.parse(result).OperationEvents));

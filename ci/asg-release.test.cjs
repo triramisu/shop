@@ -86,8 +86,8 @@ function fixture(settings = {}) {
     if (operation === "create-change-set") return { Id: changesetId };
     if (operation === "describe-change-set") return settings.executeNetworkError && phase === "after"
       ? { ...plan(), ExecutionStatus: "EXECUTE_IN_PROGRESS" } : plan();
-    if (operation === "describe-events") return { OperationEvents: settings.validationFinding ? [{ EventType: "VALIDATION_ERROR" }]
-      : [{ EventType: "STACK_EVENT", OperationStatus: settings.eventsPending ? "IN_PROGRESS" : "SUCCEEDED" }] };
+    if (operation === "describe-events") return { OperationEvents: settings.validationFinding ? [{ EventType: "VALIDATION_ERROR", StackId: stackId }]
+      : [{ EventType: "STACK_EVENT", StackId: stackId, OperationStatus: settings.eventsPending ? "IN_PROGRESS" : "SUCCEEDED" }] };
     if (operation === "execute-change-set") { phase = "after"; if (settings.executeNetworkError) throw Error("NETWORK"); return {}; }
     if (operation === "send-command") {
       const start = args.indexOf("--instance-ids") + 1;
@@ -195,6 +195,11 @@ test("requires a complete DescribeEvents response and keeps normal progress even
   assert.throws(() => assessValidationEvents({ OperationEvents: [], NextToken: "not-consumed" }), /RESPONSE_INCOMPLETE/);
   assert.deepEqual(assessValidationEvents({ OperationEvents: [{ EventType: "STACK_EVENT", OperationStatus: "IN_PROGRESS" },
     { EventType: "STACK_EVENT", OperationStatus: "SUCCEEDED" }] }), { complete: true, eventCount: 2 });
+});
+test("does not accept events from another stack as the current plan validation", () => {
+  assert.throws(() => assessValidationEvents({ OperationEvents: [
+    { EventType: "STACK_EVENT", StackId: "another-stack", OperationStatus: "SUCCEEDED" },
+  ] }, "expected-stack"), /STACK_SCOPE_MISMATCH/);
 });
 test("rechecks last update time before execution and rejects a stale plan", async () => {
   let reads = 0; const f = fixture({ editStack: s => { if (++reads >= 2) s.LastUpdatedTime = "changed"; } });

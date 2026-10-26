@@ -41,7 +41,7 @@ repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. CD source 
 checks và CI merge commit xanh. Role riêng đã được duyệt/tạo. Manual gate
 ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Chưa rollout image mới.
 
-160 test Node đạt, gồm 66 ca CD/source/CLI contract và 94 ca preflight/template/proxy;
+161 test Node đạt, gồm 67 ca CD/source/CLI contract và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
 đúng digest, restart0, không OOM, LT8**. Chỉ đọc Docker metadata bằng SSM;
 đây là kiểm tra image hiện hành, chưa phải nghiệm thu rollout image mới.
@@ -77,6 +77,14 @@ Test mới dùng `--generate-cli-skeleton output` với credential giả và t�
 event, pending/incomplete và CRLF Windows/LF Linux. Fingerprint chỉ chuẩn hóa
 CRLF; đổi nội dung/space/comment vẫn là drift. Xem
 [DescribeEvents](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/describe-events.html).
+
+PR50 đã qua required checks và merge `b707a78`, CI main xanh. Preview runner
+40295660959 tạo đúng3 Modify nhưng DescribeEvents bị AccessDenied khi request
+chỉ có change-set ARN. Controller đang bổ sung cả stack ARN trong request và
+kiểm StackId trên mọi event; giữ nguyên IAM ARN scope, chưa cấp DescribeEvents
+Resource=*. Đã đối chiếu bằng API read-only: selector stack+ARN vẫn trả đúng2
+event cùng operation/change set, không đọc nhầm toàn bộ lịch sử stack.
+Chưa xác nhận selector mới qua OIDC runner hoặc Execute; website vẫn RC2/LT8.
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
