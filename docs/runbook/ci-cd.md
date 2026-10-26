@@ -1,4 +1,8 @@
-# CI/CD monolith Shop
+# CI/CD single-host lịch sử
+
+**Luồng AWS production hiện tại dùng RDS/S3 + ASG:** xem
+[CD-ASG-01](../asg-cd.md). Không dùng deploy.sh/Compose dưới đây cho ASG.
+Nội dung còn lại là hướng dẫn single-host trước đây, không phải workflow CD hiện hành.
 
 ## Phạm vi
 

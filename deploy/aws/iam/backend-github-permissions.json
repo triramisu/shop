@@ -1,0 +1,100 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadProductionStack",
+      "Effect": "Allow",
+      "Action": ["cloudformation:DescribeStacks", "cloudformation:DescribeStackResources", "cloudformation:GetTemplate", "cloudformation:DescribeChangeSet", "cloudformation:DescribeEvents"],
+      "Resource": ["arn:aws:cloudformation:ap-southeast-1:233377400170:stack/shop-aydibro-prod/14d1af50-cc8c-11f1-a799-06ffebb3ea45", "arn:aws:cloudformation:ap-southeast-1:233377400170:changeSet/asg-cd-gh-*/*"]
+    },
+    {
+      "Sid": "CreateNamedImagePlansWithoutServiceRole",
+      "Effect": "Allow",
+      "Action": "cloudformation:CreateChangeSet",
+      "Resource": "arn:aws:cloudformation:ap-southeast-1:233377400170:stack/shop-aydibro-prod/14d1af50-cc8c-11f1-a799-06ffebb3ea45",
+      "Condition": {"StringLike": {"cloudformation:ChangeSetName": "asg-cd-gh-*"}, "Null": {"cloudformation:RoleArn": "true"}}
+    },
+    {
+      "Sid": "ExecuteNamedImagePlans",
+      "Effect": "Allow",
+      "Action": "cloudformation:ExecuteChangeSet",
+      "Resource": "arn:aws:cloudformation:ap-southeast-1:233377400170:stack/shop-aydibro-prod/14d1af50-cc8c-11f1-a799-06ffebb3ea45",
+      "Condition": {"StringLike": {"cloudformation:ChangeSetName": "asg-cd-gh-*"}}
+    },
+    {
+      "Sid": "CloudFormationTagDependencies",
+      "Effect": "Allow",
+      "Action": ["cloudformation:TagResource", "cloudformation:UntagResource"],
+      "Resource": ["arn:aws:cloudformation:ap-southeast-1:233377400170:stack/shop-aydibro-prod/14d1af50-cc8c-11f1-a799-06ffebb3ea45", "arn:aws:cloudformation:ap-southeast-1:233377400170:changeSet/asg-cd-gh-*/*"]
+    },
+    {
+      "Sid": "RegionalReadOperationsWithoutResourceScoping",
+      "Effect": "Allow",
+      "Action": ["cloudformation:ListStacks", "autoscaling:DescribeAutoScalingGroups", "autoscaling:DescribeInstanceRefreshes", "autoscaling:DescribePolicies", "autoscaling:DescribeScalingActivities", "ec2:DescribeInstances", "ec2:DescribeLaunchTemplates", "ec2:DescribeLaunchTemplateVersions", "elasticloadbalancing:DescribeTargetHealth", "ssm:ListCommandInvocations", "cloudwatch:GetMetricData"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestedRegion": "ap-southeast-1"}}
+    },
+    {
+      "Sid": "ExistingLaunchTemplateViaCloudFormation",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateLaunchTemplateVersion", "ec2:DeleteLaunchTemplateVersions", "ec2:CreateTags", "ec2:DeleteTags"],
+      "Resource": "arn:aws:ec2:ap-southeast-1:233377400170:launch-template/lt-047f6731fbe463c53",
+      "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com"}}
+    },
+    {
+      "Sid": "ExistingAsgNativeRefreshViaCloudFormation",
+      "Effect": "Allow",
+      "Action": ["autoscaling:UpdateAutoScalingGroup", "autoscaling:StartInstanceRefresh", "autoscaling:CancelInstanceRefresh", "autoscaling:PutScalingPolicy", "autoscaling:DeletePolicy"],
+      "Resource": "arn:aws:autoscaling:ap-southeast-1:233377400170:autoScalingGroup:a7153bbe-2e87-4a7d-8547-174cc5ae77b5:autoScalingGroupName/shop-aydibro-prod-ApplicationAutoScalingGroup-vGFBGIo2wDtZ",
+      "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com"}, "BoolIfExists": {"autoscaling:LaunchTemplateVersionSpecified": "true"}}
+    },
+    {
+      "Sid": "ValidatePinnedLaunchResourcesViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": ["arn:aws:ec2:ap-southeast-1::image/ami-0080f2c6aa4e378b7", "arn:aws:ec2:ap-southeast-1:233377400170:launch-template/lt-047f6731fbe463c53", "arn:aws:ec2:ap-southeast-1:233377400170:key-pair/p-shop-aydibro-click", "arn:aws:ec2:ap-southeast-1:233377400170:security-group/sg-0be79b44808c7d10b", "arn:aws:ec2:ap-southeast-1:233377400170:subnet/subnet-0fe164192786f6df8", "arn:aws:ec2:ap-southeast-1:233377400170:subnet/subnet-083d399f527a1a2ad", "arn:aws:ec2:ap-southeast-1:233377400170:network-interface/*", "arn:aws:ec2:ap-southeast-1:233377400170:volume/*"],
+      "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com"}, "ArnEquals": {"ec2:LaunchTemplate": "arn:aws:ec2:ap-southeast-1:233377400170:launch-template/lt-047f6731fbe463c53"}}
+    },
+    {
+      "Sid": "ValidateAppInstancesViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:ap-southeast-1:233377400170:instance/*",
+      "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com", "ec2:InstanceType": "t3.small", "ec2:MetadataHttpTokens": "required"}, "ArnEquals": {"ec2:LaunchTemplate": "arn:aws:ec2:ap-southeast-1:233377400170:launch-template/lt-047f6731fbe463c53", "ec2:InstanceProfile": "arn:aws:iam::233377400170:instance-profile/shop-aydibro-prod-ApplicationInstanceProfile-4c815MdB7fJo"}}
+    },
+    {
+      "Sid": "LaunchTimeTagsViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": ["arn:aws:ec2:ap-southeast-1:233377400170:instance/*", "arn:aws:ec2:ap-southeast-1:233377400170:volume/*"],
+      "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com", "ec2:CreateAction": "RunInstances"}}
+    },
+    {
+      "Sid": "PassOnlyExistingAppRoleViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::233377400170:role/shop-aydibro-prod-ApplicationRole-hqMoKgNsY6EE",
+      "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com", "aws:CalledViaFirst": "cloudformation.amazonaws.com"}}
+    },
+    {
+      "Sid": "PassExistingAutoScalingServiceRoleViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::233377400170:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+      "Condition": {"StringEquals": {"iam:PassedToService": "autoscaling.amazonaws.com", "aws:CalledViaFirst": "cloudformation.amazonaws.com"}}
+    },
+    {
+      "Sid": "RuntimeProbeDocument",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ssm:ap-southeast-1::document/AWS-RunShellScript"
+    },
+    {
+      "Sid": "RuntimeProbeOnlyCurrentAppFleet",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ec2:ap-southeast-1:233377400170:instance/*",
+      "Condition": {"StringEquals": {"ssm:resourceTag/aws:autoscaling:groupName": "shop-aydibro-prod-ApplicationAutoScalingGroup-vGFBGIo2wDtZ"}}
+    }
+  ]
+}

@@ -53,11 +53,24 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node for deployment regression
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Verify ASG release and trusted-proxy contracts without AWS credentials
+        run: |
+          npm install --prefix "$RUNNER_TEMP/shop-ci-tools" --ignore-scripts --no-audit --no-fund --no-save js-yaml@4.1.1
+          SHOP_YAML_MODULE="$RUNNER_TEMP/shop-ci-tools/node_modules/js-yaml" \
+          SHOP_BASH="$(command -v bash)" SHOP_PYTHON="$(command -v python3)" \
+          node --test ci/asg-release.test.cjs ci/cd-source.test.cjs \
+            ci/aws-vnpay-preflight.test.cjs ci/aws-vnpay-template.test.cjs ci/aws-trusted-proxy.test.cjs
 
       - name: Set up Java 21
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6

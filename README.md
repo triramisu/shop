@@ -13,6 +13,18 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 ## 2. Trạng thái hiện tại
 
+- CD-ASG-01 — Đang thay backend CD một EC2 bằng image-only CloudFormation
+  update và native ASG Instance Refresh theo yêu cầu ngày26/10/2026. Không
+  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có55 test controller/source
+  và94 test Node hồi quy đạt; probe AWS thật xác nhận2/2 container đúng image,
+  Healthy/restart0/LT8. Chủ repo đã Store DOCKERHUB_TOKEN và duyệt role OIDC:
+  đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt, cả hai cờ
+  CD false. Trial rollout đang chuẩn bị, **chưa bật tự deploy**. Xem
+  [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
+- Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
+  đã qua verify/dependency-review và merge tại `132d4a9`; verify merge commit
+  trên main xanh, dependency-review skipped đúng điều kiện push. Không đồng
+  nghĩa đã đóng toàn bộ SIT/M5 hoặc đạt mục tiêu branch coverage >80%.
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
 - PAY-SIT-01C — Nghiệm thu sandbox ngày25–26/10/2026 đang làm: đã tìm đúng
@@ -52,7 +64,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   Compose dev/prod đều đạt. Xem
   [hợp đồng, bằng chứng, cách cấu hình merchant/kho và từng bước SIT](docs/vnpay-sit.md).
   Guard vẫn34 finding, chưa có durable CloudTrail; chưa đóng toàn bộ SIT/M5,
-  push/merge hoặc duyệt thanh toán thật. Chi tiết SQL đọc bằng chứng và
+  hoặc duyệt thanh toán thật. Source đã merge qua PR47; chi tiết SQL đọc bằng chứng và
   ma trận ca live/local nằm trong runbook SIT được liên kết ở trên.
 - PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
   CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
@@ -144,7 +156,10 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   compute tiếp tục khi máy chạy; báo cáo chi phí tài khoản được giữ local.
   Xem [biên bản xuất bản và hướng dẫn phân biệt các gate](docs/backend-publication.md).
 
-### Ưu tiên hiện hành — hoàn thiện dự án trước CI/CD
+### Quyết định ưu tiên trước đây — hoàn thiện dự án trước CI/CD
+
+Ngày26/10/2026 chủ repo đã yêu cầu xử lý riêng CD-ASG-01 ở đầu mục trạng
+thái. Quyết định hoãn ngày18/10 bên dưới là lịch sử; auto-ban vẫn hoãn.
 
 Theo quyết định ngày 18/10/2026, hoãn xây mới/mở rộng CI/CD, tự động
 build/push/deploy và tự tăng phiên bản Docker cho đến sau khi hoàn thiện
