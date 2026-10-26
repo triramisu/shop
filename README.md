@@ -22,7 +22,10 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   merge1473871 và CI main xanh. Verify GitHub qua OIDC thật đạt2/2 máy/LT8;
   chỉ cờ manual bật, auto false. Build/plan bị Trivy chặn CVE-2026-111497 của
   brotli-libs trước push/deploy; đang vá package runtime, giữ nguyên gate.
-  Trial rollout đang chuẩn bị, **chưa bật tự deploy**. Xem
+  PR49 đã merge56d76a7 và CI main xanh; local Docker build/scan bản vá đạt,
+  đang thử lại publish/plan trên runner. Provider IAM đã đối chiếu Event History,
+  Access Analyzer0 finding và19 ca simulation đạt. Trial rollout đang chuẩn bị,
+  **chưa bật tự deploy**. Xem
   [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
   đã qua verify/dependency-review và merge tại `132d4a9`; verify merge commit

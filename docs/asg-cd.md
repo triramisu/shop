@@ -59,6 +59,11 @@ Alpine3.24.3. Chưa thay thế kết quả scan/push trên runner hoặc trial r
 [Alpine xác nhận bản vá](https://security.alpinelinux.org/vuln/CVE-2026-111497),
 [upstream release](https://github.com/google/brotli/releases/tag/v1.2.1).
 
+[PR49](https://github.com/triramisu/shop/pull/49) đã qua required checks,
+merge `56d76a7`; CI merge commit xanh. Build/preview mới đang chạy tại
+[40291506938](https://github.com/triramisu/shop/actions/runs/40291506938),
+chưa Execute hoặc thay EC2. Không đổi Java/schema trong bản vá.
+
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
 
@@ -101,6 +106,15 @@ GitHub environment chỉ có branch main. Mô phỏng IAM đạt13 ca allow/deny
 attach; assume OIDC và probe thật đã đạt ở run liên kết phía trên. Chỉ cờ
 manual được bật để nghiệm thu; auto vẫn false, chưa rollout image mới.
 
+Đối chiếu CloudTrail Event History của rollout kho ngày25/10, window
+14:35–14:42 UTC, userIdentity.invokedBy=cloudformation.amazonaws.com:
+provider còn dùng EC2 DescribeImages/DescribeKeyPairs và ASG CreateOrUpdateTags.
+Đã tra SAR, bổ sung hai quyền metadata chỉ Singapore và tag đúng ASG chỉ qua
+CloudFormation trong cùng policy/role đã duyệt. Access Analyzer0 finding,
+thêm6 simulation allow/deny đạt (19 tổng); đọc lại live policy khớp file.
+Không thêm GetSecretValue, key material, quyền RDS/S3/IAM/network, không mở
+phạm vi ARN. Đây là Event History90 ngày; durable CloudTrail vẫn chưa có.
+
 Repo tạo ngày26/09/2026; GitHub mặc định dùng subject có immutable IDs:
 `repo:triramisu@200755440/shop@1389536014:environment:production`.
 `aud` phải đúng `sts.amazonaws.com`; environment production bắt buộc chỉ
@@ -117,7 +131,7 @@ nhánh main. Không dùng subject legacy hoặc wildcard repo. Xem
 | CloudFormationTagDependencies | Tag/Untag được SAR liệt kê cho Create/Execute; chỉ stack/plan trên |
 | RegionalReadOperationsWithoutResourceScoping | Các API đọc cần Resource=* theo AWS; giới hạn Singapore |
 | ExistingLaunchTemplateViaCloudFormation | Version/tag của đúng LT, chỉ qua CloudFormation; có delete version phục vụ rollback |
-| ExistingAsgNativeRefreshViaCloudFormation | Update/native refresh/cancel/scaling policy của đúng ASG, chỉ qua CloudFormation |
+| ExistingAsgNativeRefreshViaCloudFormation | Update/native refresh/cancel/scaling policy và đồng bộ tag của đúng ASG, chỉ qua CloudFormation |
 | ValidatePinnedLaunchResourcesViaCloudFormation | RunInstances validation với đúng AMI/LT/key/SG/private subnets; volume/ENI mới giới hạn account/region/LT |
 | ValidateAppInstancesViaCloudFormation | App t3.small, IMDSv2, đúng instance profile và LT |
 | LaunchTimeTagsViaCloudFormation | CreateTags chỉ khi RunInstances qua CloudFormation |
