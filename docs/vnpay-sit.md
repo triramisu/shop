@@ -312,6 +312,98 @@ Quy trình tái sử dụng khi kho/dữ liệu mẫu chưa khớp:
    không sửa DB để hồi sinh đơn hoặc ghi đè ledger. Chỉ kết quả IPN hợp lệ
    mới xác nhận thanh toán; cấu hình đúng kho chưa phải SIT thành công.
 
+### SIT sau sửa kho — lỗi chữ ký cần đối chiếu (26/10)
+
+- Chủ tài khoản đã tự đăng nhập USER trong tab Codex. Từ giỏ một SKU DEMO
+  quantity1, đọc quote490.000 VND rồi xác nhận đúng một lần lúc **08:55:21**.
+  Đơn mới PENDING, payment REQUIRES_ACTION và UI hiện link VNPay hợp lệ.
+  Không tạo thêm đơn khi provider từ chối.
+- Handoff thật đã đến đúng `sandbox.vnpayment.vn/paymentv2/Payment/Error.html`;
+  provider hiển thị **Sai chữ ký** lúc **08:55:50**, trước bước nhập thẻ/OTP.
+  Ảnh chỉ chứa màn hình lỗi, ngoài Git tại
+  `%TEMP%/shop-vnpay-sit-20261025/vnpay-signature-error-20261026.jpg`.
+  Không dùng browser error để tự đổi Payment FAILED hoặc Order CANCELLED.
+- Evidence RDS08:57: stock20/reserved1, một reservation RESERVED và một
+  movement RESERVATION; Order PENDING, orchestration PAYMENT_PENDING,
+  một attempt REQUIRES_ACTION490.000 VND, chưa có webhook, chưa confirm kho.
+  Order payment event COMPLETED ở đây là event **REQUIRES_ACTION** đã được
+  consumer xử lý, không phải bằng chứng thu tiền hoặc Order PAID.
+- Cấu hình terminal khớp mã merchant đã đăng ký; secret32 chữ in hoa, không
+  dấu nháy/khoảng trắng. Đối chiếu trong RAM với đúng hai email cấp merchant
+  ngày19/10: cả hai email cùng khóa và khớp AWSCURRENT. Không lưu raw mail,
+  khóa, fingerprint hoặc attachment vào repo; không đổi label/gửi email.
+  Chưa thấy email cấp lại khóa sau24/10 trong query giới hạn nguồn provider.
+- Probe không-follow-redirect trên **chính attempt này**, trước khi hết TTL:
+  local handoff303, public CloudFront handoff303; token handoff khớp HMAC
+  của key runtime. Độc lập decode/canonicalize URL Location và tính lại
+  HMACSHA512: signature khớp, amount minor-unit khớp49000000,13 trường ký.
+  Chỉ xuất boolean/count, không URL/token/signature/IP hoặc query thô.
+  Probe không gọi tiếp gateway, gửi callback hoặc tạo payment mới.
+- Tại thời điểm probe, chưa đủ bằng chứng kết luận lỗi code hay cấu hình
+  phía provider; tiếp tục kiểm thuật toán/terminal qua merchant, không đổi khóa,
+  tắt kiểm HMAC hoặc ký callback giả thành công để vượt qua gate.
+- Handoff có TTL10 phút; không kéo dài hoặc retry link hết hạn. Inventory
+  expiry hiện bật và có thể release reservation sau15 phút; phải đọc lại
+  evidence. Hết TTL/reservation không phải bằng chứng provider thất bại;
+  query/recovery/refund vẫn tắt, không sửa trực tiếp trạng thái hoặc xóa lịch sử.
+- Hậu kiểm **09:16**: stock20/reserved0, reservation EXPIRED và đúng một
+  movement EXPIRATION bên cạnh movement RESERVATION; chưa có CONFIRMATION,
+  webhook hoặc event SUCCEEDED. Order vẫn PENDING/attempt REQUIRES_ACTION;
+  line/orchestration giữ snapshot payment-pending theo thiết kế hiện hành.
+  Không gọi trạng thái này là giao dịch đã thất bại hoặc đã được hủy.
+- Người dùng sau đó cho biết đã đổi thuật toán **ở Merchant sang SHA256**
+  hôm trước. Đã mở đúng trang cấu hình IPN đã quan sát trước đó, xác nhận
+  IPN của Shop/GET còn đúng và ô Kiểu mã hóa thực tế là SHA256. Chỉ đổi ô
+  này sang **HMACSHA512**, bấm **Hoàn thành một lần**. UI chuyển về trang
+  tài khoản dù thao tác chờ snapshot báo timeout; không gửi lại form.
+  Mở lại cấu hình xác nhận HMACSHA512/GET/IPN đúng đã được lưu.
+  Không đổi mã merchant, key, code backend, image, secret hoặc AWS.
+- Trang merchant danh sách rất dài, snapshot có giới hạn; không kết luận
+  mất terminal chỉ từ phần danh sách chưa tải đủ, không mở/sửa terminal
+  khác hoặc đoán ID. Chỉ làm trên trang Shop đã định danh bằng IPN chính xác;
+  không copy thông tin liên hệ/danh sách website khác vào README.
+
+### Handoff sau đồng bộ HMACSHA512 — 26/10, đang chờ nhập thẻ test
+
+- Baseline SELECT-only trước ca mới: SKU DEMO-AIR01-SILVER tại DEMO-LAB có
+  stock20/reserved0. Đơn trước chưa từng nhập thẻ và reservation đã EXPIRED;
+  không sử dụng lại link hết TTL hoặc chỉnh lịch sử đơn cũ.
+- Đọc lại quote490.000 VND/quantity1; xác nhận đúng một lần lúc **09:31:22**.
+  Đơn mới `0a0c2ca1-9c48-490a-8455-1adb86f0d68a`, PENDING, một attempt
+  REQUIRES_ACTION. Handoff đến đúng hosted VNPay, hiển thị **Chọn phương
+  thức thanh toán (Test)** rồi **Thanh toán qua Ngân hàng NCB**490.000 VND;
+  lỗi Sai chữ ký không còn tái hiện trong ca mới sau đồng bộ thuật toán.
+- Evidence trước nhập thẻ: stock20/reserved1, một reservation RESERVED và
+  một movement RESERVATION; chưa có CONFIRMATION/webhook/SUCCEEDED. Event
+  REQUIRES_ACTION/COMPLETED chỉ xác nhận consumer đã xử lý trạng thái chờ.
+- Đã bàn giao trang NCB cho chủ tài khoản tự nhập thẻ/OTP sandbox theo
+  [bộ test công khai của VNPay](https://sandbox.vnpayment.vn/apis/docs/gioi-thieu/).
+  Không dùng thẻ thật, không agent chấp nhận điều kiện dịch vụ thay người dùng.
+  Chưa coi gateway mở được là Order PAID hoặc IPN thành công. Chờ evidence
+  provider và hậu kiểm read-only trước khi kết luận.
+- Ảnh cấu hình đã lưu và màn hình NCB được giữ ngoài Git trong thư mục
+  `%TEMP%/shop-vnpay-sit-20261025/`; không lưu signed URL/query/QR/token/key.
+
+Phạm vi xử lý mismatch thuật toán trong cùng SIT:
+
+1. Mục tiêu là đồng bộ cấu hình terminal với adapter HMACSHA512 đang chạy;
+   không đổi thuật toán/key backend hay hạ kiểm tra chữ ký.
+2. Đầu vào là đúng terminal của Shop và cấu hình merchant thực tế; secret
+   hiện hành đã được đối chiếu trong RAM với email, không nhập lại vào chat.
+3. Chỉ sửa lựa chọn thuật toán ở merchant, giữ IPN URL/GET; mở lại kiểm tra
+   đã lưu, không làm việc trên terminal chưa xác định thuộc Shop.
+4. Giữ nguyên lịch sử order/payment/reservation cũ; không tự gán FAILED,
+   PAID hoặc xóa inbox chỉ từ kết quả trên trình duyệt.
+5. Nếu chỉ lệch cấu hình merchant thì không cần code/schema/image mới;
+   chỉ lập phạm vi release riêng nếu sau khi đồng bộ vẫn tìm thấy lỗi code.
+6. Sau readback, một ca test mới có kiểm soát; không sử dụng handoff cũ hết
+   TTL hoặc đổi idempotency key để lặp một request chưa rõ kết quả.
+7. Chỉ nghiệm thu khi gateway nhận request, IPN hợp lệ cập nhật đúng attempt,
+   Order PAID và một confirm kho; test fixture không thay bằng chứng provider.
+8. Nếu vẫn sai chữ ký, dừng tạo thêm order, dùng mã tra cứu/thời điểm đã
+   redaction để xác minh với provider; không gửi key/query ký hoặc tự liên hệ
+   bên ngoài khi chưa có ủy quyền. Query/recovery/refund tiếp tục tắt.
+
 ## Trình tự tiếp tục
 
 1. Chủ merchant đã tự đăng nhập

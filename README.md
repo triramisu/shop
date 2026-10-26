@@ -26,7 +26,16 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   22:11:37 ngày25/10. Hậu kiểm sáng26/10: stack UPDATE_COMPLETE, hai AZ/LT8,
   hai target Healthy, AMI/image giữ nguyên; mỗi container đạt24 check,
   đúng kho/merchant/DB/JWT/native flags, restart0 và không OOM. RDS vẫn20/0
-  ở SKU test; chưa tạo đơn mới hoặc giao dịch VNPay, chờ USER đăng nhập lại.
+  ở SKU test. USER đã đăng nhập và tạo một đơn mới490.000 VND: giữ kho thành
+  công, attempt REQUIRES_ACTION, nhưng hosted gateway báo **Sai chữ ký** trước
+  bước nhập thẻ. Khóa/runtime khớp email; local/public redirect đều303 và
+  HMAC tính lại độc lập khớp. Đã đọc thấy Merchant đặt SHA256, đổi lại
+  **HMACSHA512**, bấm Hoàn thành một lần và mở lại xác nhận đúng IPN/GET.
+  Một đơn kiểm soát mới lúc09:31 đã qua gateway đến màn hình nhập thẻ NCB
+  sandbox, không còn lỗi chữ ký; đang chờ chủ tài khoản nhập thẻ test/OTP.
+  Chưa có bằng chứng IPN thành công, chưa nghiệm thu luồng thanh toán.
+  Reservation đơn lỗi đã tự EXPIRED/release về20/0; Order/Payment giữ nguyên
+  PENDING/REQUIRES_ACTION vì chưa có bằng chứng final từ provider, không sửa DB.
   Regression
   ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
   0 failure/error/skipped, line**91,69%**/branch**72,42%**; 17 ca purchase
