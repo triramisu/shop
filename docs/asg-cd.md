@@ -12,7 +12,8 @@
    mọi parameter khác dùng giá trị trước. Không gọi deploy.sh/Compose lên ASG,
    không chạy MySQL/MinIO trên app host, không ép refresh/terminate thủ công.
 4. **An toàn/vận hành:** OIDC chỉ repo backend/main/environment production,
-   quyền giới hạn stack và fleet. Từ chối stack/fleet bận, thiếu target, lab
+   quyền ghi giới hạn stack/fleet; DescribeEvents đọc Singapore được duyệt
+   riêng. Từ chối stack/fleet bận, thiếu target, lab
    đang tắt, template lệch hoặc plan đụng tài nguyên ngoài app. Không đọc env,
    secret/token hoặc xuất log thô. Mọi rollout có timeout và hậu kiểm cả fleet.
 5. **Đầu ra:** controller CLI có plan/apply/verify, workflow CD mới, tests mô
@@ -33,13 +34,17 @@
 
 ## Trạng thái
 
-Đang nghiệm thu CD-ASG-01 ngày26/10/2026. PR47 đã merge tại
+Trial AWS CD-ASG-01 ngày26/10/2026 đã đạt qua run40325309982; chi tiết kết
+quả ở cuối phần này. Bước bàn giao là required checks/CI merge commit xanh
+rồi mới bật tự động theo quy trình bên dưới. Các biên bản trước phản ánh
+trạng thái tại thời điểm chạy, không phải trạng thái hiện hành. PR47 đã merge tại
 `132d4a9b87aae65fa5ce88450de075962111b558`; verify của merge commit xanh,
 dependency-review skipped đúng điều kiện push. Docker Hub token đã được chủ
 repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. CD source qua
 [PR48](https://github.com/triramisu/shop/pull/48), merge `1473871`; required
 checks và CI merge commit xanh. Role riêng đã được duyệt/tạo. Manual gate
-ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Chưa rollout image mới.
+ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false trong thời gian trial.
+Trial đầu đã rollback; các đoạn dưới lưu bằng chứng theo thời điểm.
 
 161 test Node đạt, gồm 67 ca CD/source/CLI contract và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
@@ -85,6 +90,85 @@ kiểm StackId trên mọi event; giữ nguyên IAM ARN scope, chưa cấp Descr
 Resource=*. Đã đối chiếu bằng API read-only: selector stack+ARN vẫn trả đúng2
 event cùng operation/change set, không đọc nhầm toàn bộ lịch sử stack.
 Chưa xác nhận selector mới qua OIDC runner hoặc Execute; website vẫn RC2/LT8.
+
+PR51 đã merge `20134b1`, CI main xanh. Hai lần OIDC40318776840/40319529977
+vẫn bị DescribeEvents AccessDenied với full stack selector/ARN và thử prefix
+tên stack. Đã khôi phục policy cũ sau thử nghiệm prefix không đạt. Chủ repo
+sau đó duyệt riêng quyền đọc DescribeEvents Resource=* tại Singapore; quyền
+này có thể xem metadata/cấu hình trong event của các stack khác tại region.
+Không thêm quyền ghi hoặc GetSecretValue. Access Analyzer0 finding cho policy,
+7 ca simulation bổ sung đạt, và đọc lại live policy khớp bản đã duyệt.
+
+[Preview OIDC40320764004](https://github.com/triramisu/shop/actions/runs/40320764004)
+**đã đạt** PLAN_ONLY_NOT_EXECUTED: đúng3 Modify LT/ASG/scaling policy, không
+Add/Remove; LT replacementFalse, ASG/policyConditional; validation complete
+với2 normal events, không warning/error. Hash template giữ319e79f5….
+Image được promote theo digest9e8791cd… từ build/scan/push56d76a7; controller
+chạy20134b1. Git diff src/main/pom/Dockerfile giữa hai commit rỗng; image
+anonymous pull đã xác nhận public/linux-amd64. Chưa Execute/rollout image mới.
+
+Preflight read-only19:17:33 UTC+7 ngày26/10: stack UPDATE_COMPLETE, hai AZ
+app Healthy/LT8, AMI0080f2c6aa4e378b7 và revision checkout-loc-20261025-01;
+secret AWSCURRENT version khớp baseline (chỉ đọc metadata, không plaintext).
+Trial apply sẽ tạo/validate lại plan với cùng digest và boundary trước Execute;
+không Execute preview cũ qua tài khoản admin. Chỉ bật auto sau khi native
+refresh mới Successful và toàn fleet/targets/image đạt, kèm CI bàn giao.
+
+[Trial apply40322255832](https://github.com/triramisu/shop/actions/runs/40322255832)
+đã Execute plan mới đúng3 Modify, AWS validation đạt. Stack tự về
+UPDATE_ROLLBACK_COMPLETE vì ApplicationLaunchTemplate không đọc được
+Database.Endpoint.Address: thiếu rds:DescribeDBInstances trên đúng RDS.
+Controller xác minh toàn fleet vẫn dùng image0ec7922b… trước khi báo release
+FAILED_REVIEW_REQUIRED. LT8, hai instance cũ và hai target Healthy được giữ;
+không start refresh/terminate thủ công để vượt lỗi.
+
+Đã rà GetAtt/Outputs cùng CloudTrail của lần cập nhật thành công trước:
+UserData đọc RDS endpoint, LT đọc instance-profile ARN; Outputs đọc RDS,
+bastion PublicIp, ALB DNSName và CloudFront DomainName. Image-only không bỏ
+những dependency này. Bản policy trong PR53 bổ sung12 read actions đã được
+chủ repo duyệt; đã attach vào cùng inline policy và đọc lại khớp source.
+Access Analyzer0 finding; 20/20 simulation đạt:12 allow qua CloudFormation,
+5 từ chối gọi trực tiếp và3 từ chối quyền ghi RDS/IAM/CloudFront. Các15
+statement cũ không đổi. Trial OIDC thực tế sau đó đạt; simulation riêng lẻ
+không được dùng thay bằng chứng rollout.
+RDS/profile/distribution/bastion khóa ARN; các Describe không hỗ trợ ARN chỉ
+Singapore. Tất cả quyền đọc mới yêu cầu CalledViaFirst=CloudFormation.
+GetDistribution trả cả origin config/custom headers; không xuất cấu hình này
+ra log/artifact. Không thêm quyền ghi, GetSecretValue hoặc đăng nhập SQL.
+
+[Trial lại40325309982](https://github.com/triramisu/shop/actions/runs/40325309982)
+**SUCCESS / DEPLOYED_AND_FLEET_VERIFIED**, source controller20134b1, promote
+đúng digest9e8791cd… từ build56d76a7. Plan
+`asg-cd-gh-40325309982-1` chỉ3 Modify; validation complete/2 normal events.
+Native refresh `664389a2-b7c1-47e6-b9cf-38410d1d7c5f` Successful, từ
+19:49:32 tới20:21:26 UTC+7 ngày26/10,31 phút54 giây. Stack UPDATE_COMPLETE.
+ASG tự tạo/thay tuần tự máy tại hai AZ; không manual refresh/terminate.
+
+Artifact `asg-release-40325309982-1` ghi verifiedInstances=2, LT9. SSM probe
+trên toàn bộ fleet động đạt: đúng image, Running/Health, restart0, không OOM.
+Hậu kiểm20:22:34 UTC+7 xác nhận:
+
+| Thuộc tính | Kết quả |
+| --- | --- |
+| App AZ A | i-004c4d27345010993, LT9, InService/Healthy |
+| App AZ B | i-0bba5a69618a5e795, LT9, InService/Healthy |
+| Capacity | Min2, Desired2, Max4; cả hai target Healthy |
+| Image | docker.io/t1r4m15u/shop@sha256:9e8791cdead1554275c98458249d48cc1c26ebfee19b88d633881658f82073c9 |
+| Giữ nguyên | AMI0080f2c6aa4e378b7, revision checkout-loc-20261025-01, secret AWSCURRENT version |
+| Template | Hash319e79f5… như trước; mọi parameter ngoài ApplicationImage được controller đối chiếu không đổi |
+| HTTP | / trả200; /api/catalog/products?page=0&size=1 trả200/totalElements12; /api/orders chưa đăng nhập trả401 |
+
+Hai EC2 ID ở bảng là bằng chứng của trial, không phải biến cấu hình CD.
+Trial kiểm chứng refresh2 máy, không phải load test/ép CPU scale-out tới4
+máy, diễn tập restore RDS hoặc nghiệm thu go-live. AMI/schema V26, VNPay
+sandbox, UI/DNS/WAF giữ nguyên; Guard34/durable CloudTrail vẫn còn.
+
+Bàn giao qua PR53: giữ auto=false khi merge, chờ verify/dependency-review
+trên đúng head và CI merge commit main xanh. Chờ CD workflow_run của merge
+bàn giao kết thúc skipped, rồi đặt ASG_AUTO_DEPLOY_ENABLED=true và đọc lại
+cả hai cờ. Cách này bật tự động cho release sau mà không phát hành thêm một
+image chỉ vì merge tài liệu bàn giao. Quyền bật cờ sau nghiệm thu đã được
+chủ repo duyệt. Trạng thái cờ thực tế xem tại GitHub Actions Variables.
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
@@ -161,6 +245,12 @@ nhánh main. Không dùng subject legacy hoặc wildcard repo. Xem
 | PassExistingAutoScalingServiceRoleViaCloudFormation | PassRole service-linked role sẵn có tới Auto Scaling |
 | RuntimeProbeDocument | SendCommand với AWS-RunShellScript |
 | RuntimeProbeOnlyCurrentAppFleet | Chỉ EC2 có system tag aws:autoscaling:groupName khớp ASG này |
+| ReadValidationEventsInSingapore | DescribeEvents Resource=* chỉ Singapore, đã được chủ repo duyệt vì thử scoped ARN bị từ chối; controller vẫn khóa selector/StackId |
+| ReadDatabaseReferenceViaCloudFormation | DescribeDBInstances đúng RDS để resolve endpoint; metadata, không SQL/password |
+| ReadApplicationProfileReferenceViaCloudFormation | GetInstanceProfile đúng app profile để resolve ARN |
+| ReadDistributionOutputViaCloudFormation | GetDistribution/ListTagsForResource đúng distribution để resolve Outputs; chứa origin config, chỉ qua CloudFormation |
+| ReadBastionOutputViaCloudFormation | DescribeInstanceAttribute đúng bastion cho PublicIp Output |
+| ReadRegionalProviderOutputsViaCloudFormation | Describe ALB/capacity/tags/attributes và EC2 credits/volumes/ENIs theo handler read; Resource=* chỉ Singapore, chỉ qua CloudFormation |
 
 Nguồn quyền: thao tác AWS CLI của pipeline và dependency của CloudFormation
 resource handlers; đã tra từng API trong Service Authorization Reference
@@ -174,7 +264,8 @@ Access Analyzer: permissions policy không finding; trust có một suggestion
 aud single-valued (đã dùng StringEquals, không qualifier) và một warning
 khuyên thêm branch. Trust không có wildcard; branch được khóa bằng GitHub
 environment deployment policy. Phải hậu kiểm policy main trước khi cho assume.
-Chưa kiểm chứng end-to-end role permissions bằng một lần rollout thật.
+Role đã qua rollout OIDC thật40325309982, gồm native refresh và probe cả
+fleet. Điều này không mở rộng quyền role hoặc thay nghiệm thu go-live.
 
 Giới hạn bảo mật: IAM không diễn đạt “chỉ đổi ApplicationImage”; controller
 và CI áp invariant đó. SendCommand AWS-RunShellScript cho phép chạy shell
@@ -182,6 +273,9 @@ với quyền root trên app fleet, mặc dù script của task chỉ đọc met
 Ai sửa được workflow đã được bảo vệ có quyền triển khai code lên app; vì
 vậy cần giữ main protection, OIDC/environment scope và review source.
 Role không cấp API đọc Secrets Manager hoặc quyền sửa RDS/S3/UI/IAM/network.
+Riêng DescribeEvents có quyền đọc events các stack khác trong Singapore;
+các event có thể chứa cấu hình resource. Không log ResourceProperties trong
+controller/artifact. Main/environment/OIDC và quyền ghi stack/LT/ASG giữ scope.
 Guard34 finding cũ và durable CloudTrail chưa có vẫn là khoản tồn đọng.
 
 ## Thiết lập một lần
@@ -228,7 +322,13 @@ Actions -> CD -> Run workflow -> Branch main:
    đỏ/timeout hoặc chỉ một node Healthy là deploy thành công.
 4. Tải artifact `asg-release-<run>-<attempt>` để lưu source SHA, old/new digest,
    plan ARN, template hash và số node verified. Không chứa runtime env.
-5. Chỉ khi trial thật đạt mới đặt ASG_AUTO_DEPLOY_ENABLED=true. Lần merge sau
+   `sourceSha` là commit chạy controller/workflow; khi promote/rollback bằng
+   input image, lưu thêm build commit/run riêng. Trial hiện dùng build56d76a7
+   và controller20134b1, runtime diff src/main/pom/Dockerfile bằng0.
+5. Chỉ khi trial thật đạt và CI bàn giao xong mới đặt ASG_AUTO_DEPLOY_ENABLED=true.
+   Nếu merge PR ghi bằng chứng trial, giữ auto=false tới khi CI merge commit
+   xanh và CD của merge đó đã skipped, rồi bật và đọc lại hai cờ trong Variables.
+   Lần merge sau
    tự đi theo luồng trên, không cần mở Termius. Nếu main đổi trong lúc build,
    run cũ dừng; run mới chờ concurrency, không hủy rollout đang thực hiện.
 
@@ -238,6 +338,15 @@ apply mới Execute. Chạy khi lab ASG đang bật, ổn định, không chạy
 
 ## Lỗi, dừng và rollback
 
+- Trong refresh có thể tạm có3 target: hai máy cũ Healthy và máy mới đang
+  bootstrap. ASG HealthStatus=Healthy trong grace period chưa chứng minh app
+  Healthy; kiểm cả TargetHealth và runtime. Không deregister máy mới, dừng
+  máy cũ hoặc đổi health endpoint thành phản hồi giả để vượt bước chờ.
+- Nếu máy mới chưa Healthy, kiểm trạng thái cloud-final.service và Docker
+  metadata qua SSM. Chỉ lấy Running/Health/RestartCount/OOMKilled; không xuất
+  toàn bộ docker inspect, env-file/UserData hoặc log thô. Trial26/10 ghi nhận
+  bước keytool tạo truststore RDS trước khi container được tạo. Giữ grace20
+  phút/warmup3 phút đã duyệt; timeout/failure phải điều tra, không ép refresh.
 - `TEMPLATE_DRIFT` hoặc plan ngoài phạm vi: dừng, so template Original với
   source; không cập nhật toàn bộ template chỉ để ép CD chạy.
 - Lab đang tắt: bật theo runbook tiết kiệm, đợi cả fleet/targets Healthy rồi
@@ -254,6 +363,30 @@ apply mới Execute. Chạy khi lab ASG đang bật, ổn định, không chạy
   tương thích/backup riêng; pipeline này không tự drop bảng hay restore RDS.
 - Plan preview chưa Execute có thể giữ để điều tra; dọn bằng quyền quản trị
   sau khi kiểm ARN/status. Deployment role không có DeleteStack/DeleteChangeSet.
+
+Đọc tiến trình từ máy quản trị, Bash (không thay đổi AWS):
+
+```bash
+aws cloudformation describe-stacks --profile shop-prod --region ap-southeast-1 \
+  --stack-name shop-aydibro-prod --query 'Stacks[0].StackStatus'
+asg_name=$(aws cloudformation describe-stack-resource --profile shop-prod \
+  --region ap-southeast-1 --stack-name shop-aydibro-prod \
+  --logical-resource-id ApplicationAutoScalingGroup \
+  --query 'StackResourceDetail.PhysicalResourceId' --output text)
+aws autoscaling describe-instance-refreshes --profile shop-prod \
+  --region ap-southeast-1 --auto-scaling-group-name "$asg_name" --max-records 5 \
+  --query 'InstanceRefreshes[].{Id:InstanceRefreshId,Status:Status,Progress:PercentageComplete,Reason:StatusReason}'
+target_group=$(aws cloudformation describe-stack-resource --profile shop-prod \
+  --region ap-southeast-1 --stack-name shop-aydibro-prod \
+  --logical-resource-id ApplicationTargetGroup \
+  --query 'StackResourceDetail.PhysicalResourceId' --output text)
+aws elbv2 describe-target-health --profile shop-prod --region ap-southeast-1 \
+  --target-group-arn "$target_group" \
+  --query 'TargetHealthDescriptions[].{Id:Target.Id,State:TargetHealth.State,Reason:TargetHealth.Reason}'
+```
+
+Các lệnh này dành cho profile quản trị, không thêm quyền
+DescribeStackResource riêng cho deployment role chỉ để chạy lệnh hướng dẫn.
 
 ## Lệnh kiểm tra source không cần AWS
 

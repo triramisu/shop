@@ -13,24 +13,24 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 ## 2. Trạng thái hiện tại
 
-- CD-ASG-01 — Đang thay backend CD một EC2 bằng image-only CloudFormation
-  update và native ASG Instance Refresh theo yêu cầu ngày26/10/2026. Không
-  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có67 test controller/source/CLI
-  và94 test Node hồi quy đạt; probe AWS thật xác nhận2/2 container đúng image,
-  Healthy/restart0/LT8. Chủ repo đã Store DOCKERHUB_TOKEN và duyệt role OIDC:
-  đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt. PR48 đã
-  merge1473871 và CI main xanh. Verify GitHub qua OIDC thật đạt2/2 máy/LT8;
-  chỉ cờ manual bật, auto false. Build/plan bị Trivy chặn CVE-2026-111497 của
-  brotli-libs trước push/deploy; đang vá package runtime, giữ nguyên gate.
-  PR49 đã merge56d76a7 và CI main xanh; local Docker build/scan bản vá đạt,
-  đang thử lại publish/plan trên runner. Provider IAM đã đối chiếu Event History,
-  Permissions Access Analyzer0 finding và19 ca simulation đạt. Image đã scan/push
-  thành công; preview dừng trước Execute vì filter DescribeEvents sai model,
-  PR50 đã sửa/test contract AWS CLI/CRLF và merge b707a78, CI main xanh. Preview
-  tiếp dừng ở DescribeEvents AccessDenied với selector chỉ có ARN; đang bổ sung
-  stack ARN và kiểm scope event, giữ nguyên giới hạn IAM. Trial rollout đang chuẩn bị,
-  **chưa bật tự deploy**. Xem
-  [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
+- CD-ASG-01 — Đã nghiệm thu rollout backend qua image-only CloudFormation và
+  native ASG Instance Refresh ngày26/10/2026. Không lưu EC2 ID cố định;
+  ASG/LT quản lý cả fleet và cấu hình máy được tạo sau release.
+  [Trial40325309982](https://github.com/triramisu/shop/actions/runs/40325309982)
+  đạt DEPLOYED_AND_FLEET_VERIFIED:2/2 máy mới ở hai AZ, LT8→9, digest
+  0ec7922b…→9e8791cd…, container/target Healthy, restart0, không OOM. Refresh
+  Successful sau31 phút54 giây; không ép refresh/terminate hoặc chạy tải.
+  AMI/revision/secret/template giữ nguyên; HTTP smoke200/200/401,12 sản phẩm.
+  161 test Node đạt; IAM Access Analyzer0 finding,20/20 simulation bổ sung
+  đạt. Trial đầu rollback an toàn vì thiếu quyền đọc RDS; đã bổ sung12 quyền
+  đọc dependency được duyệt, chỉ qua CloudFormation, giữ nguyên quyền ghi.
+  Bàn giao qua [PR53](https://github.com/triramisu/shop/pull/53); chỉ bật
+  ASG_AUTO_DEPLOY_ENABLED=true sau required checks và CI merge commit xanh,
+  đợi workflow CD của lần merge bàn giao skipped trước khi bật cờ. Luồng sau
+  đó: merge main → CI xanh → build/scan/push digest → refresh → kiểm cả fleet.
+  Đây là nghiệm thu CD, không phải go-live/M5 hoặc mục tiêu branch >80%;
+  Guard34 và durable CloudTrail vẫn tồn đọng. Xem
+  [cấu hình GitHub/IAM, từng bước vận hành và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
   đã qua verify/dependency-review và merge tại `132d4a9`; verify merge commit
   trên main xanh, dependency-review skipped đúng điều kiện push. Không đồng
