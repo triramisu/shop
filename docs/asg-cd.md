@@ -41,7 +41,7 @@ repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. CD source 
 checks và CI merge commit xanh. Role riêng đã được duyệt/tạo. Manual gate
 ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Chưa rollout image mới.
 
-150 test Node đạt, gồm 56 ca CD/source và 94 ca preflight/template/proxy;
+160 test Node đạt, gồm 66 ca CD/source/CLI contract và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
 đúng digest, restart0, không OOM, LT8**. Chỉ đọc Docker metadata bằng SSM;
 đây là kiểm tra image hiện hành, chưa phải nghiệm thu rollout image mới.
@@ -63,6 +63,20 @@ Alpine3.24.3. Chưa thay thế kết quả scan/push trên runner hoặc trial r
 merge `56d76a7`; CI merge commit xanh. Build/preview mới đang chạy tại
 [40291506938](https://github.com/triramisu/shop/actions/runs/40291506938),
 chưa Execute hoặc thay EC2. Không đổi Java/schema trong bản vá.
+
+Run40291506938 đã vượt scan và push image thành công; dừng ở DescribeEvents
+vì script truyền filter EventType không thuộc model AWS CLI. Không Execute;
+plan vẫn CREATE_COMPLETE/AVAILABLE với đúng3 Modify, không Add/Remove.
+Đã sửa lấy đầy đủ event theo change-set ARN và phân loại ở client, giữ chặn
+validation/provisioning/hook error kể cả WARN. Không dùng FailedEvents=true
+để lọc mất warning. Chờ stack-event SUCCEEDED, không chấp nhận response rỗng
+hoặc thiếu trang; lưu ARN/image vào artifact ngay cả khi validation thất bại.
+
+Test mới dùng `--generate-cli-skeleton output` với credential giả và tắt IMDS
+để AWS CLI tự kiểm đúng arguments, không gọi AWS thật; thêm ca WARN, unknown
+event, pending/incomplete và CRLF Windows/LF Linux. Fingerprint chỉ chuẩn hóa
+CRLF; đổi nội dung/space/comment vẫn là drift. Xem
+[DescribeEvents](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/describe-events.html).
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
@@ -236,7 +250,7 @@ apply mới Execute. Chạy khi lab ASG đang bật, ổn định, không chạy
 ## Lệnh kiểm tra source không cần AWS
 
 ```bash
-node --test ci/asg-release.test.cjs ci/cd-source.test.cjs
+node --test ci/asg-release.test.cjs ci/asg-cli-contract.test.cjs ci/cd-source.test.cjs
 actionlint .github/workflows/ci.yml .github/workflows/cd.yml
 git diff --check
 ```

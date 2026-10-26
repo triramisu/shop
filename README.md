@@ -15,7 +15,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - CD-ASG-01 — Đang thay backend CD một EC2 bằng image-only CloudFormation
   update và native ASG Instance Refresh theo yêu cầu ngày26/10/2026. Không
-  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có56 test controller/source
+  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có66 test controller/source/CLI
   và94 test Node hồi quy đạt; probe AWS thật xác nhận2/2 container đúng image,
   Healthy/restart0/LT8. Chủ repo đã Store DOCKERHUB_TOKEN và duyệt role OIDC:
   đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt. PR48 đã
@@ -24,7 +24,9 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   brotli-libs trước push/deploy; đang vá package runtime, giữ nguyên gate.
   PR49 đã merge56d76a7 và CI main xanh; local Docker build/scan bản vá đạt,
   đang thử lại publish/plan trên runner. Provider IAM đã đối chiếu Event History,
-  Access Analyzer0 finding và19 ca simulation đạt. Trial rollout đang chuẩn bị,
+  Permissions Access Analyzer0 finding và19 ca simulation đạt. Image đã scan/push
+  thành công; preview dừng trước Execute vì filter DescribeEvents sai model,
+  đang sửa/test contract trực tiếp AWS CLI và CRLF. Trial rollout đang chuẩn bị,
   **chưa bật tự deploy**. Xem
   [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { release, imageDigest, probeScript } = require("./asg-release.cjs");
+const { release, imageDigest, probeScript, assessValidationEvents } = require("./asg-release.cjs");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "shop-asg-release-test-"));
 const template = "AWSTemplateFormatVersion: '2010-09-09'\nDescription: Fixture\n";
 const templatePath = path.join(root, "template.yaml");
@@ -86,7 +86,8 @@ function fixture(settings = {}) {
     if (operation === "create-change-set") return { Id: changesetId };
     if (operation === "describe-change-set") return settings.executeNetworkError && phase === "after"
       ? { ...plan(), ExecutionStatus: "EXECUTE_IN_PROGRESS" } : plan();
-    if (operation === "describe-events") return { OperationEvents: settings.validationFinding ? [{ EventType: "VALIDATION_ERROR" }] : [] };
+    if (operation === "describe-events") return { OperationEvents: settings.validationFinding ? [{ EventType: "VALIDATION_ERROR" }]
+      : [{ EventType: "STACK_EVENT", OperationStatus: settings.eventsPending ? "IN_PROGRESS" : "SUCCEEDED" }] };
     if (operation === "execute-change-set") { phase = "after"; if (settings.executeNetworkError) throw Error("NETWORK"); return {}; }
     if (operation === "send-command") {
       const start = args.indexOf("--instance-ids") + 1;
@@ -132,6 +133,13 @@ test("same immutable digest is a whole-fleet verification, not another refresh",
   assert.equal((await release(f.options, f)).outcome, "ALREADY_DEPLOYED");
   assert.ok(!f.calls.some(c => c.operation === "create-change-set"));
 });
+test("Windows CRLF source matches the deployed LF YAML while content drift remains rejected", async () => {
+  const crlfPath = path.join(root, "crlf.yaml"); fs.writeFileSync(crlfPath, template.replace(/\n/g, "\r\n"));
+  const f = fixture({ options: { mode: "plan", templatePath: crlfPath } });
+  assert.equal((await release(f.options, f)).outcome, "PLAN_ONLY_NOT_EXECUTED");
+  const changed = fixture({ drift: true, options: { templatePath: crlfPath } });
+  await assert.rejects(release(changed.options, changed), /TEMPLATE_DRIFT/);
+});
 for (const [name, settings, message] of [
   ["wrong AWS account", { wrongAccount: true }, /ACCOUNT_MISMATCH/],
   ["stopped lab", { off: true }, /CAPACITY_UNEXPECTED/],
@@ -169,6 +177,24 @@ for (const [name, editPlan] of [
 test("AWS validation warnings/errors require review, not automatic execution", async () => {
   const f = fixture({ validationFinding: true }); await assert.rejects(release(f.options, f), /VALIDATION_FINDINGS/);
   assert.ok(!f.calls.some(c => c.operation === "execute-change-set"));
+});
+test("waits for a successful change-set event instead of accepting an empty/pending response", async () => {
+  const f = fixture({ eventsPending: true }); await assert.rejects(release(f.options, f), /AWS_VALIDATION_EVENTS_TIMEOUT/);
+  assert.ok(!f.calls.some(c => c.operation === "execute-change-set"));
+});
+for (const event of [
+  { EventType: "VALIDATION_ERROR", ValidationFailureMode: "WARN", ValidationStatus: "FAILED" },
+  { EventType: "PROVISIONING_ERROR" }, { EventType: "HOOK_INVOCATION_ERROR", HookFailureMode: "WARN" },
+  { EventType: "STACK_EVENT", OperationStatus: "FAILED" }, { EventType: "PROGRESS_EVENT", DetailedStatus: "VALIDATION_FAILED" },
+  { EventType: "UNRECOGNIZED" },
+]) test(`rejects validation event ${JSON.stringify(event)}`, () => {
+  assert.throws(() => assessValidationEvents({ OperationEvents: [event] }), /VALIDATION_FINDINGS/);
+});
+test("requires a complete DescribeEvents response and keeps normal progress events", () => {
+  assert.throws(() => assessValidationEvents({}), /RESPONSE_INCOMPLETE/);
+  assert.throws(() => assessValidationEvents({ OperationEvents: [], NextToken: "not-consumed" }), /RESPONSE_INCOMPLETE/);
+  assert.deepEqual(assessValidationEvents({ OperationEvents: [{ EventType: "STACK_EVENT", OperationStatus: "IN_PROGRESS" },
+    { EventType: "STACK_EVENT", OperationStatus: "SUCCEEDED" }] }), { complete: true, eventCount: 2 });
 });
 test("rechecks last update time before execution and rejects a stale plan", async () => {
   let reads = 0; const f = fixture({ editStack: s => { if (++reads >= 2) s.LastUpdatedTime = "changed"; } });

@@ -11,7 +11,8 @@ const RESOURCES = {
 };
 const TERMINAL_REFRESH = new Set(["Successful", "Failed", "Cancelled", "RollbackSuccessful", "RollbackFailed"]);
 const stableStatuses = new Set(["CREATE_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE"]);
-const hash = value => createHash("sha256").update(value).digest("hex");
+// YAML normalizes line breaks; allow Windows CRLF without ignoring any other source change.
+const hash = value => createHash("sha256").update(value.toString().replace(/\r\n/g, "\n")).digest("hex");
 function requireThat(value, code) { if (!value) throw new Error(code); }
 function imageDigest(image) {
   const match = /^(?:docker\.io\/)?t1r4m15u\/shop(?::[A-Za-z0-9_.-]+)?@(sha256:[a-f0-9]{64})$/.exec(image || "");
@@ -125,6 +126,16 @@ function sameBaseline(a, b) {
     && ["MinSize", "DesiredCapacity", "MaxSize"].every(k => a.asg[k] === b.asg[k])
     && JSON.stringify(a.ids) === JSON.stringify(b.ids);
 }
+function validationEventArgs(changeSetId) { return ["--change-set-name", changeSetId]; }
+function assessValidationEvents(response) {
+  requireThat(Array.isArray(response.OperationEvents) && !response.NextToken, "AWS_VALIDATION_RESPONSE_INCOMPLETE");
+  requireThat(response.OperationEvents.every(e => ["STACK_EVENT", "PROGRESS_EVENT"].includes(e.EventType)
+    && e.OperationStatus !== "FAILED" && e.DetailedStatus !== "VALIDATION_FAILED"
+    && !/_FAILED$/.test(e.ResourceStatus || "") && !["HOOK_COMPLETE_FAILED", "HOOK_FAILED"].includes(e.HookStatus)),
+  "AWS_VALIDATION_FINDINGS_REVIEW_REQUIRED");
+  return { complete: response.OperationEvents.some(e => e.EventType === "STACK_EVENT" && e.OperationStatus === "SUCCEEDED"),
+    eventCount: response.OperationEvents.length };
+}
 async function waitFor(read, complete, { sleep, now, timeoutMs, label }) {
   const deadline = now() + timeoutMs;
   while (now() < deadline) {
@@ -184,9 +195,10 @@ async function release(o, { aws, sleep = ms => new Promise(r => setTimeout(r, ms
   const plan = await waitFor(() => aws("cloudformation", "describe-change-set", ["--stack-name", o.stackName, "--change-set-name", create.Id]),
     p => ["CREATE_COMPLETE", "FAILED"].includes(p.Status), { ...timing, timeoutMs: 360000, label: "CHANGE_SET" });
   result.changeSetId = create.Id;
+  report(JSON.stringify({ phase: "PLAN_CREATED", ...result }));
   result.changes = inspectPlan(plan, baseline, o.image);
-  const events = aws("cloudformation", "describe-events", ["--change-set-name", create.Id, "--filters", "EventType=VALIDATION_ERROR"]);
-  requireThat(Array.isArray(events.OperationEvents) && events.OperationEvents.length === 0, "AWS_VALIDATION_FINDINGS_REVIEW_REQUIRED");
+  result.validation = await waitFor(() => assessValidationEvents(aws("cloudformation", "describe-events", validationEventArgs(create.Id))),
+    value => value.complete, { ...timing, timeoutMs: 90000, label: "AWS_VALIDATION_EVENTS" });
   report(JSON.stringify({ phase: "PLAN_READY", ...result }));
   if (o.mode === "plan") return { ...result, outcome: "PLAN_ONLY_NOT_EXECUTED" };
   requireThat(sameBaseline(baseline, snapshot(aws, o)), "STALE_PLAN_OR_FLEET_CHANGED");
@@ -234,7 +246,7 @@ if (require.main === module) {
   let lastPlan = {};
   release(options, { report: event => {
     const value = JSON.parse(event);
-    if (value.phase === "PLAN_READY") lastPlan = value;
+    if (["PLAN_CREATED", "PLAN_READY"].includes(value.phase)) lastPlan = value;
     console.log(event);
   } }).then(result => {
     fs.writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
@@ -244,4 +256,5 @@ if (require.main === module) {
     console.error(error.message); process.exitCode = 1;
   });
 }
-module.exports = { imageDigest, validateOptions, assertFleet, inspectPlan, snapshot, sameBaseline, probeScript, verifyRuntime, release };
+module.exports = { imageDigest, validateOptions, assertFleet, inspectPlan, snapshot, sameBaseline, validationEventArgs,
+  assessValidationEvents, probeScript, verifyRuntime, release };
