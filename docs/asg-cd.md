@@ -33,16 +33,31 @@
 
 ## Trạng thái
 
-Đang triển khai source CD-ASG-01 ngày26/10/2026. PR47 đã merge tại
+Đang nghiệm thu CD-ASG-01 ngày26/10/2026. PR47 đã merge tại
 `132d4a9b87aae65fa5ce88450de075962111b558`; verify của merge commit xanh,
 dependency-review skipped đúng điều kiện push. Docker Hub token đã được chủ
-repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. Chưa tạo role,
-bật CD hoặc rollout image mới trong task này.
+repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. CD source qua
+[PR48](https://github.com/triramisu/shop/pull/48), merge `1473871`; required
+checks và CI merge commit xanh. Role riêng đã được duyệt/tạo. Manual gate
+ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Chưa rollout image mới.
 
 150 test Node đạt, gồm 56 ca CD/source và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
 đúng digest, restart0, không OOM, LT8**. Chỉ đọc Docker metadata bằng SSM;
 đây là kiểm tra image hiện hành, chưa phải nghiệm thu rollout image mới.
+
+[Verify trên runner GitHub](https://github.com/triramisu/shop/actions/runs/40288468566)
+đã đạt qua OIDC thật: ALREADY_DEPLOYED, verifiedInstances2, LT8, source1473871.
+Không tạo change set hoặc refresh. Lần build/plan
+[40288612662](https://github.com/triramisu/shop/actions/runs/40288612662) đã bị
+Trivy chặn trước push/deploy: brotli-libs1.2.0-r1, HIGH CVE-2026-111497,
+bản vá1.2.1-r0. Dockerfile bổ sung upgrade riêng package từ repository Alpine
+hiện hành; không đổi distro/Java/user, không hạ scan gate hoặc ignore CVE.
+Build local đạt, apk xác nhận1.2.1-r0, Temurin21.0.12.1 và UID10001; Trivy
+0.75.0 cùng flags CD trả exit0, không có HIGH/CRITICAL có bản vá trong OS
+Alpine3.24.3. Chưa thay thế kết quả scan/push trên runner hoặc trial rollout.
+[Alpine xác nhận bản vá](https://security.alpinelinux.org/vuln/CVE-2026-111497),
+[upstream release](https://github.com/google/brotli/releases/tag/v1.2.1).
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
@@ -82,8 +97,9 @@ không đặt service role mới lên toàn bộ production stack.
 
 Chủ repo duyệt role/GitHub trong phiên ngày26/10. Đã tạo role và attach đúng
 inline policy `BackendAsgImageRelease`, đọc lại duration5400 và policy name;
-GitHub environment chỉ có branch main, cả hai cờ false. Mô phỏng IAM đạt13
-ca allow/deny trước attach. Chưa assume bằng OIDC trên runner hoặc rollout.
+GitHub environment chỉ có branch main. Mô phỏng IAM đạt13 ca allow/deny trước
+attach; assume OIDC và probe thật đã đạt ở run liên kết phía trên. Chỉ cờ
+manual được bật để nghiệm thu; auto vẫn false, chưa rollout image mới.
 
 Repo tạo ngày26/09/2026; GitHub mặc định dùng subject có immutable IDs:
 `repo:triramisu@200755440/shop@1389536014:environment:production`.
