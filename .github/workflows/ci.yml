@@ -69,7 +69,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/shop-ci-tools" --ignore-scripts --no-audit --no-fund --no-save js-yaml@4.1.1
           SHOP_YAML_MODULE="$RUNNER_TEMP/shop-ci-tools/node_modules/js-yaml" \
           SHOP_BASH="$(command -v bash)" SHOP_PYTHON="$(command -v python3)" \
-          node --test ci/asg-release.test.cjs ci/cd-source.test.cjs \
+          node --test ci/asg-release.test.cjs ci/asg-cli-contract.test.cjs ci/cd-source.test.cjs \
             ci/aws-vnpay-preflight.test.cjs ci/aws-vnpay-template.test.cjs ci/aws-trusted-proxy.test.cjs
 
       - name: Set up Java 21

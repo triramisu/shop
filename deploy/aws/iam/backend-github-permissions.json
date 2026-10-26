@@ -30,7 +30,7 @@
     {
       "Sid": "RegionalReadOperationsWithoutResourceScoping",
       "Effect": "Allow",
-      "Action": ["cloudformation:ListStacks", "autoscaling:DescribeAutoScalingGroups", "autoscaling:DescribeInstanceRefreshes", "autoscaling:DescribePolicies", "autoscaling:DescribeScalingActivities", "ec2:DescribeInstances", "ec2:DescribeLaunchTemplates", "ec2:DescribeLaunchTemplateVersions", "elasticloadbalancing:DescribeTargetHealth", "ssm:ListCommandInvocations", "cloudwatch:GetMetricData"],
+      "Action": ["cloudformation:ListStacks", "autoscaling:DescribeAutoScalingGroups", "autoscaling:DescribeInstanceRefreshes", "autoscaling:DescribePolicies", "autoscaling:DescribeScalingActivities", "ec2:DescribeInstances", "ec2:DescribeLaunchTemplates", "ec2:DescribeLaunchTemplateVersions", "elasticloadbalancing:DescribeTargetHealth", "ssm:ListCommandInvocations", "cloudwatch:GetMetricData", "ec2:DescribeImages", "ec2:DescribeKeyPairs"],
       "Resource": "*",
       "Condition": {"StringEquals": {"aws:RequestedRegion": "ap-southeast-1"}}
     },
@@ -44,7 +44,7 @@
     {
       "Sid": "ExistingAsgNativeRefreshViaCloudFormation",
       "Effect": "Allow",
-      "Action": ["autoscaling:UpdateAutoScalingGroup", "autoscaling:StartInstanceRefresh", "autoscaling:CancelInstanceRefresh", "autoscaling:PutScalingPolicy", "autoscaling:DeletePolicy"],
+      "Action": ["autoscaling:UpdateAutoScalingGroup", "autoscaling:StartInstanceRefresh", "autoscaling:CancelInstanceRefresh", "autoscaling:PutScalingPolicy", "autoscaling:DeletePolicy", "autoscaling:CreateOrUpdateTags"],
       "Resource": "arn:aws:autoscaling:ap-southeast-1:233377400170:autoScalingGroup:a7153bbe-2e87-4a7d-8547-174cc5ae77b5:autoScalingGroupName/shop-aydibro-prod-ApplicationAutoScalingGroup-vGFBGIo2wDtZ",
       "Condition": {"StringEquals": {"aws:CalledViaFirst": "cloudformation.amazonaws.com"}, "BoolIfExists": {"autoscaling:LaunchTemplateVersionSpecified": "true"}}
     },
