@@ -1,93 +1,53 @@
-# Triển khai Shop
+# Triển khai AWS prod
 
 [README dự án](../README.md) · [Mục lục tài liệu](../docs/README.md)
 
-Thư mục này chứa cấu hình hạ tầng và công cụ triển khai backend. Chọn đúng
-mô hình ở bảng dưới trước khi mở file hoặc chạy lệnh.
+Repo chỉ giữ một bộ triển khai: **AWS prod qua CloudFormation và ASG**.
+Backend chạy trong EC2 private, dùng RDS MySQL và S3; UI nằm ở repo riêng,
+build thành static assets để đưa lên S3/CloudFront.
 
-## Chọn mô hình triển khai
-
-| Bạn cần làm gì? | Bắt đầu ở đâu? | Thành phần chính |
-| --- | --- | --- |
-| Vận hành AWS hiện tại | [Template prod và hồ sơ triển khai](aws/PROD.md), sau đó [CD qua ASG](../docs/asg-cd.md) | CloudFormation, ALB, ASG, RDS, S3, CloudFront |
-| Chạy backend trên một máy bằng Docker Compose | [Runbook single-host](../docs/runbook/ci-cd.md) | `compose.prod.yml`, `deploy.sh`, MySQL và MinIO trong Docker |
-| Dựng lab Docker để đo tải có kiểm soát | [Hướng dẫn lab](lab/README.md) | nginx/UI, app, MySQL, MinIO; giới hạn tài nguyên container |
-| Chạy dev trên máy cá nhân | [Chạy dự án](../README.md#9-chạy-dự-án) và [object storage local](../docs/runbook/local-object-storage.md) | `compose.yaml` ở gốc repo và Spring profile `dev` |
-
-AWS hiện tại phát hành backend bằng **Launch Template + ASG Instance Refresh**.
-`deploy.sh` là công cụ cho mô hình một máy, không phải đường CD của ASG.
-Từ `prod` trong tên Compose không có nghĩa Compose đó chính là kiến trúc AWS đang chạy.
-
-## Cấu trúc thư mục
+## Cấu trúc
 
 ```text
 deploy/
-├── README.md                    ← mục lục này
-├── .env.prod.example            ← mẫu biến cho Compose một máy
-├── compose.prod.yml             ← app + MySQL + MinIO trên một host
-├── deploy.sh                    ← đổi image, kiểm health và rollback trên host đó
-├── aws/                         ← hạ tầng AWS và mẫu cấu hình runtime
-│   ├── README.md                ← chỉ dẫn chọn file và lịch sử lab AWS
-│   ├── PROD.md                  ← hướng dẫn/bằng chứng của template prod
-│   ├── shop-prod.yaml           ← baseline hạ tầng AWS prod-profile
-│   ├── shop-lab.yaml            ← template lab AWS trước đây
-│   ├── application.env.example  ← mẫu nội dung application secret
-│   ├── parameters.example.json  ← parameters mẫu của template lab cũ
-│   ├── .gitignore               ← loại env/key/parameters local khỏi Git
-│   └── iam/                     ← trust/permissions cho GitHub deploy backend
-├── lab/                         ← lab Docker riêng, khác lab hạ tầng AWS
-│   ├── README.md
-│   ├── .env.lab.example
-│   ├── compose.lab.yml
-│   └── setup-ubuntu.sh
-└── mysql/
-    └── init/
-        └── 01-create-accounts.sh ← tạo user runtime/migration cho MySQL Compose
+├── README.md                   ← bắt đầu ở đây
+└── aws/
+    ├── README.md               ← cấu hình, thứ tự dựng và kiểm tra AWS
+    ├── PROD.md                 ← hồ sơ triển khai có ngày
+    ├── shop-prod.yaml          ← template hạ tầng prod duy nhất
+    ├── application.env.example ← mẫu application secret
+    ├── .gitignore              ← bỏ qua env/key/parameters local
+    └── iam/
+        ├── backend-github-trust.json       ← GitHub nào được assume role
+        └── backend-github-permissions.json ← role được làm gì trên AWS
 ```
 
-## Các thư mục con dùng để làm gì?
+## Đọc theo việc cần làm
 
-| Đường dẫn | Vai trò | Khi cần mở |
-| --- | --- | --- |
-| [`aws/`](aws/README.md) | CloudFormation cho VPC/subnet, ALB, ASG, RDS, S3, CloudFront và cấu hình liên quan | Dựng hoặc thay đổi hạ tầng AWS |
-| `aws/iam/` | Hai policy [trust](aws/iam/backend-github-trust.json) và [permissions](aws/iam/backend-github-permissions.json) của role backend CD | Review GitHub OIDC, quyền deploy và dependency reads |
-| [`lab/`](lab/README.md) | Chạy cả stack trong lab Docker; UI source nằm ở repo riêng | Đo tải/so sánh cấu hình nginx trên môi trường lab đã chọn |
-| `mysql/init/` | [Script tạo tài khoản](mysql/init/01-create-accounts.sh) cho MySQL container | Khởi tạo volume MySQL mới của Compose single-host |
+| Công việc | Tài liệu/source |
+| --- | --- |
+| Hiểu và dựng hạ tầng | [AWS README](aws/README.md), [template prod](aws/shop-prod.yaml) |
+| Chuẩn bị biến runtime | [Env mẫu](aws/application.env.example); lưu giá trị thật trong Secrets Manager |
+| Review IAM cho GitHub backend | [Trust](aws/iam/backend-github-trust.json), [permissions](aws/iam/backend-github-permissions.json) |
+| Phát hành code lên cả cụm ASG | [Runbook ASG CD](../docs/asg-cd.md) |
+| Kiểm tra VNPay sandbox | [VNPay SIT](../docs/vnpay-sit.md) |
+| Tra lại hồ sơ rollout | [PROD.md](aws/PROD.md), [README dự án](../README.md#2-trạng-thái-hiện-tại) |
 
-Script init MySQL được `compose.prod.yml` mount vào container. Nó không tự
-tạo user trên RDS và không tự chạy lại mỗi lần restart một volume đã có dữ liệu.
+Luồng phát hành: PR → CI → build/scan/push image → OIDC → CloudFormation cập
+nhật image trong Launch Template → ASG Instance Refresh → kiểm toàn fleet.
+Máy scale-out sau đó dùng cấu hình/image từ Launch Template đã cập nhật.
 
-## Các file ở gốc `deploy/`
+## Phạm vi chuẩn hóa AWS-PROD-ONLY — 27/10/2026
 
-| File | Vai trò | Đọc cùng |
-| --- | --- | --- |
-| [`.env.prod.example`](.env.prod.example) | Danh sách biến cần điền cho Compose single-host; bản mẫu không phải secret đang chạy | [Runbook single-host](../docs/runbook/ci-cd.md) |
-| [`compose.prod.yml`](compose.prod.yml) | Khai báo ba service app/MySQL/MinIO, volume, health và port trên một host | Script init MySQL và file env của đúng môi trường |
-| [`deploy.sh`](deploy.sh) | Nhận image của Shop, pull/chạy app, kiểm health và thử quay lại image trước nếu lỗi | Bundle single-host tại `/opt/shop` |
+1. Mục tiêu: người vận hành có một cách deploy AWS prod rõ ràng; bỏ bộ lab và single-host cũ.
+2. Sở hữu: source triển khai, CI và tài liệu; Java/API/schema không đổi.
+3. Bất biến: giữ nguyên template prod, IAM, CD controller và cấu hình app; dev local vẫn dùng Compose ở gốc.
+4. Dữ liệu/secret: không đọc env thật, không gọi AWS, không xóa stack, database hoặc Docker volume.
+5. Đầu ra: chỉ `aws/` trong deploy, hướng dẫn nhất quán và CI kiểm đúng template prod.
+6. Ca kiểm: đường dẫn cũ không còn được gọi, dev Compose vẫn validate, prod giữ ranh giới network/data/edge.
+7. Gate: test Node của prod/release/bootstrap, workflow lint, liên kết Markdown, diff và SHA-256 file được bảo toàn.
+8. Phát hành/rollback: thay đổi local, chưa push/merge/deploy; khôi phục file từ Git nếu cần rollback source.
 
-## Ba điểm dễ chọn nhầm
-
-1. **Hai loại lab:** `lab/compose.lab.yml` là lab Docker; `aws/shop-lab.yaml`
-   là template hạ tầng AWS lịch sử. Hai bộ này không dùng chung cách bootstrap.
-2. **Hai loại env mẫu:** `.env.prod.example` phục vụ Compose;
-   `aws/application.env.example` phục vụ bootstrap ứng dụng trên AWS. Không
-   truyền một file sang mô hình khác chỉ vì cùng chạy Spring profile `prod`.
-3. **Hai template AWS:** `parameters.example.json` còn tên `LabClientIpv4` và
-   AMI dạng SSM path của lab. `shop-prod.yaml` dùng `AdditionalClientIpv4` và
-   AMI ID cụ thể; không nạp nguyên file parameters lab vào prod.
-
-`shop-prod.yaml` nhận ARN để gắn WAF qua `EdgeWebAclArn`; nó không chứa toàn bộ
-rule của stack edge WAF. Checkout này chưa có template WAF riêng đã được đồng bộ
-vào `main`; kiểm đúng source/stack trước khi chuẩn bị thay đổi WAF.
-
-## Đọc và cập nhật cấu hình
-
-- Từ mục lục này chọn mô hình → đọc runbook → kiểm source/parameters đúng release
-  → review kế hoạch → triển khai → hậu kiểm.
-- Các đoạn có ngày, change set hoặc test count là bằng chứng tại thời điểm ghi.
-  Trạng thái mới hơn xem ở [README dự án](../README.md#2-trạng-thái-hiện-tại)
-  và runbook của task tương ứng; không dùng snapshot cũ như trạng thái AWS live.
-- Cấu hình mẫu giữ placeholder; password/token/merchant key nằm trong cấu hình
-  kín của môi trường. Không lưu giá trị thật vào README, YAML hoặc policy mẫu.
-- Giữ đường dẫn ổn định: workflow, Docker Compose, script và test đang tham chiếu
-  các file này. Muốn đổi tên/di chuyển phải sửa các nơi gọi trong cùng thay đổi.
+`dev` và `prod` là Spring profiles. `foundation` và `application` là hai bước
+bootstrap **cùng một hạ tầng prod**, vẫn cần khi dựng mới. Bộ deployment lab
+và Compose prod một máy đã bỏ; lịch sử của chúng còn trong Git.

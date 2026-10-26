@@ -10,7 +10,7 @@ kết trong README, runbook và lịch sử release tiếp tục dùng được.
 | Bạn đang muốn biết gì? | Tài liệu bắt đầu |
 | --- | --- |
 | Dự án đã làm đến đâu? | [Trạng thái hiện tại](../README.md#2-trạng-thái-hiện-tại) |
-| Folder `deploy/` chứa gì, chọn mô hình nào? | [Mục lục triển khai](../deploy/README.md) |
+| AWS prod có những file triển khai nào? | [Mục lục triển khai](../deploy/README.md) |
 | GitHub đưa code lên cả cụm ASG ra sao? | [Backend CD qua ASG](asg-cd.md) |
 | Test mua hàng và VNPay trên website thế nào? | [VNPay SIT](vnpay-sit.md) |
 | API Catalog/tồn kho có contract gì? | Nhóm [kiến trúc và nghiệp vụ](#kiến-trúc-và-nghiệp-vụ) bên dưới |
@@ -23,7 +23,7 @@ docs/
 ├── README.md       ← mục lục này
 ├── architecture/   ← domain, API, audit, tìm kiếm và concurrency tồn kho
 ├── quality/        ← ma trận kiểm thử Identity
-├── runbook/        ← thao tác local/storage và hướng dẫn single-host lịch sử
+├── runbook/        ← chỉ dẫn CI/CD AWS và thao tác object storage local
 └── *.md            ← contract tính năng, payment, ASG CD và quyết định dự án
 ```
 
@@ -38,7 +38,7 @@ bước thao tác, kết quả kiểm tra và lịch sử triển khai của ch�
 | [Trusted client IP](trusted-proxy.md) | CloudFront → ALB → backend, header IP và chống giả mạo | Đọc khi sửa proxy/network hoặc điều tra IP |
 | [Kho ảnh sản phẩm S3](product-images-s3.md) | Adapter lưu ảnh, bucket/prefix/IAM và checklist cutover | Phân biệt ảnh AWS với MinIO local |
 | [Object storage local](runbook/local-object-storage.md) | Khởi động và cấu hình MinIO/Silo ở dev | Dùng khi chạy local |
-| [CI/CD single-host lịch sử](runbook/ci-cd.md) | Bundle Compose và `deploy.sh` trên một máy | Mô hình cũ/riêng; không dùng thay CD ASG |
+| [Mục lục CI/CD AWS](runbook/ci-cd.md) | Điểm bắt đầu cho workflow AWS prod và liên kết runbook ASG | Bundle lab/single-host đã được bỏ |
 
 ## Thanh toán và VNPay
 

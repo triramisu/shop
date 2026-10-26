@@ -2,6 +2,10 @@
 
 [Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
 
+Đây là hồ sơ đổi layout ngày 16/10/2026. Từ 27/10/2026, bộ deploy lab và
+single-host trong các bằng chứng cũ đã được bỏ; vận hành hiện tại dùng
+[AWS prod/ASG](../deploy/README.md). Các mô tả dưới đây ghi quyết định lúc đổi layout.
+
 ## 1. Mục tiêu và phạm vi
 
 Theo yêu cầu người dùng, bỏ lớp thư mục `D:/shop/backend` bằng cách chuyển toàn bộ Spring project về `D:/shop`. UI vẫn độc lập tại `D:/shop-ui`. Task này chỉ đổi layout, đường dẫn build/deploy và tài liệu; không đổi nghiệp vụ, API, schema, dependency version hoặc dữ liệu.

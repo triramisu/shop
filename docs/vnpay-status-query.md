@@ -71,9 +71,11 @@ không thay thế SIT với VNPay. Không tuyên bố M5.6/M5 hoặc branch cove
 `VNPAY_QUERY_ENABLED=false` giữ nguyên hành vi checkout/IPN. Khi bật cần thêm
 `VNPAY_QUERY_SERVER_IP` (IPv4 egress/NAT mà VNPay nhìn thấy), cùng merchant sandbox
 đang có. Chỉ cung cấp port: không có caller tự chạy hoặc test giao dịch thật.
-Các biến được nối qua `application.yml` và `deploy/compose.prod.yml`; file env
-example chỉ là mẫu, không tự nạp vào Java/IntelliJ. Nếu chạy Java trực tiếp phải
-khai báo environment trong Run Configuration. Không bật query trên lab DDoS.
+Các biến được nối qua `application.yml`; file env example chỉ là mẫu, không tự
+nạp vào Java/IntelliJ. Nếu chạy Java trực tiếp phải khai báo environment trong
+Run Configuration. AWS prod hiện ép query tắt bằng Docker flags trong template;
+muốn bật cần một task review/rollout riêng, không chỉ sửa secret. Bộ Compose
+single-host đã bỏ ngày 27/10/2026; cấu hình triển khai xem [AWS prod](../deploy/aws/README.md).
 Rollback bằng tắt flag hoặc quay về artifact cũ, không rollback dữ liệu/schema.
 Không đụng các thay đổi AWS đang dở trong checkout `D:/shop`.
 

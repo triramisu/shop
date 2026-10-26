@@ -70,5 +70,6 @@ và [trạng thái dự án](../../README.md).
 - Sau khi có payment pending, không rollback bằng `PaymentMode=none` trước
   khi drain/đối soát vì sẽ bỏ endpoint IPN. Giữ dữ liệu, không hạ Flyway.
 
-README lab trong thư mục này mô tả các lần nghiệm thu cũ; không lấy thành
-công local hoặc snapshot lịch sử thay cho trạng thái live hiện tại.
+[README AWS](README.md) mô tả bộ triển khai prod duy nhất. Hồ sơ có ngày
+trong file này không thay cho trạng thái AWS live mới; các template lab cũ
+đã được gỡ khỏi source ngày 27/10/2026.

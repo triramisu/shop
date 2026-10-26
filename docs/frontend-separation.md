@@ -4,6 +4,9 @@
 
 Đây là biên bản task tách UI ngày 15/10/2026. Vị trí backend `shop/backend` và context backend trong biên bản này đã được thay thế bởi [ROOT-01](backend-root-layout.md): backend hiện ở thẳng `D:/shop`. Kết quả kiểm tra lịch sử bên dưới không được dùng như bằng chứng cho layout mới.
 
+Bộ deployment lab nhắc trong hồ sơ lịch sử đã bỏ từ 27/10/2026; cách deploy
+hiện hành là [AWS prod](../deploy/README.md), UI và backend phát hành riêng.
+
 ## 1. Mục tiêu, actor và phạm vi
 
 Theo yêu cầu của chủ dự án, chuyển nguyên storefront từ `D:/shop/frontend` sang `D:/shop-ui`. Backend vẫn ở `D:/shop/backend`. Giữ nguyên giao diện, tài nguyên, cấu hình, package lock và luồng API. Tạm dừng WEB-01; không sửa nghiệp vụ, schema, payment hoặc hạ tầng AWS trong task này.
@@ -34,7 +37,7 @@ Frontend độc lập tại `D:/shop-ui`; README hai phía, quyết định ki�
 
 ## 7. Lệnh kiểm chứng
 
-Từ `shop-ui`: `npm run build`. Từ `shop`: `git diff --check` và `docker compose --env-file deploy/lab/.env.lab.example -f deploy/lab/compose.lab.yml config --quiet`. So sánh hash file trước/sau di chuyển, kiểm tra context đã resolve và smoke HTTP. Không coi các kiểm tra này là CI xanh, payment sandbox hoặc full regression backend.
+Từ `shop-ui`: `npm run build`. Từ `shop`: `git diff --check` và `docker compose --env-file .env.example -f compose.yaml --profile app config --quiet` cho dev local. Bộ lab đã bỏ ngày 27/10/2026; AWS prod xem [mục lục triển khai](../deploy/README.md). So sánh hash file trước/sau di chuyển, kiểm tra context đã resolve và smoke HTTP. Không coi các kiểm tra này là CI xanh, payment sandbox hoặc full regression backend.
 
 ## 8. Tương thích và rollback
 
