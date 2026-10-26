@@ -31,19 +31,29 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   bước nhập thẻ. Khóa/runtime khớp email; local/public redirect đều303 và
   HMAC tính lại độc lập khớp. Đã đọc thấy Merchant đặt SHA256, đổi lại
   **HMACSHA512**, bấm Hoàn thành một lần và mở lại xác nhận đúng IPN/GET.
-  Một đơn kiểm soát mới lúc09:31 đã qua gateway đến màn hình nhập thẻ NCB
-  sandbox, không còn lỗi chữ ký; đang chờ chủ tài khoản nhập thẻ test/OTP.
-  Chưa có bằng chứng IPN thành công, chưa nghiệm thu luồng thanh toán.
-  Reservation đơn lỗi đã tự EXPIRED/release về20/0; Order/Payment giữ nguyên
+  Đơn kiểm soát mới lúc09:31 đã qua gateway NCB sandbox, không còn lỗi chữ
+  ký. Chủ tài khoản hoàn tất thẻ test; hậu kiểm **09:35 ngày26/10** đạt:
+  **Payment SUCCEEDED / Order PAID / IPN APPLIED1**, event SUCCEEDED/COMPLETED1,
+  reservation CONFIRMED1 và movement CONFIRMATION1. Kho từ20/0 thành**19/0**.
+  Ca thành công qua provider thật đã đạt. Người dùng dùng lại thẻ success
+  cho đơn thứ hai: mỗi đơn APPLIED1/CONFIRMATION1, kho còn18/0. Đơn test
+  thứ ba dùng đúng thẻ không đủ số dư; sau hủy ở VNPay nhận IPN**24/02**:
+  **FAILED/CANCELLED**, APPLIED1, event FAILED/COMPLETED1, RELEASE1; kho giữ18/0.
+  Sửa browser return thành00 bị từ chối mã1400, hậu kiểm dữ liệu không đổi.
+  Chưa có IPN final failure51, provider duplicate hoặc callback trễ sau thu
+  tiền; không gán các ca đó là đã đạt. Test call IPN chung của portal trả97, không
+  phải công cụ replay giao dịch đã thanh toán và không thay thế ca duplicate.
+  Riêng đơn lỗi08:55 đã tự EXPIRED/release về20/0 tại mốc09:16; Order/Payment giữ nguyên
   PENDING/REQUIRES_ACTION vì chưa có bằng chứng final từ provider, không sửa DB.
   Regression
-  ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
+  ngày25/10 ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
   0 failure/error/skipped, line**91,69%**/branch**72,42%**; 17 ca purchase
   trên MySQL8.4 gồm ca sai kho. Spotless/JaCoCo gate, 94 test Node và kiểm
   Compose dev/prod đều đạt. Xem
   [hợp đồng, bằng chứng, cách cấu hình merchant/kho và từng bước SIT](docs/vnpay-sit.md).
-  Guard vẫn34 finding, chưa có durable CloudTrail; chưa nghiệm thu IPN thực,
-  đóng M5, push/merge hoặc duyệt thanh toán thật.
+  Guard vẫn34 finding, chưa có durable CloudTrail; chưa đóng toàn bộ SIT/M5,
+  push/merge hoặc duyệt thanh toán thật. Chi tiết SQL đọc bằng chứng và
+  ma trận ca live/local nằm trong runbook SIT được liên kết ở trên.
 - PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
   CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
   **Đã Execute và hậu kiểm triển khai đạt** change set

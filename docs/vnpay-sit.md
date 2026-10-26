@@ -146,7 +146,7 @@ thư bounce hoặc coi việc đã gửi email là bằng chứng callback.
 - Giỏ USER ban đầu có cùng SKU quantity2; giảm qua UI thành quantity1,
   xác minh tổng server **490.000 VND** trước khi bấm xác nhận một lần.
 
-**Chưa nghiệm thu PAY-SIT-01C:** URL IPN đã lưu và đọc lại thành công,
+**Mốc ngày25/10 trước khi sửa F1, chưa nghiệm thu PAY-SIT-01C:** URL IPN đã lưu và đọc lại thành công,
 USER đã đăng nhập và tạo một đơn DEMO. Đơn bị hủy do sai location trước
 payment; chưa có attempt/giao dịch/IPN thật. Đang sửa cấu hình kho theo F1
 bên dưới. Không đóng M5 hoặc coi cấu hình, health/receipt97 là E2E thành công.
@@ -363,7 +363,7 @@ Quy trình tái sử dụng khi kho/dữ liệu mẫu chưa khớp:
   khác hoặc đoán ID. Chỉ làm trên trang Shop đã định danh bằng IPN chính xác;
   không copy thông tin liên hệ/danh sách website khác vào README.
 
-### Handoff sau đồng bộ HMACSHA512 — 26/10, đang chờ nhập thẻ test
+### Handoff sau đồng bộ HMACSHA512 — ca thành công ngày26/10
 
 - Baseline SELECT-only trước ca mới: SKU DEMO-AIR01-SILVER tại DEMO-LAB có
   stock20/reserved0. Đơn trước chưa từng nhập thẻ và reservation đã EXPIRED;
@@ -379,10 +379,152 @@ Quy trình tái sử dụng khi kho/dữ liệu mẫu chưa khớp:
 - Đã bàn giao trang NCB cho chủ tài khoản tự nhập thẻ/OTP sandbox theo
   [bộ test công khai của VNPay](https://sandbox.vnpayment.vn/apis/docs/gioi-thieu/).
   Không dùng thẻ thật, không agent chấp nhận điều kiện dịch vụ thay người dùng.
-  Chưa coi gateway mở được là Order PAID hoặc IPN thành công. Chờ evidence
-  provider và hậu kiểm read-only trước khi kết luận.
+  Người dùng báo hoàn tất thành công; agent đọc lại trang đơn và bấm
+  **Cập nhật trạng thái**, UI từ backend hiển thị **Đã thanh toán**.
+- Hậu kiểm RDS read-only **09:35 ngày26/10/2026 UTC+7**, chính order ở trên:
+
+  | Dữ liệu | Kết quả |
+  | --- | --- |
+  | Order / Payment attempt | PAID / SUCCEEDED,490.000 VND, một attempt |
+  | Webhook inbox | APPLIED1, đúng một record gắn attempt |
+  | Order payment event | SUCCEEDED/COMPLETED1; REQUIRES_ACTION/COMPLETED1 là event cũ |
+  | Điều phối / dòng giữ kho | PAYMENT_CONFIRMED / CONFIRMED, không failure code |
+  | Reservation | CONFIRMED1, quantity1 |
+  | Movement | RESERVATION1 và CONFIRMATION1; không RELEASE/EXPIRATION |
+  | Balance SKU tại DEMO-LAB | onHand19 / reserved0, so với baseline20/0 |
+
+  Đường IPN hiện hành kiểm HMAC/mã terminal trước transaction; transaction
+  kiểm provider/reference/orderInfo/amount/currency rồi mới ghi APPLIED và
+  chuyển trạng thái. Không có callback fixture, SQL mutation hoặc query/
+  recovery worker được bật cho ca này. Kết hợp luồng hosted provider, thao
+  tác thẻ test của chủ tài khoản và inbox/event/kho là bằng chứng happy path
+  thật; không dựa riêng vào return00 hoặc lời báo thanh toán thành công.
+- **Ca success đã đạt; PAY-SIT-01C tổng thể chưa đóng.** Tại mốc09:35 mới
+  có bằng chứng success; kết quả cancel/Return và ma trận hiện tại nằm ở các
+  phần tiếp theo. Test local17 ca không được đổi thành dấu đạt provider SIT.
+  Không đổi cấu hình merchant/AWS, image
+  hoặc DB để ghi nhận kết quả, không refund hay khôi phục số dư demo bằng SQL.
+- Sau ca success, bấm **Test call IPN** chung của portal một lần trả JSON
+  RspCode97/Invalid signature. Form không có lựa chọn transaction để replay;
+  không dùng phản hồi này làm bằng chứng duplicate của giao dịch thành công,
+  không tắt xác minh chữ ký hoặc đổi key để làm test call chung trả00.
 - Ảnh cấu hình đã lưu và màn hình NCB được giữ ngoài Git trong thư mục
   `%TEMP%/shop-vnpay-sit-20261025/`; không lưu signed URL/query/QR/token/key.
+  Bằng chứng UI sau hậu kiểm: `order-paid-20261026.jpg` cùng thư mục.
+
+### Ca dự kiến không đủ số dư nhưng thực tế dùng lại thẻ success
+
+- Tạo một đơn riêng lúc **09:38:37**, UUID
+  `5a02c8c5-8321-428f-b316-c6dc1c1f3fd8`, cùng SKU/quantity1/490.000 VND.
+  Baseline sau ca success đầu là19/0, sau reserve là19/1;
+  một attempt REQUIRES_ACTION, chưa webhook/confirm.
+- Người dùng báo UI đã xác nhận thanh toán và xác nhận đã nhập lại **thẻ
+  test success kết thúc2198**, chưa dùng thẻ không đủ số dư kết thúc0488.
+  Vì vậy không gán đây là lỗi sandbox hoặc đánh dấu ca failure đã đạt.
+- Hậu kiểm **09:42**: riêng đơn thứ hai có Payment SUCCEEDED/Order PAID,
+  APPLIED1, SUCCEEDED/COMPLETED1, reservation CONFIRMED1 và CONFIRMATION1.
+  Kho chung còn**18/0** sau hai đơn success khác nhau; không phải một đơn
+  bị trừ kho hai lần. Không refund hoặc sửa lịch sử để biến success thành fail.
+- Tra cứu trong Merchant đúng mã order của ca success đầu, chỉ ngày26/10:
+  thấy một giao dịch NCB490.000 VND, Thành công lúc09:34:32. Trang chi tiết
+  hiện hành chưa hiển thị nút retry/gửi lại IPN; không gọi công cụ refund hay
+  tự ký payload để giả làm provider retry. Ca duplicate live tiếp tục chưa đạt.
+
+### Thẻ không đủ số dư và hủy qua provider — ngày26/10
+
+- Sau khi xác định ca trước dùng lại thẻ success, chạy một ca riêng lúc
+  **09:43:30**, UUID `8e0bde72-6745-41e0-8c0e-af88d478869d`, cùng SKU,
+  quantity1/490.000 VND. Baseline kho18/0; không lặp checkout khi mất response.
+  Agent điền sẵn **bộ thẻ sandbox công khai kết thúc0488**, tên và ngày phát
+  hành; chủ tài khoản tự thao tác bước Tiếp tục/xác nhận trên cổng VNPay.
+- VNPay hiển thị **Tài khoản của khách hàng không đủ số dư để thực hiện
+  giao dịch** tại form thẻ. Đây chưa phải thông báo final server-to-server:
+  RDS09:45 vẫn PENDING/REQUIRES_ACTION, PAYMENT_PENDING, stock18/reserved1,
+  RESERVED1/RESERVATION1, chưa webhook/confirm/release. Không coi đây là
+  backend lỗi hoặc tự gán FAILED từ thông báo giao diện.
+- Chọn **Hủy thanh toán → Xác nhận hủy** trên VNPay cho đúng ca test. Browser
+  về endpoint Return, trả `signatureVerified=true` và
+  `paymentConfirmedByBrowser=false`. Không lấy Return làm nguồn cập nhật tiền.
+- Hậu kiểm **09:45:51 UTC+7** bằng SELECT-only: Payment **FAILED**,
+  failure code **VNPAY_24_02**; Order **CANCELLED**; IPN inbox **APPLIED1**;
+  Order event **FAILED/COMPLETED1**; orchestration PAYMENT_RELEASED, line
+  RELEASED, reservation RELEASED1; movements RESERVATION1/RELEASE1, không
+  CONFIRMATION. Kho vẫn**18/0**. UI đọc lại từ backend hiển thị **Đã hủy**.
+- **Ca cancel24/02 đã đạt.** Không đổi nhãn thành ca IPN failure51: thông
+  báo không đủ số dư trước khi hủy chưa tạo callback final51 trong ca này.
+  Ảnh form từ chối và Order CANCELLED giữ ngoài Git, không có dữ liệu thẻ thật.
+
+### Return giả00 sau hủy — kiểm tra live và giới hạn bằng chứng
+
+- Trên Return của chính giao dịch đã hủy, chỉ sửa responseCode và
+  transactionStatus thành00, giữ checksum cũ. Gửi GET về đúng backend Shop;
+  không gửi IPN, không đọc key/ký checksum mới hoặc sửa amount/trạng thái DB.
+- Backend trả mã**1400**: thông tin trả về không hợp lệ hoặc hết hạn.
+  Hậu kiểm read-only **09:48** đối chiếu toàn bộ các dòng evidence trước/sau:
+  dữ liệu không đổi; vẫn FAILED/CANCELLED, APPLIED1, FAILED/COMPLETED1,
+  RELEASE1, không CONFIRMATION và kho18/0. Chín assertion evidence đều đạt.
+- Đây là bằng chứng live cho **Return bị sửa trên đơn đã hủy**. Ca Return00
+  trước IPN trên đơn PENDING và Return có chữ ký hợp lệ không được cập nhật
+  tiền đã có trong regression MySQL; không ghi nhầm thành đã chạy live.
+  Raw Return URL/query/checksum không ghi vào repo hoặc artifact bằng chứng.
+
+### Đọc bằng chứng qua DataGrip/SSM cho dự án sau
+
+1. Kết nối database private qua SSM như runbook production, chọn đúng schema
+   và credential chỉ có quyền đọc cần thiết; không mở public3306 hoặc dùng
+   master password trong câu lệnh. Kiểm đúng order UUID từ trang đơn của USER.
+2. Dùng các truy vấn sau để đọc cùng một snapshot; thay đúng UUID/SKU cần
+   kiểm tra. Đây là SQL chẩn đoán vận hành, không đưa query xuyên module vào
+   service nghiệp vụ. Không đọc action URL, token, checksum hoặc secret.
+
+   ```sql
+   SET @sit_order_id = UNHEX(REPLACE('THAY_UUID_DON_CAN_KIEM_TRA', '-', ''));
+   START TRANSACTION READ ONLY;
+
+   SELECT status FROM don_hang_don_dat_hang WHERE id = @sit_order_id;
+   SELECT status, amount, currency, failure_code
+   FROM thanh_toan_lan_thu WHERE order_id = @sit_order_id;
+
+   SELECT outcome, COUNT(*) AS event_count
+   FROM thanh_toan_su_kien_webhook
+   WHERE payment_attempt_id IN (
+     SELECT id FROM thanh_toan_lan_thu WHERE order_id = @sit_order_id
+   ) GROUP BY outcome;
+
+   SELECT payment_status, outcome, COUNT(*) AS event_count
+   FROM don_hang_su_kien_thanh_toan
+   WHERE order_id = @sit_order_id GROUP BY payment_status, outcome;
+
+   SELECT r.status, r.quantity
+   FROM ton_kho_giu_hang r
+   JOIN don_hang_dong_giu_ton_kho l ON l.reservation_id = r.id
+   JOIN don_hang_dieu_phoi_ton_kho o ON o.id = l.orchestration_id
+   WHERE o.order_id = @sit_order_id;
+
+   SELECT m.movement_type, COUNT(*) AS movement_count
+   FROM ton_kho_bien_dong m
+   WHERE m.reference_id IN (
+     SELECT LOWER(BIN_TO_UUID(l.reservation_id))
+     FROM don_hang_dong_giu_ton_kho l
+     JOIN don_hang_dieu_phoi_ton_kho o ON o.id = l.orchestration_id
+     WHERE o.order_id = @sit_order_id
+   ) GROUP BY m.movement_type;
+
+   SELECT sku, location_code, on_hand, reserved_quantity
+   FROM ton_kho_mat_hang WHERE sku = 'SKU_CAN_KIEM_TRA';
+   ROLLBACK;
+   ```
+
+3. Đối chiếu từng **order riêng** với baseline stock: success giảm onHand
+   đúng quantity và reserved về0, một CONFIRMATION; cancel/final failure
+   giữ onHand và reserved về0, một RELEASE. Hai đơn success khác nhau có hai
+   lần trừ kho tổng cộng là đúng; không dùng tổng movement cả SKU để kết luận
+   một order bị xử lý lặp. Event REQUIRES_ACTION/COMPLETED không phải SUCCEEDED.
+4. Nếu thiếu IPN, giữ PENDING/REQUIRES_ACTION và theo dõi reservation expiry;
+   không UPDATE status, xóa history hoặc tự ký callback để làm bằng chứng.
+   Kiểm query/recovery kill switch và quy trình manual action riêng, không
+   bật worker chỉ để kết thúc bài test. Sau SIT hoàn chỉnh mới dọn cart và
+   logout/revoke phiên USER qua API/UI hợp lệ; ledger/inbox phải được giữ lại.
 
 Phạm vi xử lý mismatch thuật toán trong cùng SIT:
 
@@ -441,12 +583,21 @@ Phạm vi xử lý mismatch thuật toán trong cùng SIT:
 
 | Kịch bản | Bằng chứng cần có | Trạng thái |
 | --- | --- | --- |
-| Sai location kho | Checkout hủy trước payment, không giữ/xuất kho, không tạo attempt | Đã quan sát trên website/RDS; đang sửa F1 |
-| Success | IPN thực, đúng chữ ký/amount/reference; Payment SUCCEEDED; Order PAID; một confirm kho | Chưa chạy |
-| Failure/cancel | Provider báo final failure, Order/kho chuyển đúng policy; không suy diễn từ đóng tab | Chưa chạy |
+| Sai location kho | Checkout hủy trước payment, không giữ/xuất kho, không tạo attempt | Đã quan sát website/RDS; F1 rollout và hậu kiểm đạt |
+| Success | IPN thực, đúng chữ ký/amount/reference; Payment SUCCEEDED; Order PAID; một confirm kho | Đạt ngày26/10 trên hai order riêng: mỗi order APPLIED1/CONFIRMATION1, kho20→19→18, reserved0 |
+| Cancel24/02 | IPN final failure, Order/kho chuyển đúng policy; không suy diễn từ đóng tab | Đạt ngày26/10: FAILED/CANCELLED, APPLIED1, RELEASE1, kho18/0 |
+| Failure51 | Provider thực sự gửi final failure không đủ số dư | Chưa có IPN51; form NCB báo lỗi tại chỗ, sau hủy nhận24/02 |
 | Duplicate | Retry do provider/SIT thực, không thêm transition/inbox/movement | Chưa chạy |
-| Return giả00 | Không đổi Order/stock khi chưa có IPN hợp lệ; tách evidence local/live | Chưa chạy live |
-| Missing/late IPN | Dừng tạo thêm order, ghi pending/manual action, không sửa DB/giả success | Chưa chạy |
+| Return giả00 | Không đổi Order/stock khi chưa có IPN hợp lệ; tách evidence local/live | Live trên đơn CANCELLED: trả1400, dữ liệu không đổi; ca PENDING/trước IPN chỉ có regression MySQL |
+| Missing/late IPN | Dừng tạo thêm order, ghi pending/manual action, không sửa DB/giả success | Quan sát ca gateway từ chối trước nhập thẻ: pending + reservation EXPIRED/release; chưa chứng minh callback trễ sau thu tiền |
+
+Phần còn lại cần chức năng/kịch bản **SIT chính thức của provider**: retry
+đúng transaction để kiểm inbox/movement không tăng, và callback final đến
+trễ sau khi có tiền. Portal Merchant đã quan sát chỉ có Test call IPN chung
+(trả97) và trang chi tiết không hiển thị Resend/Retry. Nếu dùng công cụ SIT
+hoặc VNPay cung cấp resend, giữ nguyên chính giao dịch đã chọn; không tự ký
+IPN bằng merchant key rồi gọi đó là provider retry. Không chặn webhook đang
+chạy, đổi WAF/IPN URL hoặc tạo giao dịch trả tiền mới chỉ để ép tái hiện lỗi.
 
 6. Nếu thiếu bằng chứng, báo đúng phần chưa đạt. Kill switch query/worker/
    recovery/refund vẫn giữ như baseline; không bật thêm để làm test xanh.
