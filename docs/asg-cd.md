@@ -12,7 +12,8 @@
    mọi parameter khác dùng giá trị trước. Không gọi deploy.sh/Compose lên ASG,
    không chạy MySQL/MinIO trên app host, không ép refresh/terminate thủ công.
 4. **An toàn/vận hành:** OIDC chỉ repo backend/main/environment production,
-   quyền giới hạn stack và fleet. Từ chối stack/fleet bận, thiếu target, lab
+   quyền ghi giới hạn stack/fleet; DescribeEvents đọc Singapore được duyệt
+   riêng. Từ chối stack/fleet bận, thiếu target, lab
    đang tắt, template lệch hoặc plan đụng tài nguyên ngoài app. Không đọc env,
    secret/token hoặc xuất log thô. Mọi rollout có timeout và hậu kiểm cả fleet.
 5. **Đầu ra:** controller CLI có plan/apply/verify, workflow CD mới, tests mô
@@ -85,6 +86,29 @@ kiểm StackId trên mọi event; giữ nguyên IAM ARN scope, chưa cấp Descr
 Resource=*. Đã đối chiếu bằng API read-only: selector stack+ARN vẫn trả đúng2
 event cùng operation/change set, không đọc nhầm toàn bộ lịch sử stack.
 Chưa xác nhận selector mới qua OIDC runner hoặc Execute; website vẫn RC2/LT8.
+
+PR51 đã merge `20134b1`, CI main xanh. Hai lần OIDC40318776840/40319529977
+vẫn bị DescribeEvents AccessDenied với full stack selector/ARN và thử prefix
+tên stack. Đã khôi phục policy cũ sau thử nghiệm prefix không đạt. Chủ repo
+sau đó duyệt riêng quyền đọc DescribeEvents Resource=* tại Singapore; quyền
+này có thể xem metadata/cấu hình trong event của các stack khác tại region.
+Không thêm quyền ghi hoặc GetSecretValue. Access Analyzer0 finding cho policy,
+7 ca simulation bổ sung đạt, và đọc lại live policy khớp bản đã duyệt.
+
+[Preview OIDC40320764004](https://github.com/triramisu/shop/actions/runs/40320764004)
+**đã đạt** PLAN_ONLY_NOT_EXECUTED: đúng3 Modify LT/ASG/scaling policy, không
+Add/Remove; LT replacementFalse, ASG/policyConditional; validation complete
+với2 normal events, không warning/error. Hash template giữ319e79f5….
+Image được promote theo digest9e8791cd… từ build/scan/push56d76a7; controller
+chạy20134b1. Git diff src/main/pom/Dockerfile giữa hai commit rỗng; image
+anonymous pull đã xác nhận public/linux-amd64. Chưa Execute/rollout image mới.
+
+Preflight read-only19:17:33 UTC+7 ngày26/10: stack UPDATE_COMPLETE, hai AZ
+app Healthy/LT8, AMI0080f2c6aa4e378b7 và revision checkout-loc-20261025-01;
+secret AWSCURRENT version khớp baseline (chỉ đọc metadata, không plaintext).
+Trial apply sẽ tạo/validate lại plan với cùng digest và boundary trước Execute;
+không Execute preview cũ qua tài khoản admin. Chỉ bật auto sau khi native
+refresh mới Successful và toàn fleet/targets/image đạt, kèm CI bàn giao.
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
@@ -161,6 +185,7 @@ nhánh main. Không dùng subject legacy hoặc wildcard repo. Xem
 | PassExistingAutoScalingServiceRoleViaCloudFormation | PassRole service-linked role sẵn có tới Auto Scaling |
 | RuntimeProbeDocument | SendCommand với AWS-RunShellScript |
 | RuntimeProbeOnlyCurrentAppFleet | Chỉ EC2 có system tag aws:autoscaling:groupName khớp ASG này |
+| ReadValidationEventsInSingapore | DescribeEvents Resource=* chỉ Singapore, đã được chủ repo duyệt vì thử scoped ARN bị từ chối; controller vẫn khóa selector/StackId |
 
 Nguồn quyền: thao tác AWS CLI của pipeline và dependency của CloudFormation
 resource handlers; đã tra từng API trong Service Authorization Reference
@@ -182,6 +207,9 @@ với quyền root trên app fleet, mặc dù script của task chỉ đọc met
 Ai sửa được workflow đã được bảo vệ có quyền triển khai code lên app; vì
 vậy cần giữ main protection, OIDC/environment scope và review source.
 Role không cấp API đọc Secrets Manager hoặc quyền sửa RDS/S3/UI/IAM/network.
+Riêng DescribeEvents có quyền đọc events các stack khác trong Singapore;
+các event có thể chứa cấu hình resource. Không log ResourceProperties trong
+controller/artifact. Main/environment/OIDC và quyền ghi stack/LT/ASG giữ scope.
 Guard34 finding cũ và durable CloudTrail chưa có vẫn là khoản tồn đọng.
 
 ## Thiết lập một lần
@@ -228,6 +256,9 @@ Actions -> CD -> Run workflow -> Branch main:
    đỏ/timeout hoặc chỉ một node Healthy là deploy thành công.
 4. Tải artifact `asg-release-<run>-<attempt>` để lưu source SHA, old/new digest,
    plan ARN, template hash và số node verified. Không chứa runtime env.
+   `sourceSha` là commit chạy controller/workflow; khi promote/rollback bằng
+   input image, lưu thêm build commit/run riêng. Trial hiện dùng build56d76a7
+   và controller20134b1, runtime diff src/main/pom/Dockerfile bằng0.
 5. Chỉ khi trial thật đạt mới đặt ASG_AUTO_DEPLOY_ENABLED=true. Lần merge sau
    tự đi theo luồng trên, không cần mở Termius. Nếu main đổi trong lúc build,
    run cũ dừng; run mới chờ concurrency, không hủy rollout đang thực hiện.

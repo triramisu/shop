@@ -28,7 +28,11 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   thành công; preview dừng trước Execute vì filter DescribeEvents sai model,
   PR50 đã sửa/test contract AWS CLI/CRLF và merge b707a78, CI main xanh. Preview
   tiếp dừng ở DescribeEvents AccessDenied với selector chỉ có ARN; đang bổ sung
-  stack ARN và kiểm scope event, giữ nguyên giới hạn IAM. Trial rollout đang chuẩn bị,
+  stack ARN và kiểm scope event qua PR51 (merge20134b1, CI main xanh) vẫn chưa
+  đủ. Chủ repo đã duyệt riêng quyền đọc DescribeEvents cấp Singapore, có thể
+  xem event stack khác; quyền ghi vẫn khóa production. Preview OIDC40320764004
+  **đã đạt**: đúng3 Modify, validation thành công/không warning-error, chưa Execute.
+  Image public/linux-amd64 đã được xác nhận. Trial rollout đang chuẩn bị,
   **chưa bật tự deploy**. Xem
   [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
