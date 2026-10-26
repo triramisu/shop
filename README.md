@@ -1212,6 +1212,45 @@ Backend nằm trực tiếp tại gốc repo `shop/`: [`src/`](src/), `pom.xml`,
 (trên máy hiện tại: `D:/shop-ui`). Chạy cả Maven và Docker Compose từ gốc repo;
 build context backend là `.`.
 
+### Thư mục cần giữ và output có thể dọn
+
+| Thư mục | Vai trò |
+| --- | --- |
+| `src/` | Source, test, cấu hình và migration Flyway; không xóa theo kết quả tìm import đơn thuần |
+| `.mvn/` | Maven wrapper/config dùng khi build local, CI và Docker |
+| `.github/` | Workflows CI/CD và cấu hình dependency review |
+| `ci/` | Maven settings, công cụ release và các test hợp đồng triển khai |
+| `deploy/` | Docker/Compose, init DB và CloudFormation/IAM; các mô hình local, lab và AWS có mục đích riêng |
+| `docs/` | Contract API, kiến trúc, runbook và bằng chứng triển khai |
+| `scripts/benchmark/` | Benchmark Catalog được hướng dẫn tại `docs/architecture/catalog-search.md` |
+| `.agent/skills/` | Quy trình làm việc kèm repo; không phải cache build |
+| `target/` | Output Maven: class/JAR/generated source/report; có thể tạo lại |
+
+**CLEAN-01 — phạm vi dọn local:** loại output `target/` sau khi xác nhận không
+có app/build dùng nó; lưu riêng báo cáo test/coverage cần giữ. Backend không có
+`package.json`; lockfile npm rỗng ở gốc là file sót và đã được loại bỏ. Node test
+của CI vẫn chạy trực tiếp từ `ci/`, dependency công cụ được cài vào thư mục tạm
+của runner; frontend có manifest/lockfile riêng tại repo `shop-ui`.
+
+Không thay Java/API/schema, cấu hình release hoặc dữ liệu trong thao tác dọn.
+Không dùng `git clean -fdx`, xóa Docker volume, `.env`, `data/`, thư mục IDE hay
+checkout khác để giảm số thư mục. Trước/sau dọn đối chiếu Git diff và hash của
+source/config còn lại; nếu path vượt checkout, có symlink/reparse point hoặc
+tiến trình đang dùng output thì dừng. Thay đổi này không cần test mới hoặc chạy
+lại Maven regression; `target/` được tạo lại ở lần build tiếp theo.
+
+Muốn dọn output bằng Maven, dừng app/build local trước rồi chạy `./mvnw clean`
+(PowerShell: `.\mvnw.cmd clean`). Lệnh này xóa cả report trong `target/`; lưu
+bằng chứng cần giữ trước. Khi cần JAR mới, chạy lại `./mvnw --batch-mode verify`.
+Khôi phục file tracked đã loại bằng Git từ commit trước nếu phải rollback;
+không khôi phục dữ liệu DB bằng thao tác reset source.
+
+Hậu kiểm local ngày 27/10/2026: `target/` đã được chuyển ra nơi lưu trữ ngoài
+checkout, còn đủ 2.001 file output; đây không phải giải phóng dung lượng ổ đĩa.
+718 file tracked ngoài README/lockfile giữ nguyên SHA-256; 66 test Node cho
+ASG release/source gate đạt, `git diff --check` đạt. Không chạy lại Maven,
+không đổi checkout `D:/shop`, AWS hoặc bộ hướng dẫn độc lập tại `D:/awsSkills`.
+
 ```bash
 docker compose up -d mysql
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
