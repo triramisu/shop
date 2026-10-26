@@ -15,15 +15,19 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
-- PAY-SIT-01C — Nghiệm thu sandbox ngày25/10/2026 đang làm: đã tìm đúng
+- PAY-SIT-01C — Nghiệm thu sandbox ngày25–26/10/2026 đang làm: đã tìm đúng
   website Shop trong merchant, sửa IPN URL từ `#` sang endpoint HTTPS và
   đọc lại **GET/HMACSHA512** thành công; blocker đăng ký IPN đã gỡ. USER đã
   tự đăng nhập; một đơn DEMO490.000 VND bị CANCELLED trước payment vì stock
   ở `DEMO-LAB` nhưng checkout tìm `MAIN` (`STOCK_ITEM_NOT_FOUND`). RDS xác nhận
   chưa tạo attempt/webhook/reservation/movement, stock giữ20/reserved0.
   Chủ tài khoản đã Store biến kho và duyệt Execute plan
-  `checkout-location-20261025T143210Z`; rollout revision bằng template/image
-  cũ đang được theo dõi, chưa tạo đơn mới hoặc giao dịch VNPay. Regression
+  `checkout-location-20261025T143210Z`; native refresh **Successful100%** lúc
+  22:11:37 ngày25/10. Hậu kiểm sáng26/10: stack UPDATE_COMPLETE, hai AZ/LT8,
+  hai target Healthy, AMI/image giữ nguyên; mỗi container đạt24 check,
+  đúng kho/merchant/DB/JWT/native flags, restart0 và không OOM. RDS vẫn20/0
+  ở SKU test; chưa tạo đơn mới hoặc giao dịch VNPay, chờ USER đăng nhập lại.
+  Regression
   ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
   0 failure/error/skipped, line**91,69%**/branch**72,42%**; 17 ca purchase
   trên MySQL8.4 gồm ca sai kho. Spotless/JaCoCo gate, 94 test Node và kiểm

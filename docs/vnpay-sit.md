@@ -239,6 +239,39 @@ Mốc theo dõi rollout F1 (UTC+7, không phải lệnh cần chạy lại):
 - **21:51:** ASG drain/terminate máy LT7 tại AZ B rồi khởi tạo LT8 ở AZ A;
   hai target phục vụ vẫn Healthy. Snapshot có4 instance ID gồm1 Terminating,
   không sửa capacity/policy hoặc terminate thủ công. Chưa tạo đơn SIT mới.
+- **22:11:37 ngày25/10:** native refresh `c646918e-2f36-462a-aefa-8324651fa3eb`
+  kết thúc Successful100% (Start21:36:09), không ép refresh/terminate.
+
+### Hậu kiểm khi tiếp tục ngày26/10/2026 (UTC+7)
+
+- Phiên CLI shop-prod đã hết hạn; chạy lại `aws login` theo ủy quyền gia hạn
+  đã có. CLI2.37.9 có sẵn, login tự hoàn tất bằng phiên trình duyệt hiện hành;
+  STS xác minh đúng account Shop/identity admin2. Không đổi profile mặc định,
+  cài tool hoặc yêu cầu người dùng gửi credential/MFA vào chat.
+- Snapshot **08:46:** stack UPDATE_COMPLETE, revision
+  `checkout-loc-20261025-01`; ASG2/2/4, hai AZ cùng LT8/InService/Healthy,
+  đúng hai target8080 Healthy; refresh Successful100%, không refresh khác.
+  EC2 thực tế vẫn dùng AMI đã ghim, không chỉ suy diễn từ parameter.
+- Probe SSM trên cả hai container: **24/24 check đều true**. Profile prod,
+  provider vnpay, initiation/consumer=true; refund/query/reconciliation/
+  recovery=false. Location đúng DEMO-LAB, đủ8 native flags, image khớp,
+  Docker Healthy/restart0/OOM=false; không có credential bootstrap ADMIN.
+  Các key AWSCURRENT ngoài override cố định khớp runtime trong RAM và
+  version giữ nguyên. Chỉ lưu boolean, không xuất env/secret hoặc checksum
+  có thể được dùng như token thanh toán.
+- Preflight read-only32/32 đạt, blocker rỗng, template SHA/size không đổi;
+  vẫn báo PREFLIGHT_ONLY/readyForSit=false theo đúng thiết kế. Probe runtime
+  riêng đạt không được dùng để đổi công cụ thành chứng nhận SIT.
+- JDBC read-only **08:48:** đúng RDS8.4.11/schema/runtime user và TLS; ba
+  danh mục,12 sản phẩm/24 SKU; `DEMO-AIR01-SILVER` vẫn **20/0 tại DEMO-LAB**.
+  Helper tạm đã được xóa khỏi container sau khi đọc; không mutation DB.
+- Working tree đầu lượt sạch, HEAD local `6b134ed` chứa regression737 test
+  và runbook. Không có thay đổi Java/schema mới nên không chạy lại toàn bộ
+  regression đã đạt chỉ vì qua ngày; chưa push/merge. Giữ kết quả737 test
+  lúc21:44:56 ngày25/10, không ghi nhầm là bộ test mới chạy ngày26/10.
+- Tab merchant cũ đã hết phiên. Cấu hình IPN đã lưu/đọc lại từ ngày25/10;
+  không cần đăng nhập merchant để tạo đơn. Tab Shop mới ở /login, đang chờ
+  chủ tài khoản tự đăng nhập USER. Chưa tạo thêm order/attempt/handoff.
 
 Quy trình tái sử dụng khi kho/dữ liệu mẫu chưa khớp:
 
