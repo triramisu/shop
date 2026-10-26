@@ -102,6 +102,73 @@
       "Action": "cloudformation:DescribeEvents",
       "Resource": "*",
       "Condition": {"StringEquals": {"aws:RequestedRegion": "ap-southeast-1"}}
+    },
+    {
+      "Sid": "ReadDatabaseReferenceViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "rds:DescribeDBInstances",
+      "Resource": "arn:aws:rds:ap-southeast-1:233377400170:db:shop-aydibro-prod-database-ttgxpgopxrp4",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaFirst": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadApplicationProfileReferenceViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "iam:GetInstanceProfile",
+      "Resource": "arn:aws:iam::233377400170:instance-profile/shop-aydibro-prod-ApplicationInstanceProfile-4c815MdB7fJo",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaFirst": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadDistributionOutputViaCloudFormation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistribution",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::233377400170:distribution/E1VK6HT0PA7A35",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaFirst": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadBastionOutputViaCloudFormation",
+      "Effect": "Allow",
+      "Action": "ec2:DescribeInstanceAttribute",
+      "Resource": "arn:aws:ec2:ap-southeast-1:233377400170:instance/i-083343a714409c61b",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaFirst": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadRegionalProviderOutputsViaCloudFormation",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+        "elasticloadbalancing:DescribeTags",
+        "elasticloadbalancing:DescribeCapacityReservation",
+        "ec2:DescribeInstanceCreditSpecifications",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeNetworkInterfaces"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:CalledViaFirst": "cloudformation.amazonaws.com",
+          "aws:RequestedRegion": "ap-southeast-1"
+        }
+      }
     }
   ]
 }

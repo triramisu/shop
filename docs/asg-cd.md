@@ -40,7 +40,8 @@ dependency-review skipped đúng điều kiện push. Docker Hub token đã đư
 repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. CD source qua
 [PR48](https://github.com/triramisu/shop/pull/48), merge `1473871`; required
 checks và CI merge commit xanh. Role riêng đã được duyệt/tạo. Manual gate
-ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Chưa rollout image mới.
+ASG_CD_ENABLED=true; ASG_AUTO_DEPLOY_ENABLED=false. Trial đầu đã rollback,
+chưa nghiệm thu rollout image mới; các đoạn dưới lưu bằng chứng theo thời điểm.
 
 161 test Node đạt, gồm 67 ca CD/source/CLI contract và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
@@ -109,6 +110,27 @@ secret AWSCURRENT version khớp baseline (chỉ đọc metadata, không plainte
 Trial apply sẽ tạo/validate lại plan với cùng digest và boundary trước Execute;
 không Execute preview cũ qua tài khoản admin. Chỉ bật auto sau khi native
 refresh mới Successful và toàn fleet/targets/image đạt, kèm CI bàn giao.
+
+[Trial apply40322255832](https://github.com/triramisu/shop/actions/runs/40322255832)
+đã Execute plan mới đúng3 Modify, AWS validation đạt. Stack tự về
+UPDATE_ROLLBACK_COMPLETE vì ApplicationLaunchTemplate không đọc được
+Database.Endpoint.Address: thiếu rds:DescribeDBInstances trên đúng RDS.
+Controller xác minh toàn fleet vẫn dùng image0ec7922b… trước khi báo release
+FAILED_REVIEW_REQUIRED. LT8, hai instance cũ và hai target Healthy được giữ;
+không start refresh/terminate thủ công để vượt lỗi.
+
+Đã rà GetAtt/Outputs cùng CloudTrail của lần cập nhật thành công trước:
+UserData đọc RDS endpoint, LT đọc instance-profile ARN; Outputs đọc RDS,
+bastion PublicIp, ALB DNSName và CloudFront DomainName. Image-only không bỏ
+những dependency này. Bản policy trong PR53 bổ sung12 read actions đã được
+chủ repo duyệt; đã attach vào cùng inline policy và đọc lại khớp source.
+Access Analyzer0 finding; 20/20 simulation đạt:12 allow qua CloudFormation,
+5 từ chối gọi trực tiếp và3 từ chối quyền ghi RDS/IAM/CloudFront. Các15
+statement cũ không đổi. Cần thử lại OIDC; simulation không chứng minh rollout.
+RDS/profile/distribution/bastion khóa ARN; các Describe không hỗ trợ ARN chỉ
+Singapore. Tất cả quyền đọc mới yêu cầu CalledViaFirst=CloudFormation.
+GetDistribution trả cả origin config/custom headers; không xuất cấu hình này
+ra log/artifact. Không thêm quyền ghi, GetSecretValue hoặc đăng nhập SQL.
 
 Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
 deploy/deploy.sh cho ASG dùng RDS/S3.
@@ -186,6 +208,11 @@ nhánh main. Không dùng subject legacy hoặc wildcard repo. Xem
 | RuntimeProbeDocument | SendCommand với AWS-RunShellScript |
 | RuntimeProbeOnlyCurrentAppFleet | Chỉ EC2 có system tag aws:autoscaling:groupName khớp ASG này |
 | ReadValidationEventsInSingapore | DescribeEvents Resource=* chỉ Singapore, đã được chủ repo duyệt vì thử scoped ARN bị từ chối; controller vẫn khóa selector/StackId |
+| ReadDatabaseReferenceViaCloudFormation | DescribeDBInstances đúng RDS để resolve endpoint; metadata, không SQL/password |
+| ReadApplicationProfileReferenceViaCloudFormation | GetInstanceProfile đúng app profile để resolve ARN |
+| ReadDistributionOutputViaCloudFormation | GetDistribution/ListTagsForResource đúng distribution để resolve Outputs; chứa origin config, chỉ qua CloudFormation |
+| ReadBastionOutputViaCloudFormation | DescribeInstanceAttribute đúng bastion cho PublicIp Output |
+| ReadRegionalProviderOutputsViaCloudFormation | Describe ALB/capacity/tags/attributes và EC2 credits/volumes/ENIs theo handler read; Resource=* chỉ Singapore, chỉ qua CloudFormation |
 
 Nguồn quyền: thao tác AWS CLI của pipeline và dependency của CloudFormation
 resource handlers; đã tra từng API trong Service Authorization Reference

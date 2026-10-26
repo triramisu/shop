@@ -32,8 +32,12 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   đủ. Chủ repo đã duyệt riêng quyền đọc DescribeEvents cấp Singapore, có thể
   xem event stack khác; quyền ghi vẫn khóa production. Preview OIDC40320764004
   **đã đạt**: đúng3 Modify, validation thành công/không warning-error, chưa Execute.
-  Image public/linux-amd64 đã được xác nhận. Trial rollout đang chuẩn bị,
-  **chưa bật tự deploy**. Xem
+  Image public/linux-amd64 đã được xác nhận. Trial apply40322255832 đã Execute
+  rồi tự rollback vì role thiếu rds:DescribeDBInstances để resolve endpoint
+  trong UserData. Controller xác minh lại image cũ; hai target Healthy, LT8,
+  không thay EC2. Chủ repo đã duyệt bổ sung12 quyền đọc dependency/Outputs
+  chỉ qua CloudFormation; Access Analyzer0 finding,20/20 simulation đạt,
+  live policy đọc lại khớp source. Đang thử lại; **chưa bật tự deploy**. Xem
   [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
   đã qua verify/dependency-review và merge tại `132d4a9`; verify merge commit
