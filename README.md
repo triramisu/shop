@@ -15,6 +15,89 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - PUB-BE-01 — Xuất bản backend độc lập: source/build ở gốc repo, UI ở repo riêng; giữ các cấu hình theo môi trường dưới dạng env/placeholder để người vận hành điền sau. Xem [hợp đồng và gate xuất bản](docs/backend-publication.md). Xuất bản source không đồng nghĩa deploy AWS, bật thanh toán thật hoặc hoàn tất M5; các ghi chú “chưa push/CI” ở từng biên bản bên dưới phản ánh thời điểm nghiệm thu local, trạng thái PR/merge được theo dõi riêng cho PUB-BE-01.
 - Giai đoạn hiện tại: `M5 — Payment`.
+- PAY-SIT-01C — Nghiệm thu sandbox ngày25–26/10/2026 đang làm: đã tìm đúng
+  website Shop trong merchant, sửa IPN URL từ `#` sang endpoint HTTPS và
+  đọc lại **GET/HMACSHA512** thành công; blocker đăng ký IPN đã gỡ. USER đã
+  tự đăng nhập; một đơn DEMO490.000 VND bị CANCELLED trước payment vì stock
+  ở `DEMO-LAB` nhưng checkout tìm `MAIN` (`STOCK_ITEM_NOT_FOUND`). RDS xác nhận
+  chưa tạo attempt/webhook/reservation/movement, stock giữ20/reserved0.
+  Chủ tài khoản đã Store biến kho và duyệt Execute plan
+  `checkout-location-20261025T143210Z`; native refresh **Successful100%** lúc
+  22:11:37 ngày25/10. Hậu kiểm sáng26/10: stack UPDATE_COMPLETE, hai AZ/LT8,
+  hai target Healthy, AMI/image giữ nguyên; mỗi container đạt24 check,
+  đúng kho/merchant/DB/JWT/native flags, restart0 và không OOM. RDS vẫn20/0
+  ở SKU test. USER đã đăng nhập và tạo một đơn mới490.000 VND: giữ kho thành
+  công, attempt REQUIRES_ACTION, nhưng hosted gateway báo **Sai chữ ký** trước
+  bước nhập thẻ. Khóa/runtime khớp email; local/public redirect đều303 và
+  HMAC tính lại độc lập khớp. Đã đọc thấy Merchant đặt SHA256, đổi lại
+  **HMACSHA512**, bấm Hoàn thành một lần và mở lại xác nhận đúng IPN/GET.
+  Đơn kiểm soát mới lúc09:31 đã qua gateway NCB sandbox, không còn lỗi chữ
+  ký. Chủ tài khoản hoàn tất thẻ test; hậu kiểm **09:35 ngày26/10** đạt:
+  **Payment SUCCEEDED / Order PAID / IPN APPLIED1**, event SUCCEEDED/COMPLETED1,
+  reservation CONFIRMED1 và movement CONFIRMATION1. Kho từ20/0 thành**19/0**.
+  Ca thành công qua provider thật đã đạt. Người dùng dùng lại thẻ success
+  cho đơn thứ hai: mỗi đơn APPLIED1/CONFIRMATION1, kho còn18/0. Đơn test
+  thứ ba dùng đúng thẻ không đủ số dư; sau hủy ở VNPay nhận IPN**24/02**:
+  **FAILED/CANCELLED**, APPLIED1, event FAILED/COMPLETED1, RELEASE1; kho giữ18/0.
+  Sửa browser return thành00 bị từ chối mã1400, hậu kiểm dữ liệu không đổi.
+  Chưa có IPN final failure51, provider duplicate hoặc callback trễ sau thu
+  tiền; không gán các ca đó là đã đạt. Test call IPN chung của portal trả97, không
+  phải công cụ replay giao dịch đã thanh toán và không thay thế ca duplicate.
+  Riêng đơn lỗi08:55 đã tự EXPIRED/release về20/0 tại mốc09:16; Order/Payment giữ nguyên
+  PENDING/REQUIRES_ACTION vì chưa có bằng chứng final từ provider, không sửa DB.
+  Regression
+  ngày25/10 ban đầu736 test PASS; sau ca cấu hình kho, full regression đạt **737 test**,
+  0 failure/error/skipped, line**91,69%**/branch**72,42%**; 17 ca purchase
+  trên MySQL8.4 gồm ca sai kho. Spotless/JaCoCo gate, 94 test Node và kiểm
+  Compose dev/prod đều đạt. Xem
+  [hợp đồng, bằng chứng, cách cấu hình merchant/kho và từng bước SIT](docs/vnpay-sit.md).
+  Guard vẫn34 finding, chưa có durable CloudTrail; chưa đóng toàn bộ SIT/M5,
+  push/merge hoặc duyệt thanh toán thật. Chi tiết SQL đọc bằng chứng và
+  ma trận ca live/local nằm trong runbook SIT được liên kết ở trên.
+- PAY-SIT-01B — Trusted client IP ngày 24/10/2026: đã chuẩn bị cấu hình
+  CloudFront ghi đè header IP và Tomcat chỉ tin peer thuộc hai subnet ALB.
+  **Đã Execute và hậu kiểm triển khai đạt** change set
+  `trusted-proxy-20261024T101541Z` sau duyệt riêng của người dùng. Execute
+  19:35:53 UTC+7; snapshot 20:13:20 xác nhận stack UPDATE_COMPLETE, refresh
+  Successful100%, hai AZ cùng LT7/targets Healthy, ASG giữ2/2/4. Hậu kiểm
+  20:23–20:24 xác nhận container Healthy/restart0, đủ8 native flags,
+  merchant/JWT/DB khớp AWSCURRENT trong RAM; giữ nguyên AMI/image, secret
+  version, ranh giới SG/origin, WAF và API forwarding. Function LIVE đã qua
+  sáu ca synthetic IPv4/IPv6, spoof và route. UI/Catalog200 (12 sản phẩm),
+  private anonymous401; IPN giả97/query rỗng99 và no-store. **Chưa SIT thật**,
+  không tạo USER/order/transaction. Local đạt 94 test Node, 88 test Java đúng
+  phạm vi, Spotless và cfn-lint; Guard vẫn 34 failed Rule ID, chưa có durable
+  CloudTrail. AWS preflight không có validation error; plan mặc định 5 Modify
+  (ASG/policy Conditional), enhanced 3 Modify; không Add/Remove.
+  Source đã deploy khớp SHA candidate; 52.108 byte dùng artifact S3 private,
+  không gửi inline. Có lúc4 EC2 gồm1 máy đang terminate; không đổi policy/
+  capacity hoặc terminate thủ công. Người dùng đã trả
+  lời email đăng ký IPN, chưa có bằng chứng VNPay xác nhận hoặc giao dịch SIT.
+  Xem [thiết kế, bằng chứng, từng lệnh rollout và rollback](docs/trusted-proxy.md).
+  Không đổi Java production/schema/image/AMI/secret hoặc tự push/merge.
+- PAY-SIT-01A — Preflight VNPay HTTPS ngày 24/10/2026: công cụ read-only và
+  [hướng dẫn chuẩn bị secret/rollout/SIT](docs/vnpay-sandbox-preflight.md).
+  AWS đã đăng nhập đúng tài khoản; người dùng đã tự Store merchant và hai
+  switch event/recovery=false, qua kiểm tra cấu hình trong RAM. Người dùng
+  chọn giữ khóa hiện hành chỉ cho sandbox sau cảnh báo; không chép khóa từ chat.
+  **Đã bật sandbox và hậu kiểm rollout; chưa SIT**: ngày 24/10 người dùng duyệt phạm vi
+  thận trọng 3 Modify và agent gửi Execute đúng plan `vnpay-activate-20261024T052438Z`.
+  Khoảng 16:46 UTC+7: stack UPDATE_COMPLETE, native refresh Successful,
+  hai EC2/target Healthy ở hai AZ cùng LT version 6. Container probe đã xác
+  minh sandbox, image giữ nguyên và merchant/JWT/DB khớp secret trong RAM.
+  Bản nền [prod YAML](deploy/aws/shop-prod.yaml) đã bật sandbox có kiểm soát, sửa optional
+  bank-code rỗng và ghim AMI hiện hành thay vì tự lấy SSM latest đã đổi.
+  Thêm tag desired revision ASG để plan thể hiện group tham gia update;
+  tag không chứng minh runtime đã rollout. Không đổi image/IAM/DB/SG/DNS/UI/WAF
+  hoặc update policy. 78 test Node/bootstrap và diff check đạt local;
+  cfn-lint của đúng template đã duyệt cũng đạt;
+  Guard vẫn 34 failed Rule ID như Original, CloudTrail đọc lại vẫn 0 trail.
+  UI/Catalog200 (12 sản phẩm), private my-info401; IPN checksum giả trả97,
+  query rỗng trả99, no-store. Không tạo giao dịch hoặc đăng ký merchant IPN.
+  Chưa CI/push hoặc approval go-live; trusted-proxy đã được triển khai riêng
+  ở PAY-SIT-01B phía trên, còn chờ xác nhận IPN từ merchant và SIT thật.
+  Bằng chứng purchase local 724 test ở commit `43522e6` chưa merge/CI, không
+  tự coi có trên `main` hoặc đóng M5; auto-ban vẫn hoãn.
 - Cập nhật xuất bản ngày 23/10/2026: [PR #43](https://github.com/triramisu/shop/pull/43)
   (query) đã qua `verify`/`dependency-review` và merge vào `main` tại `ca37e4c`;
   hậu kiểm CI merge commit đã xanh và backend CD skipped. [PR #44](https://github.com/triramisu/shop/pull/44)
