@@ -15,7 +15,7 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 - CD-ASG-01 — Đang thay backend CD một EC2 bằng image-only CloudFormation
   update và native ASG Instance Refresh theo yêu cầu ngày26/10/2026. Không
-  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có55 test controller/source
+  lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có56 test controller/source
   và94 test Node hồi quy đạt; probe AWS thật xác nhận2/2 container đúng image,
   Healthy/restart0/LT8. Chủ repo đã Store DOCKERHUB_TOKEN và duyệt role OIDC:
   đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt, cả hai cờ

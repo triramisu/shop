@@ -82,7 +82,10 @@ function awsCli(region, profile) {
       const raw = execFileSync("aws", command, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60000,
         maxBuffer: 8 * 1024 * 1024, env: { ...process.env, AWS_PAGER: "", AWS_RETRY_MODE: "standard", AWS_MAX_ATTEMPTS: "3" } });
       return raw.trim() ? JSON.parse(raw) : {};
-    } catch { throw new Error(`AWS_${service}_${operation}_FAILED`); }
+    } catch (error) {
+      const code = /An error occurred \(([A-Za-z0-9.]+)\)/.exec(String(error.stderr || ""))?.[1];
+      throw new Error(`AWS_${service}_${operation}_FAILED${code ? `_${code}` : ""}`);
+    }
   };
 }
 function snapshot(aws, o) {
@@ -90,6 +93,7 @@ function snapshot(aws, o) {
   requireThat(identity.Account === o.accountId, "AWS_ACCOUNT_MISMATCH");
   const stack = aws("cloudformation", "describe-stacks", ["--stack-name", o.stackName]).Stacks?.[0];
   requireThat(stack && stableStatuses.has(stack.StackStatus) && !stack.ParentId, "STACK_NOT_STABLE_ROOT");
+  requireThat(!stack.RoleARN, "STACK_SERVICE_ROLE_CHANGED_REVIEW_PERMISSIONS");
   const params = parameters(stack);
   requireThat(params.DeploymentMode === "application" && ["none", "vnpay-sandbox"].includes(params.PaymentMode), "STACK_MODE_UNEXPECTED");
   imageDigest(params.ApplicationImage);

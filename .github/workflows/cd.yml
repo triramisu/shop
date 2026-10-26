@@ -50,6 +50,13 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
+      - name: Validate manual request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          OPERATION: ${{ inputs.operation }}
+          REQUESTED_IMAGE: ${{ inputs.image }}
+        run: |
+          node -e 'const m=process.env.OPERATION; if(!["plan","apply","verify"].includes(m))throw Error("INVALID_OPERATION"); if(m==="verify"||process.env.REQUESTED_IMAGE)require("./ci/asg-release.cjs").imageDigest(process.env.REQUESTED_IMAGE)'
       - name: Require current main and successful main CI
         id: source
         env:

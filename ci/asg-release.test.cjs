@@ -136,6 +136,7 @@ for (const [name, settings, message] of [
   ["wrong AWS account", { wrongAccount: true }, /ACCOUNT_MISMATCH/],
   ["stopped lab", { off: true }, /CAPACITY_UNEXPECTED/],
   ["busy stack", { stackBusy: true }, /STACK_NOT_STABLE/],
+  ["new stack service role", { editStack: s => { s.RoleARN = "unapproved-role"; } }, /STACK_SERVICE_ROLE/],
   ["active refresh", { activeRefresh: true }, /REFRESH_ALREADY_ACTIVE/],
   ["template drift", { drift: true }, /TEMPLATE_DRIFT/],
   ["AMI drift", { wrongAmi: true }, /INSTANCE_CONFIGURATION/],

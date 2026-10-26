@@ -39,7 +39,7 @@ dependency-review skipped đúng điều kiện push. Docker Hub token đã đư
 repo Store; chỉ kiểm tên `DOCKERHUB_TOKEN`, không đọc token. Chưa tạo role,
 bật CD hoặc rollout image mới trong task này.
 
-149 test Node đạt, gồm 55 ca CD/source và 94 ca preflight/template/proxy;
+150 test Node đạt, gồm 56 ca CD/source và 94 ca preflight/template/proxy;
 actionlint đạt. Probe thật ở Singapore xác nhận **2/2 container Healthy,
 đúng digest, restart0, không OOM, LT8**. Chỉ đọc Docker metadata bằng SSM;
 đây là kiểm tra image hiện hành, chưa phải nghiệm thu rollout image mới.
