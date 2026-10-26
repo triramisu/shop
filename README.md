@@ -18,8 +18,11 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
   lưu EC2 ID cố định; máy scale-out dùng LT mới. Đã có56 test controller/source
   và94 test Node hồi quy đạt; probe AWS thật xác nhận2/2 container đúng image,
   Healthy/restart0/LT8. Chủ repo đã Store DOCKERHUB_TOKEN và duyệt role OIDC:
-  đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt, cả hai cờ
-  CD false. Trial rollout đang chuẩn bị, **chưa bật tự deploy**. Xem
+  đã tạo role riêng, environment chỉ main; IAM simulation13 ca đạt. PR48 đã
+  merge1473871 và CI main xanh. Verify GitHub qua OIDC thật đạt2/2 máy/LT8;
+  chỉ cờ manual bật, auto false. Build/plan bị Trivy chặn CVE-2026-111497 của
+  brotli-libs trước push/deploy; đang vá package runtime, giữ nguyên gate.
+  Trial rollout đang chuẩn bị, **chưa bật tự deploy**. Xem
   [luồng, cấu hình GitHub/IAM, từng bước trial và rollback](docs/asg-cd.md).
 - Xuất bản source SIT/AWS: [PR #47](https://github.com/triramisu/shop/pull/47)
   đã qua verify/dependency-review và merge tại `132d4a9`; verify merge commit

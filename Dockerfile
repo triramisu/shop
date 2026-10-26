@@ -13,7 +13,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN addgroup --system spring \
+# CVE-2026-111497: refresh the decoder before the next Temurin base rebuild.
+RUN apk upgrade --no-cache brotli-libs \
+    && addgroup --system spring \
     && adduser --system --disabled-password --no-create-home --uid 10001 --ingroup spring spring
 COPY --from=build /workspace/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
