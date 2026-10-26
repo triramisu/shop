@@ -126,9 +126,10 @@ function sameBaseline(a, b) {
     && ["MinSize", "DesiredCapacity", "MaxSize"].every(k => a.asg[k] === b.asg[k])
     && JSON.stringify(a.ids) === JSON.stringify(b.ids);
 }
-function validationEventArgs(changeSetId) { return ["--change-set-name", changeSetId]; }
-function assessValidationEvents(response) {
+function validationEventArgs(stackId, changeSetId) { return ["--stack-name", stackId, "--change-set-name", changeSetId]; }
+function assessValidationEvents(response, stackId) {
   requireThat(Array.isArray(response.OperationEvents) && !response.NextToken, "AWS_VALIDATION_RESPONSE_INCOMPLETE");
+  requireThat(!stackId || response.OperationEvents.every(e => e.StackId === stackId), "AWS_VALIDATION_STACK_SCOPE_MISMATCH");
   requireThat(response.OperationEvents.every(e => ["STACK_EVENT", "PROGRESS_EVENT"].includes(e.EventType)
     && e.OperationStatus !== "FAILED" && e.DetailedStatus !== "VALIDATION_FAILED"
     && !/_FAILED$/.test(e.ResourceStatus || "") && !["HOOK_COMPLETE_FAILED", "HOOK_FAILED"].includes(e.HookStatus)),
@@ -197,7 +198,8 @@ async function release(o, { aws, sleep = ms => new Promise(r => setTimeout(r, ms
   result.changeSetId = create.Id;
   report(JSON.stringify({ phase: "PLAN_CREATED", ...result }));
   result.changes = inspectPlan(plan, baseline, o.image);
-  result.validation = await waitFor(() => assessValidationEvents(aws("cloudformation", "describe-events", validationEventArgs(create.Id))),
+  result.validation = await waitFor(() => assessValidationEvents(aws("cloudformation", "describe-events",
+    validationEventArgs(baseline.stack.StackId, create.Id)), baseline.stack.StackId),
     value => value.complete, { ...timing, timeoutMs: 90000, label: "AWS_VALIDATION_EVENTS" });
   report(JSON.stringify({ phase: "PLAN_READY", ...result }));
   if (o.mode === "plan") return { ...result, outcome: "PLAN_ONLY_NOT_EXECUTED" };
