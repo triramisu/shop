@@ -13,6 +13,11 @@ README là tài liệu chính thức được theo dõi bằng Git từ M4.7. C�
 
 ## 2. Trạng thái hiện tại
 
+- SEC-DEP-01 — Bản vá mở chặn phát hành ngày 28/10/2026: quản lý Guava
+  33.7.2-jre và Snappy Java 1.1.10.12 thay dependency bắc cầu có bốn CVE
+  được Trivy phát hiện. Tách khỏi PR #54 dọn source; gate bảo mật giữ nguyên.
+  [Hợp đồng, finding và nguồn phiên bản](docs/quality/storage-dependency-security.md).
+  Phải kiểm required checks/main CI và CD riêng; không đổi nghiệp vụ/schema.
 - CD-ASG-01 — Đã nghiệm thu rollout backend qua image-only CloudFormation và
   native ASG Instance Refresh ngày26/10/2026. Không lưu EC2 ID cố định;
   ASG/LT quản lý cả fleet và cấu hình máy được tạo sau release.
