@@ -11,13 +11,36 @@ Cách làm này giúp phát triển và debug nhanh ở giai đoạn đầu như
 
 README là tài liệu chính thức được theo dõi bằng Git từ M4.7. Các ghi chú cũ nói README chỉ lưu local phản ánh đúng quy trình lịch sử trước thời điểm này.
 
+## Tra cứu nhanh
+
+| Bạn cần tìm | Mở tài liệu |
+| --- | --- |
+| Hiểu code/nghiệp vụ, payment, kiểm thử và cách vận hành | [Mục lục `docs/`](docs/README.md) |
+| Triển khai AWS prod, cấu hình runtime và IAM | [Mục lục `deploy/`](deploy/README.md) |
+
+Các mục lục phân biệt luồng AWS prod hiện hành với hồ sơ lịch sử. Source
+triển khai lab/single-host đã được bỏ; các quyết định cũ còn trong Git.
+
 ## 2. Trạng thái hiện tại
 
-- SEC-DEP-01 — Bản vá mở chặn phát hành ngày 28/10/2026: quản lý Guava
-  33.7.2-jre và Snappy Java 1.1.10.12 thay dependency bắc cầu có bốn CVE
-  được Trivy phát hiện. Tách khỏi PR #54 dọn source; gate bảo mật giữ nguyên.
+- SEC-DEP-01 — Bản vá mở chặn phát hành ngày 28/10/2026 đã merge qua
+  [PR #55](https://github.com/triramisu/shop/pull/55): quản lý Guava
+  33.7.2-jre và Snappy Java 1.1.10.12 thay dependency bắc cầu có bốn CVE.
+  [CI của PR](https://github.com/triramisu/shop/actions/runs/40615159069)
+  đạt `verify`/`dependency-review`, 737 test, 0 failure/error/skipped.
   [Hợp đồng, finding và nguồn phiên bản](docs/quality/storage-dependency-security.md).
-  Phải kiểm required checks/main CI và CD riêng; không đổi nghiệp vụ/schema.
+  CI main và CD được kiểm riêng; không đổi nghiệp vụ/schema hoặc hạ gate.
+- AWS-PROD-ONLY — Chuẩn hóa source ngày 27/10/2026, phát hành qua
+  [PR #54](https://github.com/triramisu/shop/pull/54): chỉ giữ bộ triển khai
+  AWS prod; gỡ lab, Compose single-host và test template lab. CI kiểm template
+  prod, còn `compose.yaml`/Spring `dev` giữ cho phát triển local. 172 test Node
+  đạt, không skip; Compose dev và actionlint CI/CD đạt. Không sửa Java/schema,
+  template prod, IAM, CD controller hoặc cấu hình runtime đang chạy. Hậu kiểm
+  local ngày 28/10 đạt lại 172/172 test, kiểm SHA-256 657 file cần giữ và toàn
+  bộ liên kết nội bộ. Trạng thái required checks/merge theo PR; CI của main
+  và CD phải được kiểm riêng sau merge. CD chạy theo các cờ repository hiện
+  hữu; không tự thay cờ hoặc gọi AWS trực tiếp trong bước dọn source này.
+  Đây không phải nghiệm thu go-live.
 - CD-ASG-01 — Đã nghiệm thu rollout backend qua image-only CloudFormation và
   native ASG Instance Refresh ngày26/10/2026. Không lưu EC2 ID cố định;
   ASG/LT quản lý cả fleet và cấu hình máy được tạo sau release.
@@ -1217,6 +1240,45 @@ Backend nằm trực tiếp tại gốc repo `shop/`: [`src/`](src/), `pom.xml`,
 (trên máy hiện tại: `D:/shop-ui`). Chạy cả Maven và Docker Compose từ gốc repo;
 build context backend là `.`.
 
+### Thư mục cần giữ và output có thể dọn
+
+| Thư mục | Vai trò |
+| --- | --- |
+| `src/` | Source, test, cấu hình và migration Flyway; không xóa theo kết quả tìm import đơn thuần |
+| `.mvn/` | Maven wrapper/config dùng khi build local, CI và Docker |
+| `.github/` | Workflows CI/CD và cấu hình dependency review |
+| `ci/` | Maven settings, công cụ release và các test hợp đồng triển khai |
+| `deploy/` | Chỉ còn CloudFormation/IAM và env mẫu của AWS prod; dev Compose nằm ở gốc repo |
+| `docs/` | Contract API, kiến trúc, runbook và bằng chứng triển khai |
+| `scripts/benchmark/` | Benchmark Catalog được hướng dẫn tại `docs/architecture/catalog-search.md` |
+| `.agent/skills/` | Quy trình làm việc kèm repo; không phải cache build |
+| `target/` | Output Maven: class/JAR/generated source/report; có thể tạo lại |
+
+**CLEAN-01 — phạm vi dọn local:** loại output `target/` sau khi xác nhận không
+có app/build dùng nó; lưu riêng báo cáo test/coverage cần giữ. Backend không có
+`package.json`; lockfile npm rỗng ở gốc là file sót và đã được loại bỏ. Node test
+của CI vẫn chạy trực tiếp từ `ci/`, dependency công cụ được cài vào thư mục tạm
+của runner; frontend có manifest/lockfile riêng tại repo `shop-ui`.
+
+Không thay Java/API/schema, cấu hình release hoặc dữ liệu trong thao tác dọn.
+Không dùng `git clean -fdx`, xóa Docker volume, `.env`, `data/`, thư mục IDE hay
+checkout khác để giảm số thư mục. Trước/sau dọn đối chiếu Git diff và hash của
+source/config còn lại; nếu path vượt checkout, có symlink/reparse point hoặc
+tiến trình đang dùng output thì dừng. Thay đổi này không cần test mới hoặc chạy
+lại Maven regression; `target/` được tạo lại ở lần build tiếp theo.
+
+Muốn dọn output bằng Maven, dừng app/build local trước rồi chạy `./mvnw clean`
+(PowerShell: `.\mvnw.cmd clean`). Lệnh này xóa cả report trong `target/`; lưu
+bằng chứng cần giữ trước. Khi cần JAR mới, chạy lại `./mvnw --batch-mode verify`.
+Khôi phục file tracked đã loại bằng Git từ commit trước nếu phải rollback;
+không khôi phục dữ liệu DB bằng thao tác reset source.
+
+Hậu kiểm local ngày 27/10/2026: `target/` đã được chuyển ra nơi lưu trữ ngoài
+checkout, còn đủ 2.001 file output; đây không phải giải phóng dung lượng ổ đĩa.
+718 file tracked ngoài README/lockfile giữ nguyên SHA-256; 66 test Node cho
+ASG release/source gate đạt, `git diff --check` đạt. Không chạy lại Maven,
+không đổi checkout `D:/shop`, AWS hoặc bộ hướng dẫn độc lập tại `D:/awsSkills`.
+
 ```bash
 docker compose up -d mysql
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
@@ -1507,33 +1569,21 @@ Windows PowerShell có thể chuyển thẳng bằng `cd D:/shop-ui`. Mặc đ�
 proxy `/api` sang `http://localhost:8080`; đổi `VITE_DEV_API_TARGET` trong
 `.env.local` của UI nếu backend ở địa chỉ khác. Không nhúng secret vào `VITE_*`.
 
-Khi đóng gói, chạy `docker build -t t1r4m15u/shop-ui:local .` từ `shop-ui/`.
-Dockerfile UI build SPA rồi phục vụ qua nginx, đồng thời làm **edge** proxy
-`/api` tới `APP_UPSTREAM` (mặc định `app:8080`, cùng Docker network). Lab Compose
-dùng `SHOP_UI_CONTEXT`, mặc định `../../../shop-ui` tính từ `deploy/lab/`.
-Pipeline và Compose backend-only dùng context gốc repo (`.`), không phụ thuộc UI.
+Đưa UI lên AWS bằng build static assets trong repo `shop-ui`, upload S3 và
+invalidate CloudFront theo pipeline UI. Backend CI/CD dùng context gốc repo
+(`.`); source/build UI vẫn độc lập.
 
-### 9.y Lab nghiên cứu sức chịu tải / chống chịu DDoS
+### 9.y Chỉ giữ bộ triển khai AWS prod
 
-Thư mục [`deploy/lab/`](deploy/lab/) dựng cả stack (edge nginx + app + mysql +
-minio) thành một *target* để **đo và quan sát** hành vi hệ thống dưới tải trong
-**mạng lab cô lập, đã được phép**. Thiết kế phục vụ nghiên cứu phòng thủ:
+Quyết định ngày 27/10/2026: bỏ deployment lab và Compose prod một máy, giữ
+`deploy/aws/shop-prod.yaml`, application env mẫu và policy IAM. Dev local vẫn
+dùng `compose.yaml` ở gốc; Spring profiles `dev`/`prod` giữ nguyên.
 
-- Mỗi container có giới hạn CPU/RAM/pids để lab có biên rõ ràng; Dockerfile app
-  thêm cờ JVM nhận biết cgroup để `mem_limit` bó heap.
-- App giữ nguyên phòng vệ (read-only rootfs, `cap_drop: ALL`,
-  `no-new-privileges`, rate limit JVM + CAPTCHA bật mặc định).
-- Edge nginx có hai profile `EDGE_PROFILE=hardened|baseline` để **đo đối chứng**
-  tác dụng của `limit_req`/`limit_conn`/timeout ở edge.
-- Repo **không kèm** công cụ sinh tải/tấn công; dùng công cụ benchmark tiêu
-  chuẩn bạn tự vận hành (k6/wrk/hey/vegeta) nhắm vào chính target trong lab.
-
-Chi tiết và cảnh báo phạm vi: [`deploy/lab/README.md`](deploy/lab/README.md).
-
-```bash
-cp deploy/lab/.env.lab.example deploy/lab/.env.lab   # điền secret ngẫu nhiên
-sudo deploy/lab/setup-ubuntu.sh --lab-cidr 10.10.0.0/24
-```
+AWS prod dùng CloudFront/ALB → ASG private → RDS/S3. Phase `foundation` và
+`application` là hai bước dựng cùng hạ tầng prod, không phải hai môi trường.
+Xem [mục lục triển khai](deploy/README.md), [AWS README](deploy/aws/README.md)
+và [ASG CD](docs/asg-cd.md). Các mô tả lab/single-host trong ADR hoặc biên bản
+cũ chỉ là lịch sử; lệnh và file triển khai tương ứng đã được gỡ khỏi source.
 
 ## 10. Nhật ký quyết định
 

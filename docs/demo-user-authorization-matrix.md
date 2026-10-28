@@ -1,5 +1,7 @@
 # DEMO-01B.1 — Ma trận USER/token/ownership tại local
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần
 
 1. Mục tiêu: chứng minh contract anonymous/USER/admin-denied trên cùng bộ API,

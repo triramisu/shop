@@ -1,5 +1,7 @@
 # M5.7A — VNPay sandbox checkout và IPN
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng nhiệm vụ
 
 1. **Phạm vi:** ưu tiên adapter VNPay sandbox theo yêu cầu merchant mới, trước refund/reconciliation còn lại. Khách lấy action URL từ đơn hàng, mở hosted checkout; VNPay gọi IPN để cập nhật Payment và event Order/Inventory hiện hành. Không thanh toán thật, không refund/query/expiry scheduler, không CI/CD hoặc triển khai AWS.

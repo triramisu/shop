@@ -1,4 +1,22 @@
-# Prod-profile CloudFormation candidate
+# AWS prod — template và hồ sơ triển khai
+
+[Mục lục triển khai](../README.md) · [Chọn file AWS](README.md) · [Mục lục tài liệu](../../docs/README.md)
+
+## Bắt đầu theo việc cần làm
+
+| Bạn cần làm gì? | Nguồn cần đọc |
+| --- | --- |
+| Hiểu hạ tầng prod-profile | [`shop-prod.yaml`](shop-prod.yaml) và các parameter/rule được khai báo trong file |
+| Chuẩn bị cấu hình app | [`application.env.example`](application.env.example); giữ giá trị thật trong secret của môi trường |
+| Phát hành image backend qua cả cụm ASG | [Runbook ASG CD](../../docs/asg-cd.md) |
+| Kiểm tra thanh toán sandbox thực tế | [VNPay SIT](../../docs/vnpay-sit.md) |
+| Xem tiến độ mới nhất đã ghi nhận | [README dự án](../../README.md#2-trạng-thái-hiện-tại) |
+
+Phần dưới là hồ sơ PAY-SIT/trusted-proxy có ngày; giữ để truy vết quyết định
+và kết quả lúc triển khai. LT version, test count và trạng thái SIT trong đoạn
+cũ không thay cho bằng chứng mới hơn của task CD/SIT hoặc kiểm tra AWS live.
+
+## Prod-profile CloudFormation candidate
 
 `shop-prod.yaml` được khôi phục từ Original template của stack đang chạy,
 không sao chép bản draft trong checkout vận hành. Bản nền VNPay sandbox đã
@@ -52,5 +70,6 @@ và [trạng thái dự án](../../README.md).
 - Sau khi có payment pending, không rollback bằng `PaymentMode=none` trước
   khi drain/đối soát vì sẽ bỏ endpoint IPN. Giữ dữ liệu, không hạ Flyway.
 
-README lab trong thư mục này mô tả các lần nghiệm thu cũ; không lấy thành
-công local hoặc snapshot lịch sử thay cho trạng thái live hiện tại.
+[README AWS](README.md) mô tả bộ triển khai prod duy nhất. Hồ sơ có ngày
+trong file này không thay cho trạng thái AWS live mới; các template lab cũ
+đã được gỡ khỏi source ngày 27/10/2026.

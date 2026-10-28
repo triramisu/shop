@@ -1,5 +1,7 @@
 # PAY-SIT-01B — Trusted client IP trước nghiệm thu VNPay
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng — 24/10/2026
 
 1. **Mục tiêu/phạm vi:** backend nhận IP viewer do CloudFront xác lập, không

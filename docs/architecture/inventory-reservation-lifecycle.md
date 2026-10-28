@@ -1,5 +1,7 @@
 # Vòng đời giữ tồn kho
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## State machine
 
 Mỗi bản ghi `ton_kho_giu_hang` bắt đầu ở `RESERVED` và chỉ được chuyển một lần sang một trạng thái kết thúc:

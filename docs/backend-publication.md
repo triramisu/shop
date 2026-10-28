@@ -1,5 +1,7 @@
 # PUB-BE-01 — Xuất bản backend độc lập
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần — 19/10/2026
 
 1. **Phạm vi:** theo ủy quyền hiện hành, rà soát và xuất bản thay đổi backend local lên `triramisu/shop`, thông qua nhánh/PR và CI trước khi merge `main`. Không tự triển khai AWS, push Docker Hub, mở thanh toán thật hoặc xuất bản repo UI trong lượt này.
@@ -13,7 +15,7 @@
 
 ### Cấu hình để người vận hành điền sau
 
-Theo xác nhận của người dùng, không cần credential hoặc DNS thật để xuất bản source. Các giá trị DB, JWT, CORS và VNPay tiếp tục đọc từ env; chỉ commit file mẫu/placeholder. Khi deploy, copy `deploy/.env.prod.example` thành `deploy/.env.prod` ngoài Git rồi điền giá trị riêng. Không thay validation production để chấp nhận credential trống: build/test độc lập bằng fixture, còn chạy production phải có đủ cấu hình thật. Khi chưa cấu hình thanh toán giữ `PAYMENT_PROVIDER_TYPE=none`, `PAYMENT_REFUND_ENABLED=false`.
+Theo xác nhận của người dùng, không cần credential hoặc DNS thật để xuất bản source. Các giá trị DB, JWT, CORS và VNPay tiếp tục đọc từ env; chỉ commit file mẫu/placeholder. Cách triển khai hiện hành dùng `deploy/aws/application.env.example` làm mẫu cho application secret trong Secrets Manager; xem [hướng dẫn AWS prod](../deploy/aws/README.md). Không thay validation production để chấp nhận credential trống: build/test độc lập bằng fixture, còn chạy production phải có đủ cấu hình thật. Khi dựng mới chưa cấu hình thanh toán giữ payment tắt theo template; không tự đổi mode của hệ thống đang có giao dịch pending.
 
 AWS DDoS lab không phải môi trường payment SIT: giữ provider none và không đưa merchant secret vào mẫu lab. File `.env.lab` thật vẫn còn trên máy, nhưng không còn thuộc source xuất bản. Không cần gửi secret trong chat.
 

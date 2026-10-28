@@ -1,5 +1,7 @@
 # Object storage local
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Mục tiêu
 
 Môi trường `dev` lưu binary ảnh sản phẩm trong object storage tương thích MinIO/S3. MySQL chỉ lưu metadata và object key; API trả presigned URL có thời hạn thay vì Base64.

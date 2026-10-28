@@ -1,5 +1,7 @@
 # Ma trận kiểm thử Identity
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Mục tiêu
 
 Tài liệu này là hồ sơ nghiệm thu cho M1.8. Mỗi test phải bảo vệ một hợp đồng API, quy tắc nghiệp vụ, ranh giới bảo mật hoặc hành vi cạnh tranh dữ liệu; không thêm test chỉ để tăng phần trăm coverage.

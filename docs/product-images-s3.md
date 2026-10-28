@@ -1,5 +1,7 @@
 # S3-01 — Kho ảnh sản phẩm trên AWS
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## 1. Mục tiêu và phạm vi
 
 Thêm S3 adapter cho Catalog để mọi EC2 trong ASG dùng cùng kho ảnh private;
@@ -61,16 +63,19 @@ Lệnh chạy lại tại root backend (Java 21, Docker Engine đang chạy):
 
 ```powershell
 ./mvnw.cmd --batch-mode clean verify
-node --test ci/aws-template.test.cjs
-aws cloudformation validate-template --region ap-southeast-1 --template-body file://deploy/aws/shop-lab.yaml
+node --test ci/aws-prod-template.test.cjs ci/aws-vnpay-template.test.cjs ci/aws-trusted-proxy.test.cjs
 git diff --check
 ```
 
 Node checks cần `js-yaml`, Bash và Python; cấu hình `SHOP_YAML_MODULE`,
-`SHOP_BASH`, `SHOP_PYTHON`, `SHOP_FETCH_CFN_SPEC=1` theo
+`SHOP_BASH`, `SHOP_PYTHON` theo
 [runbook AWS](../deploy/aws/README.md#bằng-chứng-kiểm-tra-và-giới-hạn-nghiệm-thu).
 Không cài các công cụ kiểm tra vào image runtime. SDK chỉ sử dụng
 `url-connection-client`; loại các HTTP transport Apache/Netty không dùng.
+
+Template prod vượt giới hạn inline; khi chuẩn bị thay đổi AWS phải chạy các
+gate hạ tầng riêng và dùng artifact S3/TemplateURL, không truyền file prod
+qua `--template-body`. Bộ template/test lab đã được bỏ ngày 27/10/2026.
 
 Bằng chứng local ngày 18/10/2026:
 

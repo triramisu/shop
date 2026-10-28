@@ -1,5 +1,7 @@
 # Chiến lược giữ tồn kho nguyên tử
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Quyết định
 
 Shop dùng atomic conditional update thay vì đọc số dư rồi khóa bi quan:

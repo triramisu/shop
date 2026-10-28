@@ -68,3 +68,12 @@ tree đạt. Tree resolve Guava 33.7.2-jre và Snappy Java 1.1.10.12 qua MinIO
 9.0.3; không đổi API hoặc migration. Đây là kiểm build/resolve, không phải
 full regression: test bị bỏ qua có chủ đích trong riêng lệnh package này;
 required `verify` trên CI vẫn phải chạy đầy đủ với MySQL và MinIO.
+
+## Nghiệm thu PR
+
+[PR #55](https://github.com/triramisu/shop/pull/55) đã merge ngày 28/10 sau
+[CI 40615159069](https://github.com/triramisu/shop/actions/runs/40615159069)
+đạt `verify` và `dependency-review`. Full Maven regression: 737 test,
+0 failure/error/skipped, gồm MySQL/MinIO, migration và kiểm kiến trúc.
+Không hạ threshold hoặc thêm CVE ignore. CI của merge commit và CD vẫn
+phải được kiểm riêng; kết quả PR không tự chứng minh image đang chạy trên AWS.

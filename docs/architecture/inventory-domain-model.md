@@ -1,5 +1,7 @@
 # Mô hình miền Inventory
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Ranh giới module
 
 Inventory sở hữu số dư, biến động và giữ hàng. Inventory không đọc trực tiếp entity, repository hoặc bảng của

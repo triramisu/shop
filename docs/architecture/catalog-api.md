@@ -1,5 +1,7 @@
 # API Catalog công khai và quản trị
 
+[Mục lục tài liệu](../README.md) · [Triển khai](../../deploy/README.md)
+
 ## Phạm vi M2.2–M2.6
 
 M2.2 cung cấp API quản trị category, product và variant trên nền domain M2.1. M2.5 hoàn thiện tìm kiếm theo tên, slug và SKU bằng query/index đã benchmark. M2.6 tách rõ API cửa hàng chỉ đọc khỏi API quản trị và thay phân quyền tạm theo vai trò bằng permission Catalog chi tiết. API dùng request/response DTO riêng và không trả JPA entity ra ngoài module.

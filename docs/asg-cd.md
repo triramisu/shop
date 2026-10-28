@@ -1,5 +1,7 @@
 # CD-ASG-01 — Backend CD qua CloudFormation và Instance Refresh
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần
 
 1. **Mục tiêu/actor/phạm vi:** chủ repo phát hành backend đã qua CI trên main
@@ -170,8 +172,8 @@ cả hai cờ. Cách này bật tự động cho release sau mà không phát h�
 image chỉ vì merge tài liệu bàn giao. Quyền bật cờ sau nghiệm thu đã được
 chủ repo duyệt. Trạng thái cờ thực tế xem tại GitHub Actions Variables.
 
-Lệnh cũ trong docs/runbook/ci-cd.md là luồng single-host lịch sử; không dùng
-deploy/deploy.sh cho ASG dùng RDS/S3.
+Bundle single-host đã được bỏ ngày 27/10/2026. [Mục lục CI/CD](runbook/ci-cd.md)
+hiện trỏ về luồng ASG dùng RDS/S3; các lệnh triển khai một máy còn trong Git history.
 
 ## Luồng vận hành
 

@@ -1,5 +1,7 @@
 # WEB-PAY-01 — Link VNPay và trạng thái thanh toán trên UI
 
+[Mục lục tài liệu](README.md) · [Triển khai](../deploy/README.md)
+
 ## Hợp đồng tám phần (19/10/2026)
 
 1. **Mục tiêu/phạm vi:** sau M5.7A local gate 537 test/image/prod smoke, ưu tiên nối storefront với API đã có để khách tiếp tục thanh toán đơn của mình. Phần SIT/IPN public của M5.7A vẫn chờ HTTPS, không gọi task trước hoàn hảo hoặc đóng M5. Không triển khai refund/query/scheduler, AWS, push hoặc CI/CD. Không thiết kế lại toàn bộ UI.
