@@ -23,12 +23,17 @@ triển khai lab/single-host đã được bỏ; các quyết định cũ còn t
 
 ## 2. Trạng thái hiện tại
 
-- AWS-PROD-ONLY — Chuẩn hóa source local ngày 27/10/2026: chỉ giữ bộ triển khai
+- AWS-PROD-ONLY — Chuẩn hóa source ngày 27/10/2026, phát hành qua
+  [PR #54](https://github.com/triramisu/shop/pull/54): chỉ giữ bộ triển khai
   AWS prod; gỡ lab, Compose single-host và test template lab. CI kiểm template
   prod, còn `compose.yaml`/Spring `dev` giữ cho phát triển local. 172 test Node
   đạt, không skip; Compose dev và actionlint CI/CD đạt. Không sửa Java/schema,
-  template prod, IAM, CD controller hoặc cấu hình runtime đang chạy. Chưa push,
-  merge hoặc thay đổi tài nguyên AWS; không phải nghiệm thu go-live.
+  template prod, IAM, CD controller hoặc cấu hình runtime đang chạy. Hậu kiểm
+  local ngày 28/10 đạt lại 172/172 test, kiểm SHA-256 657 file cần giữ và toàn
+  bộ liên kết nội bộ. Trạng thái required checks/merge theo PR; CI của main
+  và CD phải được kiểm riêng sau merge. CD chạy theo các cờ repository hiện
+  hữu; không tự thay cờ hoặc gọi AWS trực tiếp trong bước dọn source này.
+  Đây không phải nghiệm thu go-live.
 - CD-ASG-01 — Đã nghiệm thu rollout backend qua image-only CloudFormation và
   native ASG Instance Refresh ngày26/10/2026. Không lưu EC2 ID cố định;
   ASG/LT quản lý cả fleet và cấu hình máy được tạo sau release.

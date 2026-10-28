@@ -46,7 +46,7 @@ Máy scale-out sau đó dùng cấu hình/image từ Launch Template đã cập 
 5. Đầu ra: chỉ `aws/` trong deploy, hướng dẫn nhất quán và CI kiểm đúng template prod.
 6. Ca kiểm: đường dẫn cũ không còn được gọi, dev Compose vẫn validate, prod giữ ranh giới network/data/edge.
 7. Gate: test Node của prod/release/bootstrap, workflow lint, liên kết Markdown, diff và SHA-256 file được bảo toàn.
-8. Phát hành/rollback: thay đổi local, chưa push/merge/deploy; khôi phục file từ Git nếu cần rollback source.
+8. Phát hành/rollback: [PR #54](https://github.com/triramisu/shop/pull/54) phải qua `verify` và `dependency-review`, rồi kiểm CI main và CD theo các cờ hiện hữu. Rollback source bằng revert PR; không hoàn tác dữ liệu hoặc tự đổi cờ CD.
 
 `dev` và `prod` là Spring profiles. `foundation` và `application` là hai bước
 bootstrap **cùng một hạ tầng prod**, vẫn cần khi dựng mới. Bộ deployment lab
