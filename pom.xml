@@ -32,7 +32,7 @@
         <h2.version>2.3.232</h2.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <jacoco.version>0.8.13</jacoco.version>
-        <bucket4j.version>8.20.0</bucket4j.version>
+        <bucket4j.version>8.21.0</bucket4j.version>
         <springdoc-openapi.version>3.1.1</springdoc-openapi.version>
         <minio.version>9.0.3</minio.version>
         <guava.version>33.7.2-jre</guava.version>
