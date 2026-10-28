@@ -23,6 +23,13 @@ triển khai lab/single-host đã được bỏ; các quyết định cũ còn t
 
 ## 2. Trạng thái hiện tại
 
+- SEC-DEP-01 — Bản vá mở chặn phát hành ngày 28/10/2026 đã merge qua
+  [PR #55](https://github.com/triramisu/shop/pull/55): quản lý Guava
+  33.7.2-jre và Snappy Java 1.1.10.12 thay dependency bắc cầu có bốn CVE.
+  [CI của PR](https://github.com/triramisu/shop/actions/runs/40615159069)
+  đạt `verify`/`dependency-review`, 737 test, 0 failure/error/skipped.
+  [Hợp đồng, finding và nguồn phiên bản](docs/quality/storage-dependency-security.md).
+  CI main và CD được kiểm riêng; không đổi nghiệp vụ/schema hoặc hạ gate.
 - AWS-PROD-ONLY — Chuẩn hóa source ngày 27/10/2026, phát hành qua
   [PR #54](https://github.com/triramisu/shop/pull/54): chỉ giữ bộ triển khai
   AWS prod; gỡ lab, Compose single-host và test template lab. CI kiểm template

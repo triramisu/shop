@@ -74,6 +74,7 @@ SIT provider thật. Đọc ngày/bằng chứng/phạm vi và các ca còn thi�
 | --- | --- |
 | [Ma trận test Identity](quality/identity-test-matrix.md) | Các nhóm ca kiểm thử xác thực và quản trị |
 | [Ma trận USER/token/ownership](demo-user-authorization-matrix.md) | Kiểm tra quyền theo người dùng và chủ sở hữu tài nguyên |
+| [Vá dependency object storage](quality/storage-dependency-security.md) | Finding Guava/Snappy, phiên bản đã chọn và gate phát hành |
 
 ## Kế hoạch và lịch sử cấu trúc
 
